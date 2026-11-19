@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jewellery by Riddhi - Handmade Jewellery</title>
+  <!-- Bootstrap 5 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Bootstrap Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,500&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- Navbar -->
+  <nav class="navbar sticky-top px-3">
+    <div class="container d-flex justify-content-between align-items-center">
+      <div class="d-flex align-items-center gap-2" style="cursor:pointer;" onclick="showHome()">
+        <img src="assets/logo.png" alt="Jewellery by Riddhi logo" class="brand-logo">
+      </div>
+
+      <div class="d-flex align-items-center gap-2">
+        <!-- Cart Icon Button -->
+        <button class="btn btn-outline-dark position-relative" data-bs-toggle="offcanvas" data-bs-target="#cartOffcanvas">
+          <i class="bi bi-bag-heart fs-5"></i>
+          <span id="navCartCount" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+            0
+          </span>
+        </button>
+        <!-- Hamburger Menu -->
+        <button class="btn btn-outline-secondary" type="button" data-bs-toggle="offcanvas" data-bs-target="#menuOffcanvas">
+          <i class="bi bi-list fs-4"></i>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Menu Slider (Offcanvas) -->
+  <div class="offcanvas offcanvas-end" tabindex="-1" id="menuOffcanvas">
+    <div class="offcanvas-header" style="background-color: var(--primary-green); color: #fff;">
+      <h5 class="offcanvas-title brand-font"><img src="assets/logo.png" alt="Jewellery by Riddhi logo" class="brand-logo-sidebar"></h5>
+      <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"></button>
+    </div>
+    <div class="offcanvas-body" style="background-color: var(--cream-bg);">
+      <ul class="list-group list-group-flush">
+        <li class="list-group-item bg-transparent"><a href="#" class="text-decoration-none text-dark fw-medium" onclick="showHome()" data-bs-dismiss="offcanvas">Home</a></li>
+        <li class="list-group-item bg-transparent"><a href="#" class="text-decoration-none text-dark fw-medium" onclick="openCategory('Choker')" data-bs-dismiss="offcanvas">Choker Collection</a></li>
+        <li class="list-group-item bg-transparent"><a href="#about" class="text-decoration-none text-dark fw-medium" data-bs-dismiss="offcanvas">About Us</a></li>
+        <li class="list-group-item bg-transparent"><a href="#care" class="text-decoration-none text-dark fw-medium" data-bs-dismiss="offcanvas">How to Order & Care Guide</a></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- HERO SECTION -->
+  <section class="hero-section text-center" id="heroSection">
+    <div class="container">
+      <p class="text-uppercase small fw-semibold mb-1" style="color: var(--accent-gold); letter-spacing: 1.5px;">Handmade Jewellery</p>
+      <h1 class="display-5 fw-bold mb-2" style="color: var(--primary-green);">Timeless Beauty, Made by Hand</h1>
+      <p class="text-muted mx-auto mb-4" style="max-width: 500px;">Explore our exclusive collection of handmade jewellery crafted with love and perfection.</p>
+      <button class="btn btn-green px-4 py-2 rounded-pill" onclick="openCategory('Choker')">
+        <i class="bi bi-bag-check me-1"></i> Explore Chokers
+      </button>
+    </div>
+  </section>
+
+  <!-- VIEW 1: SHOP BY CATEGORY (HOME) -->
+  <section class="container my-5" id="categorySection">
+    <div class="text-center mb-4">
+      <h3 class="section-title">✦ Shop by Category ✦</h3>
+    </div>
+
+    <div class="row g-3 g-md-4">
+      <!-- Choker Category (Clickable) -->
+      <div class="col-6 col-md-4 col-lg-3">
+        <div class="custom-card" onclick="openCategory('Choker')">
+          <img src="assets/Categories/Choker-Category.jpeg" alt="Choker">
+          <div class="card-footer-title">Choker</div>
+        </div>
+      </div>
+
+      <!-- Necklaces -->
+      <div class="col-6 col-md-4 col-lg-3">
+        <div class="custom-card" onclick="openCategory('Necklaces')">
+          <img src="assets/Categories/Necklaces-Category.jpeg" alt="Necklaces">
+          <div class="card-footer-title">Necklaces</div>
+        </div>
+      </div>
+
+      <!-- Mangalsutra -->
+      <div class="col-6 col-md-4 col-lg-3">
+        <div class="custom-card" onclick="openCategory('Mangalsutra')">
+          <img src="assets/Categories/Mangalsutra-Category.jpeg" alt="Mangalsutra">
+          <div class="card-footer-title">Mangalsutra</div>
+        </div>
+      </div>
+
+      <!-- Earrings -->
+      <div class="col-6 col-md-4 col-lg-3">
+        <div class="custom-card" onclick="openCategory('Earrings')">
+          <img src="assets/Categories/Earrings-Category.jpeg" alt="Earrings">
+          <div class="card-footer-title">Earrings</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- VIEW 2: CATEGORY PRODUCTS LISTING (e.g., ALL CHOKERS) -->
+  <section class="container my-4 d-none" id="productListSection">
+    <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
+      <button class="btn btn-outline-dark btn-sm rounded-pill px-3" onclick="showHome()">
+        <i class="bi bi-arrow-left"></i> Back to Categories
+      </button>
+      <h3 class="brand-font fw-bold m-0" id="categoryHeading" style="color: var(--primary-green);">Choker Collection</h3>
+      <span class="badge bg-secondary" id="productCountBadge">0 Items</span>
+    </div>
+
+    <!-- Products Grid -->
+    <div class="row g-3 g-md-4" id="productsGrid">
+      <!-- JavaScript se yahan products load honge -->
+    </div>
+  </section>
+
+  <!-- PRODUCT DETAIL & CUSTOMIZATION MODAL -->
+  <div class="modal fade" id="productModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content" style="background-color: var(--cream-bg); border-radius: 15px;">
+        <div class="modal-header border-0 pb-0">
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body pt-0">
+          <div class="row g-4 align-items-center">
+            <!-- Product Image -->
+            <div class="col-md-6 text-center">
+              <img id="modalImg" src="" alt="Product" class="img-fluid rounded-3 shadow-sm" style="max-height: 320px; width: 100%; object-fit: cover;">
+            </div>
+
+            <!-- Product Options -->
+            <div class="col-md-6">
+              <span class="badge mb-2" style="background-color: var(--accent-gold);" id="modalCategory">Choker</span>
+              <h3 class="brand-font fw-bold" id="modalTitle" style="color: var(--primary-green);">Product Name</h3>
+              <h4 class="fw-bold my-2" style="color: #b0881e;">₹<span id="modalPrice">0</span></h4>
+              <p class="small text-muted" id="modalDesc">Handcrafted traditional design with adjustable dori.</p>
+
+              <!-- Size Selector -->
+              <div class="mb-3">
+                <label class="form-label fw-semibold small">Select Size:</label>
+                <select class="form-select form-select-sm" id="modalSize">
+                  <option value="Free Size (Adjustable Dori)">Free Size (Adjustable Dori)</option>
+                  <option value="Small / Kids">Small / Kids</option>
+                  <option value="Medium (Standard)">Medium (Standard)</option>
+                  <option value="Large">Large</option>
+                </select>
+              </div>
+
+              <!-- Quantity Selector -->
+              <div class="mb-3">
+                <label class="form-label fw-semibold small">Quantity (Kitne piece chahiye):</label>
+                <div class="input-group input-group-sm" style="width: 130px;">
+                  <button class="btn btn-outline-secondary" type="button" onclick="changeModalQty(-1)">-</button>
+                  <input type="text" class="form-control text-center fw-bold" id="modalQty" value="1" readonly>
+                  <button class="btn btn-outline-secondary" type="button" onclick="changeModalQty(1)">+</button>
+                </div>
+              </div>
+
+              <!-- Customization Box -->
+              <div class="mb-3">
+                <label class="form-label fw-semibold small">
+                  Customization Note <span class="text-muted fw-normal">(Optional)</span>:
+                </label>
+                <textarea class="form-control form-control-sm" id="modalCustom" rows="2" 
+                  placeholder="E.g. 1 piece Red aur 2 piece Green colour me chahiye, ya size custom chahiye..."></textarea>
+              </div>
+
+              <!-- Action Buttons -->
+              <div class="d-grid gap-2 d-sm-flex mt-4">
+                <button class="btn btn-outline-dark flex-fill fw-medium" onclick="addToCartFromModal()">
+                  <i class="bi bi-cart-plus me-1"></i> Add to Cart
+                </button>
+                <button class="btn btn-green flex-fill fw-medium" onclick="orderSingleNow()">
+                  <i class="bi bi-whatsapp me-1"></i> Order Now
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CART OFFCANVAS (MULTIPLE PRODUCTS) -->
+  <div class="offcanvas offcanvas-end" tabindex="-1" id="cartOffcanvas">
+    <div class="offcanvas-header" style="background-color: var(--primary-green); color: #fff;">
+      <h5 class="offcanvas-title brand-font"><i class="bi bi-bag-heart me-2"></i>Your Shopping Cart</h5>
+      <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"></button>
+    </div>
+    <div class="offcanvas-body d-flex flex-column justify-content-between" style="background-color: var(--cream-bg);">
+      <div id="cartItemsContainer">
+        <!-- Cart items yahan dikhenge -->
+      </div>
+
+      <div class="border-top pt-3 mt-3">
+        <div class="mb-2">
+          <label class="form-label small fw-semibold">Your Name / City (Optional):</label>
+          <input type="text" id="customerName" class="form-control form-control-sm" placeholder="Enter your name">
+        </div>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <span class="fw-bold fs-5">Total Amount:</span>
+          <span class="fw-bold fs-5" style="color: var(--primary-green);">₹<span id="cartTotal">0</span></span>
+        </div>
+        <button class="btn btn-green w-100 py-2 fw-semibold" onclick="checkoutWhatsApp()">
+          <i class="bi bi-whatsapp me-1"></i> Order All on WhatsApp
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Floating Cart Button (Visible when items > 0) -->
+  <div class="floating-cart d-none" id="floatingCartBtn" data-bs-toggle="offcanvas" data-bs-target="#cartOffcanvas">
+    <i class="bi bi-bag-check-fill fs-5" style="color: var(--accent-gold);"></i>
+    <span class="fw-medium small"><span id="floatCount">0</span> Items | ₹<span id="floatTotal">0</span></span>
+  </div>
+
+  <!-- Footer -->
+  <footer class="text-center">
+    <div class="container">
+      <h4 class="brand-font fw-bold mb-2">Jewellery by Riddhi</h4>
+      <p class="small text-light opacity-75 mb-3">For orders and enquiries, get in touch with us.</p>
+      <a href="https://wa.me/918412981213" target="_blank" class="btn btn-gold px-4 py-2 rounded-pill mb-3">
+        <i class="bi bi-whatsapp me-1"></i> Message on WhatsApp
+      </a>
+      <p class="small mb-0 opacity-50">© Jewellery by Riddhi</p>
+    </div>
+  </footer>
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+    // ==========================================
+    // 1. APNA WHATSAPP NUMBER YAHAN DALEIN (91 ke sath)
+    // ==========================================
+    const WHATSAPP_NUMBER = "918412981213"; // <-- Yahan apna 10 digit number 91 lagakar likhein
+
+    // ==========================================
+    // 2. PRODUCTS DATABASE (Aap yahan aur products aur apni image URL add kar sakte hain)
+    // ==========================================
+    const products = [
+      {
+        id: "CHK-01",
+        category: "Choker",
+        name: "Royal Red Floral Handmade Choker",
+        price: 499,
+        image: "./assets/Categories/Choker/Choker-1.jpeg",
+        desc: "Traditional handmade choker with intricate beadwork and adjustable soft dori."
+      },
+      {
+        id: "CHK-02",
+        category: "Choker",
+        name: "Emerald Green Pearl Choker Set",
+        price: 650,
+        image: "./assets/Categories/Choker/Choker-Set.png",
+        desc: "Handcrafted green stones with white moti detailing, comes with matching studs."
+      },
+      // {
+      //   id: "CHK-03",
+      //   category: "Choker",
+      //   name: "Maharashtrian Traditional Gold Choker",
+      //   price: 550,
+      //   image: "https://images.unsplash.com/photo-1611591437281-460bfbe1220a?auto=format&fit=crop&w=600&q=80",
+      //   desc: "Classic festive wear choker lightweight and comfortable for all-day wear."
+      // },
+      // {
+      //   id: "CHK-04",
+      //   category: "Choker",
+      //   name: "Kundan & Mirror Work Bridal Choker",
+      //   price: 799,
+      //   image: "https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?auto=format&fit=crop&w=600&q=80",
+      //   desc: "Premium handmade mirror & kundan choker ideal for weddings and haldi functions."
+      // },
+      {
+        id: "NCK-01",
+        category: "Necklaces",
+        name: "Leaf Design Green Handmade Necklace",
+        price: 599,
+        image: "https://images.unsplash.com/photo-1601121141799-c0ea464627f1?auto=format&fit=crop&w=600&q=80",
+        desc: "Delicate handmade leaf pattern necklace."
+      },
+      {
+        id: "MNG-01",
+        category: "Mangalsutra",
+        name: "Traditional Red Pendal Mangalsutra",
+        price: 450,
+        image: "https://images.unsplash.com/photo-1611591437281-460bfbe1220a?auto=format&fit=crop&w=600&q=80",
+        desc: "Handmade black beads mangalsutra with red floral centerpiece."
+      },
+      {
+        id: "EAR-01",
+        category: "Earrings",
+        name: "Handcrafted Red Stud Earrings",
+        price: 250,
+        image: "https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?auto=format&fit=crop&w=600&q=80",
+        desc: "Lightweight festive handmade earrings."
+      }
+    ];
+
+    let cart = [];
+    let currentProduct = null;
+    const productModal = new bootstrap.Modal(document.getElementById('productModal'));
+
+    // ==========================================
+    // 3. CATEGORY NAVIGATION
+    // ==========================================
+    function openCategory(categoryName) {
+      document.getElementById('heroSection').classList.add('d-none');
+      document.getElementById('categorySection').classList.add('d-none');
+      document.getElementById('productListSection').classList.remove('d-none');
+
+      document.getElementById('categoryHeading').innerText = categoryName + " Collection";
+
+      const filtered = products.filter(p => p.category.toLowerCase() === categoryName.toLowerCase());
+      document.getElementById('productCountBadge').innerText = filtered.length + " Items";
+
+      const grid = document.getElementById('productsGrid');
+      grid.innerHTML = "";
+
+      filtered.forEach(prod => {
+        grid.innerHTML += `
+          <div class="col-6 col-md-4 col-lg-3">
+            <div class="product-card" onclick="openProductDetail('${prod.id}')">
+              <div>
+                <img src="${prod.image}" alt="${prod.name}">
+                <div class="p-3">
+                  <small class="text-muted d-block mb-1">${prod.id}</small>
+                  <h6 class="fw-semibold mb-2 text-dark">${prod.name}</h6>
+                </div>
+              </div>
+              <div class="px-3 pb-3 d-flex justify-content-between align-items-center">
+                <span class="price-tag">₹${prod.price}</span>
+                <span class="btn btn-sm btn-green rounded-pill px-3">Select</span>
+              </div>
+            </div>
+          </div>
+        `;
+      });
+      window.scrollTo(0, 0);
+    }
+
+    function showHome() {
+      document.getElementById('heroSection').classList.remove('d-none');
+      document.getElementById('categorySection').classList.remove('d-none');
+      document.getElementById('productListSection').classList.add('d-none');
+    }
+
+    // ==========================================
+    // 4. PRODUCT DETAIL POPUP
+    // ==========================================
+    function openProductDetail(productId) {
+      currentProduct = products.find(p => p.id === productId);
+      if (!currentProduct) return;
+
+      document.getElementById('modalImg').src = currentProduct.image;
+      document.getElementById('modalCategory').innerText = currentProduct.category;
+      document.getElementById('modalTitle').innerText = currentProduct.name;
+      document.getElementById('modalPrice').innerText = currentProduct.price;
+      document.getElementById('modalDesc').innerText = currentProduct.desc;
+
+      // Reset inputs
+      document.getElementById('modalSize').selectedIndex = 0;
+      document.getElementById('modalQty').value = 1;
+      document.getElementById('modalCustom').value = "";
+
+      productModal.show();
+    }
+
+    function changeModalQty(delta) {
+      const qtyInput = document.getElementById('modalQty');
+      let val = parseInt(qtyInput.value) + delta;
+      if (val < 1) val = 1;
+      qtyInput.value = val;
+    }
+
+    // ==========================================
+    // 5. CART LOGIC (WITH CUSTOMIZATION SUPPORT)
+    // ==========================================
+    function addToCartFromModal() {
+      const size = document.getElementById('modalSize').value;
+      const qty = parseInt(document.getElementById('modalQty').value);
+      const customNote = document.getElementById('modalCustom').value.trim();
+
+      // Agar same product, same size aur same customization pehle se cart me hai toh quantity badhayein
+      const existingIndex = cart.findIndex(item => 
+        item.id === currentProduct.id && 
+        item.size === size && 
+        item.customNote === customNote
+      );
+
+      if (existingIndex > -1) {
+        cart[existingIndex].qty += qty;
+      } else {
+        cart.push({
+          ...currentProduct,
+          size: size,
+          qty: qty,
+          customNote: customNote
+        });
+      }
+
+      updateCartUI();
+      productModal.hide();
+
+      // Cart drawer open karein taaki user ko dikhe ki add ho gaya
+      const cartCanvas = new bootstrap.Offcanvas(document.getElementById('cartOffcanvas'));
+      cartCanvas.show();
+    }
+
+    function updateCartItemQty(index, delta) {
+      cart[index].qty += delta;
+      if (cart[index].qty <= 0) {
+        cart.splice(index, 1);
+      }
+      updateCartUI();
+    }
+
+    function removeCartItem(index) {
+      cart.splice(index, 1);
+      updateCartUI();
+    }
+
+    function updateCartUI() {
+      const container = document.getElementById('cartItemsContainer');
+      const navCount = document.getElementById('navCartCount');
+      const floatBtn = document.getElementById('floatingCartBtn');
+
+      let totalQty = 0;
+      let totalPrice = 0;
+
+      if (cart.length === 0) {
+        container.innerHTML = `<div class="text-center text-muted my-5"><i class="bi bi-bag-x fs-1"></i><p class="mt-2">Your cart is empty.</p></div>`;
+        navCount.innerText = "0";
+        document.getElementById('cartTotal').innerText = "0";
+        floatBtn.classList.add('d-none');
+        return;
+      }
+
+      container.innerHTML = "";
+      cart.forEach((item, index) => {
+        totalQty += item.qty;
+        totalPrice += item.price * item.qty;
+
+        container.innerHTML += `
+          <div class="card mb-3 border-0 shadow-sm">
+            <div class="card-body p-2 d-flex gap-2 align-items-center">
+              <img src="${item.image}" style="width: 65px; height: 65px; object-fit: cover; border-radius: 8px;">
+              <div class="flex-grow-1">
+                <h6 class="mb-0 small fw-bold">${item.name}</h6>
+                <small class="text-muted d-block" style="font-size: 11px;">Size: ${item.size}</small>
+                ${item.customNote ? `<small class="text-success d-block" style="font-size: 11px;"><strong>Note:</strong> ${item.customNote}</small>` : ''}
+                <div class="d-flex justify-content-between align-items-center mt-1">
+                  <span class="fw-bold small" style="color: var(--primary-green);">₹${item.price * item.qty}</span>
+                  <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-secondary py-0 px-2" onclick="updateCartItemQty(${index}, -1)">-</button>
+                    <span class="btn btn-light py-0 px-2 disabled text-dark fw-bold">${item.qty}</span>
+                    <button class="btn btn-outline-secondary py-0 px-2" onclick="updateCartItemQty(${index}, 1)">+</button>
+                  </div>
+                </div>
+              </div>
+              <button class="btn btn-sm text-danger" onclick="removeCartItem(${index})"><i class="bi bi-trash"></i></button>
+            </div>
+          </div>
+        `;
+      });
+
+      navCount.innerText = totalQty;
+      document.getElementById('cartTotal').innerText = totalPrice;
+
+      // Floating Cart Update
+      floatBtn.classList.remove('d-none');
+      document.getElementById('floatCount').innerText = totalQty;
+      document.getElementById('floatTotal').innerText = totalPrice;
+    }
+
+    // ==========================================
+    // 6. WHATSAPP ORDER REDIRECTION
+    // ==========================================
+    // Option A: Single Product Direct "Order Now"
+    function orderSingleNow() {
+      const size = document.getElementById('modalSize').value;
+      const qty = parseInt(document.getElementById('modalQty').value);
+      const customNote = document.getElementById('modalCustom').value.trim();
+      const total = currentProduct.price * qty;
+
+      let message = `Hello *Jewellery by Riddhi*! ✨\nI want to place an order:\n\n`;
+      message += `*1. ${currentProduct.name}* (${currentProduct.id})\n`;
+      message += `   • Size: ${size}\n`;
+      message += `   • Quantity: ${qty}\n`;
+      message += `   • Price: ₹${currentProduct.price} x ${qty} = ₹${total}\n`;
+      if (customNote) {
+        message += `   • Customization: _${customNote}_\n`;
+      }
+      message += `\n*Total Amount: ₹${total}*\nPlease confirm availability and payment details.`;
+
+      sendToWhatsApp(message);
+    }
+
+    // Option B: Multiple Products from Cart "Order All on WhatsApp"
+    function checkoutWhatsApp() {
+      if (cart.length === 0) {
+        alert("Please add at least one product to your cart!");
+        return;
+      }
+
+      const custName = document.getElementById('customerName').value.trim();
+      let grandTotal = 0;
+
+      let message = `Hello *Jewellery by Riddhi*! ✨\n`;
+      if (custName) message += `Customer: *${custName}*\n`;
+      message += `I would like to order the following items:\n\n`;
+
+      cart.forEach((item, idx) => {
+        const itemTotal = item.price * item.qty;
+        grandTotal += itemTotal;
+
+        message += `*${idx + 1}. ${item.name}* (${item.id})\n`;
+        message += `   • Size: ${item.size}\n`;
+        message += `   • Qty: ${item.qty} (₹${item.price} each)\n`;
+        if (item.customNote) {
+          message += `   • Customization: _${item.customNote}_\n`;
+        }
+        message += `   • Subtotal: ₹${itemTotal}\n\n`;
+      });
+
+      message += `------------------------\n`;
+      message += `*Grand Total: ₹${grandTotal}*\n`;
+      message += `Please share payment details to confirm my order.`;
+
+      sendToWhatsApp(message);
+    }
+
+    function sendToWhatsApp(text) {
+      const encodedText = encodeURIComponent(text);
+      const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodedText}`;
+      window.open(url, '_blank');
+    }
+  </script>
+</body>
+</html>
