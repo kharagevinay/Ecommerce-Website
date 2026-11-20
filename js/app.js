@@ -33,6 +33,7 @@ document.addEventListener("DOMContentLoaded", () => {
   syncPendingOrders();
   updateAdminMenuLabel();
   checkAdminHash();
+  refreshAdminHistory();
 });
 
 // ==========================================
@@ -658,7 +659,18 @@ function saveOrderToHistory(orderRecord) {
 function renderMyOrders() {
   const container = document.getElementById("myOrdersListContainer");
   const badge = document.getElementById("navOrdersCount");
-  const orders = getLocalOrders();
+  const adminView = isAdminLoggedIn();
+  // Admin ko yahan saare customers ke orders dikhte hain, customer ko sirf apne
+  const orders = adminView
+    ? adminOrders.slice().sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+    : getLocalOrders();
+
+  const titleEl = document.querySelector("#myOrdersOffcanvas .offcanvas-title");
+  if (titleEl) titleEl.innerHTML = adminView
+    ? `<i class="bi bi-receipt-cutoff me-2"></i>All Orders (Admin)`
+    : `<i class="bi bi-receipt-cutoff me-2"></i>My Placed Orders`;
+  const footEl = document.querySelector("#myOrdersOffcanvas .border-top");
+  if (footEl) footEl.classList.toggle("d-none", adminView);
 
   if (badge) {
     if (orders.length > 0) {
@@ -674,7 +686,7 @@ function renderMyOrders() {
     container.innerHTML = `
       <div class="text-center text-muted my-5">
         <i class="bi bi-receipt fs-1"></i>
-        <p class="mt-2 small">You haven't placed any orders on this device yet.</p>
+        <p class="mt-2 small">${adminView ? "No orders yet." : "You haven't placed any orders on this device yet."}</p>
       </div>`;
     return;
   }
@@ -683,7 +695,10 @@ function renderMyOrders() {
     const cust = ord.customer || {};
     let cleanCustPhone = (cust.mobile || "").replace(/[^0-9]/g, "");
     if (cleanCustPhone.length === 10) cleanCustPhone = "91" + cleanCustPhone;
-    const waSelfUrl = `https://wa.me/${cleanCustPhone}?text=${encodeURIComponent(ord.fullMessage || "")}`;
+    const waSelfUrl = adminView
+      ? `https://wa.me/${cleanCustPhone}`
+      : `https://wa.me/${cleanCustPhone}?text=${encodeURIComponent(ord.fullMessage || "")}`;
+    const waLabel = adminView ? "Chat with Customer" : "Send Copy to My WhatsApp";
     const itemsHtml = ord.items ? buildItemsHtml(ord.items) : (ord.itemsHtml || "");
 
     return `
@@ -700,7 +715,7 @@ function renderMyOrders() {
             ${esc(cust.address)}, ${esc(cust.city)} - ${esc(cust.pincode)}
           </div>
           <a href="${waSelfUrl}" target="_blank" rel="noopener" class="btn btn-outline-success btn-sm w-100 rounded-pill" style="font-size: 11px;">
-            <i class="bi bi-whatsapp me-1"></i> Send Copy to My WhatsApp
+            <i class="bi bi-whatsapp me-1"></i> ${waLabel}
           </a>
         </div>
       </div>`;
@@ -852,6 +867,21 @@ function checkAdminHash() {
 }
 window.addEventListener("hashchange", checkAdminHash);
 
+// Order history khulte hi admin ke liye taaza data laata hai
+async function refreshAdminHistory() {
+  if (!isAdminLoggedIn()) return;
+  try {
+    if (await loadAdminOrders()) renderMyOrders();
+    else renderMyOrders();
+  } catch (e) { /* purana data dikhta rahega */ }
+}
+document.addEventListener("show.bs.offcanvas", ev => {
+  if (ev.target && ev.target.id === "myOrdersOffcanvas") {
+    renderMyOrders();
+    refreshAdminHistory();
+  }
+});
+
 function handleAdminClick() {
   if (isAdminLoggedIn()) openAllCustomersModal();
   else openAdminLogin();
@@ -922,6 +952,7 @@ async function submitAdminLogin(e) {
     clearAdminFails();
     sessionStorage.setItem("riddhi_admin_session", JSON.stringify(session));
     updateAdminMenuLabel();
+    renderMyOrders();
 
     const loginEl = document.getElementById("adminLoginModal");
     loginEl.addEventListener("hidden.bs.modal", () => openAllCustomersModal(true), { once: true });
@@ -938,6 +969,7 @@ async function adminLogout() {
   sessionStorage.removeItem("riddhi_admin_session");
   adminOrders = [];
   updateAdminMenuLabel();
+  renderMyOrders();
   const panel = document.getElementById("allCustomersModal");
   if (panel) bootstrap.Modal.getOrCreateInstance(panel).hide();
   if (s && s.mode === "sheet" && APPS_SCRIPT_URL) {
@@ -1007,6 +1039,7 @@ async function refreshAdminPanel() {
     return;
   }
   renderAllCustomersSummary();
+  renderMyOrders();
 }
 
 const RECENT_DAYS = 7;
