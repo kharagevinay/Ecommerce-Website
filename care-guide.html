@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Care Guide - Jewellery by Riddhi</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,500&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <nav class="navbar sticky-top px-2 px-md-3">
+    <div class="container d-flex justify-content-between align-items-center">
+      <a href="index.html" class="d-flex align-items-center gap-2 text-decoration-none">
+        <img src="assets/logo.png" alt="Jewellery by Riddhi Logo" class="brand-logo-img">
+        <span class="brand-font fw-bold fs-5" style="color: var(--primary-green);">Jewellery by Riddhi</span>
+      </a>
+      <div class="d-flex gap-2">
+        <button class="btn btn-outline-success btn-sm rounded-pill px-3 position-relative" data-bs-toggle="offcanvas" data-bs-target="#myOrdersOffcanvas"><i class="bi bi-receipt-cutoff me-1"></i>My Orders <span id="navOrdersCount" class="badge bg-success rounded-pill d-none">0</span></button>
+        <a href="index.html" class="btn btn-outline-dark btn-sm rounded-pill px-3">Home</a>
+        <a href="about.html" class="btn btn-green btn-sm rounded-pill px-3">About Us</a>
+      </div>
+    </div>
+  </nav>
+
+  <section class="container my-5">
+    <div class="info-card shadow-sm">
+      <div class="text-center mb-4">
+        <span class="badge mb-2" style="background-color: var(--accent-gold);">Jewellery Care</span>
+        <h1 class="brand-font fw-bold" style="color: var(--primary-green);">Handmade Jewellery Care Guide</h1>
+        <p class="text-muted small">Simple care habits help preserve the shine, thread strength, and finish of your handmade jewellery.</p>
+      </div>
+
+      <div class="row g-3">
+        <div class="col-md-6">
+          <div class="p-3 rounded-3 h-100" style="background-color: var(--cream-bg); border: 1px solid #eadbc8;">
+            <h6 class="fw-bold" style="color: var(--primary-green);"><i class="bi bi-droplet-half me-2 text-warning"></i>1. Avoid Moisture, Perfume & Chemicals</h6>
+            <p class="small text-muted mb-0">Wear jewellery as the final step after applying perfume, hairspray, or creams. Keep away from water and sweat.</p>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="p-3 rounded-3 h-100" style="background-color: var(--cream-bg); border: 1px solid #eadbc8;">
+            <h6 class="fw-bold" style="color: var(--primary-green);"><i class="bi bi-box2-heart me-2 text-warning"></i>2. Airtight Storage</h6>
+            <p class="small text-muted mb-0">Store each piece individually inside an airtight zip-lock pouch or soft cloth box in a cool, dry place.</p>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="p-3 rounded-3 h-100" style="background-color: var(--cream-bg); border: 1px solid #eadbc8;">
+            <h6 class="fw-bold" style="color: var(--primary-green);"><i class="bi bi-brush me-2 text-warning"></i>3. Soft Dry Wipe</h6>
+            <p class="small text-muted mb-0">Wipe gently with a soft, dry cotton or microfiber cloth after wearing; never use harsh liquids or brushes.</p>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="p-3 rounded-3 h-100" style="background-color: var(--cream-bg); border: 1px solid #eadbc8;">
+            <h6 class="fw-bold" style="color: var(--primary-green);"><i class="bi bi-shield-check me-2 text-warning"></i>4. Gentle Handling</h6>
+            <p class="small text-muted mb-0">Handle adjustable doris, pearl strands, and delicate kundan/beadwork gently without tugging or crushing.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="d-flex justify-content-center gap-2 flex-wrap mt-4">
+        <button class="btn btn-outline-dark btn-sm rounded-pill px-3" onclick="openPolicyModal('shipping')">Shipping Policy</button>
+        <button class="btn btn-outline-dark btn-sm rounded-pill px-3" onclick="openPolicyModal('return')">Return Policy</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- MY ORDERS OFFCANVAS -->
+  <div class="offcanvas offcanvas-end" tabindex="-1" id="myOrdersOffcanvas">
+    <div class="offcanvas-header" style="background-color: var(--primary-green); color: #fff;">
+      <h5 class="offcanvas-title brand-font"><i class="bi bi-receipt-cutoff me-2"></i>My Placed Orders</h5>
+      <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"></button>
+    </div>
+    <div class="offcanvas-body d-flex flex-column justify-content-between" style="background-color: var(--cream-bg);">
+      <div id="myOrdersListContainer"></div>
+      <div class="border-top pt-2 mt-2 text-center">
+        <small class="text-muted d-block mb-2" style="font-size: 11px;">Orders placed on this device are saved here automatically.</small>
+        <button class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="clearOrderHistory()">Clear History</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="policyModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content" style="background-color: var(--cream-bg); border-radius: 16px;">
+        <div class="modal-header" style="background-color: var(--primary-green); color: #fff;">
+          <h5 class="modal-title brand-font" id="policyModalTitle">Policy Details</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body" id="policyModalBody"></div>
+        <div class="modal-footer border-0">
+          <button type="button" class="btn btn-green btn-sm px-4 rounded-pill" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <footer>
+    <div class="container">
+      <div class="row g-4 align-items-center text-center text-md-start">
+        <div class="col-md-4">
+          <div class="d-flex align-items-center justify-content-center justify-content-md-start gap-2 mb-2">
+            <img src="assets/logo.png" alt="Jewellery by Riddhi" class="brand-logo-img">
+            <h4 class="brand-font fw-bold m-0" style="color: var(--accent-gold);">Jewellery by Riddhi</h4>
+          </div>
+          <p class="small text-light opacity-75 mb-2">Handcrafted with love. Discover thoughtfully designed handmade jewellery for your special moments.</p>
+          <div class="d-flex justify-content-center justify-content-md-start gap-3 small flex-wrap">
+            <a href="index.html" class="text-light text-decoration-none">Home</a>
+            <a href="about.html" class="text-light text-decoration-none">About Us</a>
+            <a href="care-guide.html" class="text-light text-decoration-none">Care Guide</a>
+            <a href="javascript:void(0)" class="text-warning text-decoration-none" onclick="openPolicyModal('shipping')">Shipping Policy</a>
+            <a href="javascript:void(0)" class="text-warning text-decoration-none" onclick="openPolicyModal('return')">Return Policy</a>
+          </div>
+        </div>
+
+        <div class="col-md-4 text-center">
+          <h6 class="fw-semibold mb-2">Direct Order & Enquiry</h6>
+          <p class="small mb-2 text-light opacity-75">
+            <i class="bi bi-whatsapp text-success me-1"></i> WhatsApp: <strong>+91 84129 81213</strong>
+          </p>
+          <a href="https://wa.me/918412981213?text=Hello%20Jewellery%20by%20Riddhi!%20I%20have%20an%20enquiry." target="_blank" class="btn btn-gold px-4 py-2 rounded-pill">
+            <i class="bi bi-whatsapp me-1"></i> Message on WhatsApp
+          </a>
+        </div>
+
+        <div class="col-md-4 text-center text-md-end">
+          <div class="qr-box shadow">
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://www.instagram.com/jewellery_by_riddhi/" alt="Instagram QR Code">
+            <div class="fw-bold mt-1" style="color: var(--primary-green); font-size: 12px;">
+              <i class="bi bi-instagram text-danger me-1"></i>@jewellery_by_riddhi
+            </div>
+            <div class="text-muted" style="font-size: 10px;">Scan to view Instagram Profile</div>
+          </div>
+        </div>
+      </div>
+
+      <hr class="border-light opacity-25 my-3">
+      <p class="text-center small mb-0 opacity-75">© 2026 Jewellery by Riddhi. All Rights Reserved.</p>
+    </div>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
