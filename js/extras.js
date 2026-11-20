@@ -38,3 +38,7 @@ const INDIAN_CITIES = [
   "Kochi","Thiruvananthapuram","Kozhikode","Thrissur","Kollam","Kannur","Alappuzha","Palakkad","Kottayam","Malappuram",
   "Panaji","Margao","Vasco da Gama","Mapusa","Silvassa","Daman","Diu"
 ];
+
+// Website ka asli https link (WhatsApp message me logo ka link isi se banta hai). Khaali chhodne par current page ka link use hota hai.
+// Example: const SITE_BASE_URL = "https://www.jewelleryByriddhi.com";
+const SITE_BASE_URL = "";

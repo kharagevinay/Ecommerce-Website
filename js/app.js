@@ -596,8 +596,37 @@ function cancelOrderConfirmation() {
   confirmOrderModalInstance.hide();
 }
 
+// ---- WhatsApp message branding ----
+// wa.me links sirf text bhejte hain (file attach nahi hoti), isliye logo ka link message me jata hai;
+// WhatsApp us link ko photo preview ki tarah dikha deta hai (site https par hosted ho tab).
+function logoUrl() {
+  try {
+    if (typeof SITE_BASE_URL !== "undefined" && SITE_BASE_URL) return SITE_BASE_URL.replace(/\/+$/, "") + "/assets/logo.png";
+    const u = new URL("assets/logo.png", location.href);
+    return u.protocol === "https:" || u.protocol === "http:" ? u.href : "";
+  } catch (e) { return ""; }
+}
+function brandHeader() {
+  const logo = logoUrl();
+  return `💎 *JEWELLERY BY RIDDHI* 💎\n` + (logo ? `🖼️ Logo: ${logo}\n` : "") + `━━━━━━━━━━━━━━\n`;
+}
+// Product ka name, size, quantity, price, image aur grand total - order aur status dono messages me
+function itemsMessageBlock(items, total) {
+  let t = "";
+  (items || []).forEach((it, idx) => {
+    t += `*${idx + 1}. ${it.name}* (${it.id})\n`;
+    t += `   • Size: ${it.size}\n`;
+    t += `   • Qty: ${it.qty} x ₹${it.price} = *₹${it.price * it.qty}*\n`;
+    if (it.note) t += `   • Customization: _${it.note}_\n`;
+    if (safeImgUrl(it.image)) t += `   • Image: ${it.image}\n`;
+    t += `\n`;
+  });
+  const grand = total != null ? total : (items || []).reduce((n, i) => n + i.price * i.qty, 0);
+  return t + `💰 *Grand Total: ₹${grand}*\n`;
+}
+
 function buildOrderMessage(items, total, cust, multi) {
-  let msg = `Hello *Jewellery by Riddhi*! ✨\n*${multi ? "NEW MULTI-ITEM ORDER" : "NEW ORDER RECEIVED"}*\n\n`;
+  let msg = brandHeader() + `Hello *Jewellery by Riddhi*! ✨\n*${multi ? "NEW MULTI-ITEM ORDER" : "NEW ORDER RECEIVED"}*\n\n`;
   items.forEach((it, idx) => {
     const mrp = it.actualPrice > it.price ? ` (MRP ~₹${it.actualPrice}~)` : "";
     msg += `*${idx + 1}. ${it.name}* (${it.id})\n`;
@@ -897,11 +926,15 @@ function customerStatusHtml(ord) {
 }
 
 // Admin ke liye status dropdown + customer ko WhatsApp se batane ka button
-function adminStatusControl(orderId, status, custName, custMobile) {
+function adminStatusControl(orderId, status, custName, custMobile, order) {
   const st = normStatus(status);
   let wa = String(custMobile || "").replace(/[^0-9]/g, "");
   if (wa.length === 10) wa = "91" + wa;
-  const text = `Namaste ${custName || ""}! 🌸\nAapke order ${orderId} ka status: *${STATUS_META[st].label}*\n${STATUS_META[st].waMsg || STATUS_META[st].msg}\n- Jewellery by Riddhi`;
+  let text = brandHeader() + `Namaste ${custName || ""}! 🌸\nAapke order *${orderId}* ka status: *${STATUS_META[st].label}*\n${STATUS_META[st].waMsg || STATUS_META[st].msg}\n\n`;
+  if (order && order.items && order.items.length) {
+    text += `🛍️ *Order Details:*\n` + itemsMessageBlock(order.items, order.total) + `\n`;
+  }
+  text += `- Jewellery by Riddhi`;
   return `
     <div class="d-flex flex-wrap align-items-center gap-2 my-2">
       <select class="form-select form-select-sm w-auto" data-oid="${esc(orderId)}" onchange="adminChangeStatus(this)" aria-label="Order status">
@@ -1187,7 +1220,7 @@ function renderMyOrders() {
     const waLabel = adminView ? "Chat with Customer" : "Send Copy to My WhatsApp";
     const itemsHtml = ord.items ? buildItemsHtml(ord.items) : (ord.itemsHtml || "");
     const statusHtml = adminView
-      ? adminStatusControl(ord.orderId, ord.status, cust.name, cust.mobile)
+      ? adminStatusControl(ord.orderId, ord.status, cust.name, cust.mobile, ord)
       : customerStatusHtml(ord);
 
     return `
@@ -1565,6 +1598,7 @@ function groupOrdersByCustomer(orders) {
       total: Number(ord.total || 0),
       status: ord.status,
       custName: cust.name, custMobile: cust.mobile,
+      items: ord.items || [],
       itemsHtml: ord.items ? buildItemsHtml(ord.items) : (ord.itemsHtml || "")
     });
   });
@@ -1627,7 +1661,7 @@ function renderAllCustomersSummary() {
           <span class="fw-bold" style="color: var(--primary-green);">₹${esc(o.total)}</span>
         </div>
         <div class="text-muted" style="font-size:11px;">${esc(o.date)}</div>
-        ${adminStatusControl(o.orderId, o.status, o.custName, o.custMobile)}
+        ${adminStatusControl(o.orderId, o.status, o.custName, o.custMobile, o)}
         <div class="mt-1">${o.itemsHtml}</div>
       </div>`).join("");
 
