@@ -34,6 +34,7 @@ document.addEventListener("DOMContentLoaded", () => {
   updateAdminMenuLabel();
   checkAdminHash();
   refreshAdminHistory();
+  refreshMyOrderStatuses();
 });
 
 // ==========================================
@@ -533,6 +534,131 @@ function executeOrderCart(cust) {
 }
 
 // Order ki items list ko safe HTML me badalta hai (customer ka likha text escape hota hai)
+// ==========================================
+// ORDER STATUS
+// ==========================================
+const ORDER_STATUSES = ["Pending", "Confirmed", "Packed", "Shipped", "Delivered", "Cancelled"];
+const STATUS_META = {
+  Pending:   { label: "Order Placed (Pending)", cls: "bg-secondary",         msg: "Aapka order mil gaya hai. Hum jaldi confirm karenge." },
+  Confirmed: { label: "Confirmed",              cls: "bg-primary",           msg: "Aapka order confirm ho gaya hai." },
+  Packed:    { label: "Packed",                 cls: "bg-info text-dark",    msg: "Aapka order pack ho gaya hai." },
+  Shipped:   { label: "Shipped",                cls: "bg-warning text-dark", msg: "Aapka order ship ho gaya hai." },
+  Delivered: { label: "Delivered",              cls: "bg-success",           msg: "Aapka order deliver ho gaya hai. Dhanyavaad!" },
+  Cancelled: { label: "Cancelled",              cls: "bg-danger",            msg: "Aapka order cancel kar diya gaya hai." }
+};
+const STATUS_FLOW = ["Pending", "Confirmed", "Packed", "Shipped", "Delivered"];
+
+function normStatus(st) {
+  return ORDER_STATUSES.includes(st) ? st : "Pending";
+}
+
+function fmtStatusTime(ts) {
+  return ts ? new Date(ts).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) : "";
+}
+
+// Customer ko dikhne wala status: badge + chhota progress tracker
+function customerStatusHtml(ord) {
+  const st = normStatus(ord.status);
+  const meta = STATUS_META[st];
+  let tracker = "";
+  if (st !== "Cancelled") {
+    const idx = STATUS_FLOW.indexOf(st);
+    tracker = `<div class="d-flex align-items-center my-2" aria-hidden="true">` + STATUS_FLOW.map((step, i) => `
+      <div class="text-center" style="flex:1;">
+        <div class="mx-auto rounded-circle" style="width:12px;height:12px;background:${i <= idx ? "var(--primary-green)" : "#d9d2c5"};"></div>
+        <div style="font-size:9px;" class="${i <= idx ? "fw-semibold" : "text-muted"}">${step === "Pending" ? "Placed" : step}</div>
+      </div>`).join("") + `</div>`;
+  }
+  return `
+    <div class="p-2 rounded mb-2" style="background:#fdfaf5;border:1px solid #efe3d2;">
+      <div class="d-flex justify-content-between align-items-center">
+        <span class="badge ${meta.cls}">${esc(meta.label)}</span>
+        ${ord.statusUpdated ? `<span class="text-muted" style="font-size:10px;">Updated: ${esc(fmtStatusTime(ord.statusUpdated))}</span>` : ""}
+      </div>
+      ${tracker}
+      <div class="text-muted" style="font-size:11px;">${esc(meta.msg)}</div>
+    </div>`;
+}
+
+// Admin ke liye status dropdown + customer ko WhatsApp se batane ka button
+function adminStatusControl(orderId, status, custName, custMobile) {
+  const st = normStatus(status);
+  let wa = String(custMobile || "").replace(/[^0-9]/g, "");
+  if (wa.length === 10) wa = "91" + wa;
+  const text = `Namaste ${custName || ""}! 🌸\nAapke order ${orderId} ka status: *${STATUS_META[st].label}*\n${STATUS_META[st].msg}\n- Jewellery by Riddhi`;
+  return `
+    <div class="d-flex flex-wrap align-items-center gap-2 my-2">
+      <select class="form-select form-select-sm w-auto" data-oid="${esc(orderId)}" onchange="adminChangeStatus(this)" aria-label="Order status">
+        ${ORDER_STATUSES.map(x => `<option value="${x}" ${x === st ? "selected" : ""}>${STATUS_META[x].label}</option>`).join("")}
+      </select>
+      <a href="https://wa.me/${wa}?text=${encodeURIComponent(text)}" target="_blank" rel="noopener" class="btn btn-outline-success btn-sm py-0 px-2" style="font-size:11px;"><i class="bi bi-whatsapp"></i> Customer ko batayein</a>
+    </div>`;
+}
+
+async function adminChangeStatus(sel) {
+  const orderId = sel.dataset.oid;
+  const status = sel.value;
+  const s = getAdminSession();
+  if (!s) return;
+  sel.disabled = true;
+  try {
+    let updated = Date.now();
+    if (s.mode === "sheet") {
+      const r = await callScript({ action: "updateStatus", token: s.token, orderId, status });
+      if (!r.ok) {
+        if (r.error === "auth") {
+          sessionStorage.removeItem("riddhi_admin_session");
+          updateAdminMenuLabel();
+          alert("Session expire ho gaya. Dobara admin login karein.");
+          return;
+        }
+        throw new Error(r.error || "failed");
+      }
+      updated = r.statusUpdated || updated;
+    } else {
+      const orders = getLocalOrders();
+      const o = orders.find(x => x.orderId === orderId);
+      if (o) {
+        o.status = status;
+        o.statusUpdated = updated;
+        localStorage.setItem("riddhi_orders", JSON.stringify(orders));
+      }
+    }
+    const mine = adminOrders.find(x => x.orderId === orderId);
+    if (mine) { mine.status = status; mine.statusUpdated = updated; }
+  } catch (e) {
+    alert("Status update nahi ho paya. Internet check karke dobara try karein.");
+  } finally {
+    sel.disabled = false;
+    renderAllCustomersSummary();
+    renderMyOrders();
+  }
+}
+
+// Customer ke device par status Sheet se laata hai (orderId + mobile match hone par hi)
+async function refreshMyOrderStatuses() {
+  if (!APPS_SCRIPT_URL || isAdminLoggedIn()) return;
+  const orders = getLocalOrders();
+  if (!orders.length) return;
+  try {
+    const list = orders.slice(0, 30).map(o => ({ orderId: o.orderId, mobile: (o.customer || {}).mobile }));
+    const r = await callScript({ action: "orderStatus", orders: list });
+    if (!r.ok || !r.statuses) return;
+    let changed = false;
+    const fresh = getLocalOrders();
+    fresh.forEach(o => {
+      const st = r.statuses[o.orderId];
+      if (st && (o.status !== st.status || o.statusUpdated !== st.updated)) {
+        o.status = st.status;
+        o.statusUpdated = st.updated;
+        changed = true;
+      }
+    });
+    if (changed) localStorage.setItem("riddhi_orders", JSON.stringify(fresh));
+    renderMyOrders();
+  } catch (e) { /* internet nahi: purana status dikhta rahega */ }
+}
+
 function safeImgUrl(u) {
   return /^https:\/\/[^\s"'<>]+$/.test(String(u || "")) ? u : "";
 }
@@ -643,6 +769,7 @@ function saveOrderToHistory(orderRecord) {
     orderId: "ORD-" + Date.now().toString().slice(-6) + Math.floor(10 + Math.random() * 90),
     timestamp: Date.now(),
     date: new Date().toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }),
+    status: "Pending",
     ...orderRecord
   };
   try {
@@ -695,7 +822,11 @@ function renderMyOrders() {
     return;
   }
 
-  container.innerHTML = warn + orders.map(ord => {
+  const refreshBtn = (!adminView && APPS_SCRIPT_URL)
+    ? `<button type="button" class="btn btn-outline-dark btn-sm w-100 mb-3 rounded-pill" onclick="refreshMyOrderStatuses()"><i class="bi bi-arrow-clockwise me-1"></i>Refresh Order Status</button>`
+    : "";
+
+  container.innerHTML = warn + refreshBtn + orders.map(ord => {
     const cust = ord.customer || {};
     let cleanCustPhone = (cust.mobile || "").replace(/[^0-9]/g, "");
     if (cleanCustPhone.length === 10) cleanCustPhone = "91" + cleanCustPhone;
@@ -704,6 +835,9 @@ function renderMyOrders() {
       : `https://wa.me/${cleanCustPhone}?text=${encodeURIComponent(ord.fullMessage || "")}`;
     const waLabel = adminView ? "Chat with Customer" : "Send Copy to My WhatsApp";
     const itemsHtml = ord.items ? buildItemsHtml(ord.items) : (ord.itemsHtml || "");
+    const statusHtml = adminView
+      ? adminStatusControl(ord.orderId, ord.status, cust.name, cust.mobile)
+      : customerStatusHtml(ord);
 
     return `
       <div class="card mb-3 border-0 shadow-sm">
@@ -713,6 +847,7 @@ function renderMyOrders() {
             <span class="fw-bold" style="color: var(--primary-green);">₹${esc(ord.total)}</span>
           </div>
           <div class="text-muted mb-2" style="font-size: 11px;"><i class="bi bi-clock me-1"></i>${esc(ord.date)}</div>
+          ${statusHtml}
           <div class="mb-2">${itemsHtml}</div>
           <div class="p-2 rounded bg-light text-muted mb-2" style="font-size: 11px;">
             <strong class="text-dark">👤 ${esc(cust.name)}</strong> (${esc(cust.mobile)})<br>
@@ -883,6 +1018,7 @@ document.addEventListener("show.bs.offcanvas", ev => {
   if (ev.target && ev.target.id === "myOrdersOffcanvas") {
     renderMyOrders();
     refreshAdminHistory();
+    refreshMyOrderStatuses();
   }
 });
 
@@ -1069,6 +1205,8 @@ function groupOrdersByCustomer(orders) {
     map[key].orders.push({
       orderId: ord.orderId, date: ord.date, timestamp: ord.timestamp || 0, period,
       total: Number(ord.total || 0),
+      status: ord.status,
+      custName: cust.name, custMobile: cust.mobile,
       itemsHtml: ord.items ? buildItemsHtml(ord.items) : (ord.itemsHtml || "")
     });
   });
@@ -1125,6 +1263,7 @@ function renderAllCustomersSummary() {
           <span class="fw-bold" style="color: var(--primary-green);">₹${esc(o.total)}</span>
         </div>
         <div class="text-muted" style="font-size:11px;">${esc(o.date)}</div>
+        ${adminStatusControl(o.orderId, o.status, o.custName, o.custMobile)}
         <div class="mt-1">${o.itemsHtml}</div>
       </div>`).join("");
 
@@ -1158,12 +1297,12 @@ function csvCell(v) {
 
 function exportOrdersCsv() {
   if (!isAdminLoggedIn()) return;
-  const rows = [["Order ID", "Date", "Name", "Mobile", "Address", "City", "Pincode", "Items", "Image Links", "Total (INR)"]];
+  const rows = [["Order ID", "Date", "Name", "Mobile", "Address", "City", "Pincode", "Items", "Image Links", "Total (INR)", "Status"]];
   adminOrders.forEach(o => {
     const c = o.customer || {};
     const items = (o.items || []).map(i => `${i.name} (${i.id}) x${i.qty} [${i.size}]${i.note ? " note: " + i.note : ""}`).join(" | ");
     const imgs = (o.items || []).map(i => i.image || "").filter(Boolean).join(" | ");
-    rows.push([o.orderId, o.date, c.name, c.mobile, c.address, c.city, c.pincode, items, imgs, o.total]);
+    rows.push([o.orderId, o.date, c.name, c.mobile, c.address, c.city, c.pincode, items, imgs, o.total, normStatus(o.status)]);
   });
   const csv = "\uFEFF" + rows.map(r => r.map(csvCell).join(",")).join("\r\n");
   const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));

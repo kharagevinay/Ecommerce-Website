@@ -9,13 +9,15 @@
 
 // ====== SIRF YE 2 LINES BADLEIN ======
 const ADMIN_USERNAME = 'riddhi@admin';
-const ADMIN_PASSWORD = 'Admin2026';   // <-- deploy karne se pehle zaroor badal dein
+const ADMIN_PASSWORD = 'Admin@2026';   // <-- deploy karne se pehle zaroor badal dein
 // =====================================
 
 const SHEET_NAME = 'Orders';
 const HEADERS = ['Timestamp', 'Order ID', 'Date', 'Name', 'Mobile', 'Address', 'City', 'Pincode',
-                 'Items', 'Total (INR)', 'Items JSON', 'Image 1', 'Image 2', 'Image 3', 'Image Links'];
-const READ_COLS = 11;                // Items JSON tak (purani sheets ke saath bhi chalta hai)
+                 'Items', 'Total (INR)', 'Items JSON', 'Image 1', 'Image 2', 'Image 3', 'Image Links', 'Status', 'Status Updated'];
+const READ_COLS = 17;                // Status Updated tak (purani sheets ke saath bhi chalta hai)
+const STATUS_COL = 16;               // Sheet ka "Status" column (P)
+const STATUSES = ['Pending', 'Confirmed', 'Packed', 'Shipped', 'Delivered', 'Cancelled'];
 const MAX_IMG_COLS = 3;
 const TOKEN_TTL_SEC = 2 * 60 * 60;   // admin login 2 ghante chalta hai
 const MAX_FAILS = 5;                 // itni galat koshish ke baad lock
@@ -33,6 +35,8 @@ function doPost(e) {
       case 'adminLogin':  return json_(adminLogin_(body.username, body.password));
       case 'getOrders':   return json_(getOrders_(body.token));
       case 'adminLogout': return json_(adminLogout_(body.token));
+      case 'updateStatus': return json_(updateStatus_(body.token, body.orderId, body.status));
+      case 'orderStatus': return json_(orderStatus_(body.orders));
       default:            return json_({ ok: false, error: 'bad_request' });
     }
   } catch (err) {
@@ -45,6 +49,12 @@ function json_(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }
 
+// Status column me dropdown (Sheet me seedha bhi status badal sakte hain)
+function statusValidation_(sh) {
+  const rule = SpreadsheetApp.newDataValidation().requireValueInList(STATUSES, true).setAllowInvalid(false).build();
+  sh.getRange(2, STATUS_COL, 2000, 1).setDataValidation(rule);
+}
+
 function sheet_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sh = ss.getSheetByName(SHEET_NAME);
@@ -55,9 +65,11 @@ function sheet_() {
     sh.getRange(1, 1, 1, HEADERS.length).setFontWeight('bold').setBackground('#15321e').setFontColor('#ffffff');
     sh.setColumnWidth(9, 280);
     for (let c = 12; c <= 14; c++) sh.setColumnWidth(c, 110);
+    statusValidation_(sh);
   } else if (sh.getLastColumn() < HEADERS.length) {
-    // purani sheet: nayi image columns ke headers jod do
+    // purani sheet: nayi columns ke headers jod do
     sh.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]);
+    statusValidation_(sh);
   }
   return sh;
 }
@@ -134,7 +146,7 @@ function addOrder_(o) {
       new Date(Number(o.timestamp) || Date.now()), orderId, safe_(o.date, 40),
       safe_(c.name, 100), "'" + mobile, safe_(c.address, 300), safe_(c.city, 80), "'" + pin,
       itemsText, total, JSON.stringify(items)
-    ].concat(imgCells, [imgs.join('\n')]));
+    ].concat(imgCells, [imgs.join('\n'), 'Pending', new Date()]));
     if (imgs.length) sh.setRowHeight(sh.getLastRow(), 100);
   } finally {
     lock.releaseLock();
@@ -173,11 +185,60 @@ function adminLogout_(token) {
   return { ok: true };
 }
 
+// Admin: order ka status badalna
+function updateStatus_(token, orderId, status) {
+  if (!validToken_(token)) return { ok: false, error: 'auth' };
+  if (STATUSES.indexOf(status) < 0) return { ok: false, error: 'bad_status' };
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const sh = sheet_();
+    const last = sh.getLastRow();
+    if (last < 2) return { ok: false, error: 'not_found' };
+    const ids = sh.getRange(2, 2, last - 1, 1).getValues();
+    for (let i = 0; i < ids.length; i++) {
+      if (ids[i][0] === orderId) {
+        const now = new Date();
+        sh.getRange(i + 2, STATUS_COL, 1, 2).setValues([[status, now]]);
+        return { ok: true, status: status, statusUpdated: now.getTime() };
+      }
+    }
+    return { ok: false, error: 'not_found' };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// Customer: apne orders ka status (orderId + mobile dono match hone chahiye, koi personal data wapas nahi jata)
+function orderStatus_(list) {
+  if (!Array.isArray(list)) return { ok: false, error: 'bad_request' };
+  const sh = sheet_();
+  const last = sh.getLastRow();
+  const out = {};
+  if (last < 2) return { ok: true, statuses: out };
+  const rows = sh.getRange(2, 1, last - 1, Math.min(READ_COLS, sh.getLastColumn())).getValues();
+  const byId = {};
+  rows.forEach(function (r) { byId[r[1]] = r; });
+  list.slice(0, 30).forEach(function (q) {
+    const r = q && byId[String(q.orderId)];
+    if (!r) return;
+    const a = String(r[4]).replace(/[^0-9]/g, '').slice(-10);
+    const b = String(q.mobile || '').replace(/[^0-9]/g, '').slice(-10);
+    if (a && a === b) {
+      out[q.orderId] = {
+        status: STATUSES.indexOf(r[15]) >= 0 ? r[15] : 'Pending',
+        updated: r[16] instanceof Date ? r[16].getTime() : 0
+      };
+    }
+  });
+  return { ok: true, statuses: out };
+}
+
 function readOrders_() {
   const sh = sheet_();
   const last = sh.getLastRow();
   if (last < 2) return [];
-  const rows = sh.getRange(2, 1, last - 1, READ_COLS).getValues();
+  const rows = sh.getRange(2, 1, last - 1, Math.min(READ_COLS, sh.getLastColumn())).getValues();
   return rows.map(function (r) {
     let items = [];
     try { items = JSON.parse(r[10] || '[]'); } catch (e) {}
@@ -186,7 +247,9 @@ function readOrders_() {
       orderId: r[1], timestamp: ts, date: String(r[2]), total: Number(r[9]) || 0,
       customer: { name: r[3], mobile: String(r[4]).replace(/^'/, ''), address: r[5], city: r[6],
                   pincode: String(r[7]).replace(/^'/, '') },
-      items: items
+      items: items,
+      status: STATUSES.indexOf(r[15]) >= 0 ? r[15] : 'Pending',
+      statusUpdated: r[16] instanceof Date ? r[16].getTime() : 0
     };
   }).reverse();   // naya order sabse upar
 }

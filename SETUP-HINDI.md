@@ -38,3 +38,10 @@ Ab har order (kisi bhi phone se) Sheet ke **Orders** tab me row ban kar aayega, 
 `ADMIN_USERNAME` / `ADMIN_LOCAL_HASH` se check hota hai. Ye sirf testing ke liye hai; asli security
 Google Sheet mode me hoti hai. Naya local password banane ke liye browser console me chalayein:
 `makeAdminHash("username","password")` aur result `ADMIN_LOCAL_HASH` me daalein.
+
+## D. Order Status (Pending / Confirmed / Packed / Shipped / Delivered / Cancelled)
+- Admin login ke baad **All Orders** ya **Customers & Orders** me har order par status dropdown hota hai. Badalte hi Sheet ke **Status** column me save ho jata hai.
+- "Customer ko batayein" button se customer ko WhatsApp par status bhej sakte hain.
+- Sheet me seedha **Status** column ka dropdown badalne se bhi status update hota hai.
+- Customer ko **My Orders** me status badge + progress tracker dikhta hai. Wo "Refresh Order Status" dabane par ya My Orders kholne par update hota hai.
+- Isko chalane ke liye naya `Code.gs` paste karke **Deploy -> Manage deployments -> Edit -> New version -> Deploy** karein.
