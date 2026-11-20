@@ -665,6 +665,10 @@ function renderMyOrders() {
     ? adminOrders.slice().sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
     : getLocalOrders();
 
+  const warn = adminView && (getAdminSession() || {}).mode === "local"
+    ? `<div class="alert alert-warning small py-2"><strong>Google Sheet connect nahi hai.</strong> Sirf is device ke orders dikh rahe hain. <code>js/data.js</code> me <code>APPS_SCRIPT_URL</code> daalein (SETUP-HINDI.md dekhein), phir dobara login karein.</div>`
+    : "";
+
   const titleEl = document.querySelector("#myOrdersOffcanvas .offcanvas-title");
   if (titleEl) titleEl.innerHTML = adminView
     ? `<i class="bi bi-receipt-cutoff me-2"></i>All Orders (Admin)`
@@ -683,7 +687,7 @@ function renderMyOrders() {
   if (!container) return;
 
   if (orders.length === 0) {
-    container.innerHTML = `
+    container.innerHTML = warn + `
       <div class="text-center text-muted my-5">
         <i class="bi bi-receipt fs-1"></i>
         <p class="mt-2 small">${adminView ? "No orders yet." : "You haven't placed any orders on this device yet."}</p>
@@ -691,7 +695,7 @@ function renderMyOrders() {
     return;
   }
 
-  container.innerHTML = orders.map(ord => {
+  container.innerHTML = warn + orders.map(ord => {
     const cust = ord.customer || {};
     let cleanCustPhone = (cust.mobile || "").replace(/[^0-9]/g, "");
     if (cleanCustPhone.length === 10) cleanCustPhone = "91" + cleanCustPhone;

@@ -8,8 +8,8 @@
  */
 
 // ====== SIRF YE 2 LINES BADLEIN ======
-const ADMIN_USERNAME = 'riddhi_admin';
-const ADMIN_PASSWORD = 'Riddhi@Admin2026';   // <-- deploy karne se pehle zaroor badal dein
+const ADMIN_USERNAME = 'riddhi@admin';
+const ADMIN_PASSWORD = 'Admin2026';   // <-- deploy karne se pehle zaroor badal dein
 // =====================================
 
 const SHEET_NAME = 'Orders';
