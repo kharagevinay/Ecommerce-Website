@@ -448,8 +448,20 @@
         <select id="orderFilter" class="form-select form-select-sm mb-3" onchange="renderMyOrders()" aria-label="Filter orders">
           <option value="all">All Orders</option>
           <option value="notshipped">Not Yet Shipped</option>
-          <option value="last30">Date-wise: Last 30 Days</option>
-          <option value="last3m">Date-wise: Last 3 Months</option>
+          <optgroup label="By Status">
+            <option value="status-Pending">Order Placed (Awaiting Confirmation)</option>
+            <option value="status-Confirmed">Confirmed</option>
+            <option value="status-Custom Making">Custom Making</option>
+            <option value="status-Partial Stock Ready">Partial Stock Ready</option>
+            <option value="status-Packed">Packed</option>
+            <option value="status-Shipped">Shipped</option>
+            <option value="status-Delivered">Delivered</option>
+            <option value="status-Cancelled">Cancelled</option>
+          </optgroup>
+          <optgroup label="Date-wise" id="orderDateGroup">
+            <option value="last30">Last 30 Days</option>
+            <option value="last3m">Last 3 Months</option>
+          </optgroup>
         </select>
         <div id="myOrdersListContainer"></div>
       </div>
@@ -563,14 +575,27 @@
             </div>
           </div>
           <div class="row g-2 mb-3">
-            <div class="col-12 col-sm-7">
+            <div class="col-12">
               <input type="text" id="customerSearchInput" class="form-control form-control-sm" placeholder="Search by Customer Name or Mobile Number..." oninput="renderAllCustomersSummary()">
             </div>
-            <div class="col-12 col-sm-5">
+            <div class="col-6">
               <select id="customerFilterType" class="form-select form-select-sm" onchange="renderAllCustomersSummary()">
                 <option value="all">All Orders (Past & Recent)</option>
                 <option value="present">Recent (last 7 days)</option>
                 <option value="past">Older than 7 days</option>
+              </select>
+            </div>
+            <div class="col-6">
+              <select id="customerFilterStatus" class="form-select form-select-sm" onchange="renderAllCustomersSummary()" aria-label="Filter by order status">
+                <option value="all">All Status</option>
+                <option value="Pending">Pending</option>
+                <option value="Confirmed">Confirmed</option>
+                <option value="Custom Making">Custom Making</option>
+                <option value="Partial Stock Ready">Partial Stock Ready</option>
+                <option value="Packed">Packed</option>
+                <option value="Shipped">Shipped</option>
+                <option value="Delivered">Delivered</option>
+                <option value="Cancelled">Cancelled</option>
               </select>
             </div>
           </div>

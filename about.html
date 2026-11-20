@@ -64,8 +64,20 @@
         <select id="orderFilter" class="form-select form-select-sm mb-3" onchange="renderMyOrders()" aria-label="Filter orders">
           <option value="all">All Orders</option>
           <option value="notshipped">Not Yet Shipped</option>
-          <option value="last30">Date-wise: Last 30 Days</option>
-          <option value="last3m">Date-wise: Last 3 Months</option>
+          <optgroup label="By Status">
+            <option value="status-Pending">Order Placed (Awaiting Confirmation)</option>
+            <option value="status-Confirmed">Confirmed</option>
+            <option value="status-Custom Making">Custom Making</option>
+            <option value="status-Partial Stock Ready">Partial Stock Ready</option>
+            <option value="status-Packed">Packed</option>
+            <option value="status-Shipped">Shipped</option>
+            <option value="status-Delivered">Delivered</option>
+            <option value="status-Cancelled">Cancelled</option>
+          </optgroup>
+          <optgroup label="Date-wise" id="orderDateGroup">
+            <option value="last30">Last 30 Days</option>
+            <option value="last3m">Last 3 Months</option>
+          </optgroup>
         </select>
         <div id="myOrdersListContainer"></div>
       </div>

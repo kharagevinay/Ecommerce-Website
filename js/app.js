@@ -1106,6 +1106,7 @@ function filterOrders(list, f) {
   const now = Date.now();
   const DAY = 24 * 60 * 60 * 1000;
   if (f === "notshipped") return list.filter(o => NOT_SHIPPED_STATUSES.includes(normStatus(o.status)));
+  if (f.startsWith("status-")) return list.filter(o => normStatus(o.status) === f.slice(7));
   if (f === "last30") return list.filter(o => (o.timestamp || 0) >= now - 30 * DAY);
   if (f === "last3m") return list.filter(o => (o.timestamp || 0) >= now - 90 * DAY);
   if (f.startsWith("year-")) {
@@ -1124,9 +1125,9 @@ function syncYearOptions(orders) {
   const cur = sel.value;
   sel.querySelectorAll("option[data-year]").forEach(o => o.remove());
   Array.from(years).sort((a, b) => b - a).forEach(y => {
-    const opt = new Option(`Date-wise: Year ${y}`, `year-${y}`);
+    const opt = new Option(`Year ${y}`, `year-${y}`);
     opt.dataset.year = "1";
-    sel.add(opt);
+    (document.getElementById("orderDateGroup") || sel).appendChild(opt);
   });
   sel.value = Array.from(sel.options).some(o => o.value === cur) ? cur : "all";
 }
@@ -1504,6 +1505,7 @@ async function openAllCustomersModal(skipReload = false) {
 
   document.getElementById("customerSearchInput").value = "";
   document.getElementById("customerFilterType").value = "all";
+  document.getElementById("customerFilterStatus").value = "all";
 
   const s = getAdminSession();
   const srcEl = document.getElementById("adminSourceBadge");
@@ -1576,6 +1578,7 @@ function renderAllCustomersSummary() {
 
   const searchQ = (document.getElementById("customerSearchInput")?.value || "").toLowerCase().trim();
   const filterPeriod = document.getElementById("customerFilterType")?.value || "all";
+  const filterStatus = document.getElementById("customerFilterStatus")?.value || "all";
 
   let customers = groupOrdersByCustomer(adminOrders);
 
@@ -1587,6 +1590,11 @@ function renderAllCustomersSummary() {
   if (filterPeriod !== "all") {
     customers = customers
       .map(c => ({ ...c, orders: c.orders.filter(o => o.period.toLowerCase() === filterPeriod) }))
+      .filter(c => c.orders.length > 0);
+  }
+  if (filterStatus !== "all") {
+    customers = customers
+      .map(c => ({ ...c, orders: c.orders.filter(o => normStatus(o.status) === filterStatus) }))
       .filter(c => c.orders.length > 0);
   }
   customers.forEach(c => {
