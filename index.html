@@ -11,33 +11,35 @@
 </head>
 <body>
 
-  <!-- NAVBAR -->
+  <!-- NAVBAR : Menu (left) | Logo (center) | My Orders + Cart (right) -->
   <nav class="navbar sticky-top px-2 px-md-3">
-    <div class="container d-flex justify-content-between align-items-center">
-      <div class="d-flex align-items-center gap-2" style="cursor:pointer;" onclick="navigateTo('home'); adminLogoTap()">
-        <img src="assets/logo.png" alt="Jewellery by Riddhi Logo" class="brand-logo-img">
-        <span class="brand-font fw-bold fs-5" style="color: var(--primary-green);">Jewellery by Riddhi</span>
+    <div class="container header-grid">
+      <div class="header-left">
+        <button class="btn btn-outline-secondary btn-sm px-2 py-1" type="button" data-bs-toggle="offcanvas" data-bs-target="#menuOffcanvas" aria-label="Open menu">
+          <i class="bi bi-list fs-4"></i>
+        </button>
       </div>
 
-      <div class="d-flex align-items-center gap-2">
-                <!-- My Orders Button -->
-        <button class="btn btn-outline-success position-relative btn-sm px-2 py-1" data-bs-toggle="offcanvas" data-bs-target="#myOrdersOffcanvas" title="My Orders">
+      <div class="header-center" style="cursor:pointer;" onclick="navigateTo('home'); adminLogoTap()">
+        <img src="assets/logo.png" alt="Jewellery by Riddhi Logo" class="brand-logo-img">
+      </div>
+
+      <div class="header-right d-flex align-items-center gap-2 gap-md-3">
+        <!-- My Orders Button -->
+        <button class="btn btn-outline-success position-relative btn-sm px-2 py-1" data-bs-toggle="offcanvas" data-bs-target="#myOrdersOffcanvas" title="My Orders" aria-label="My Orders">
           <i class="bi bi-receipt-cutoff fs-5"></i>
           <span id="navOrdersCount" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-success d-none">0</span>
         </button>
-        <button class="btn btn-outline-dark position-relative btn-sm px-2 py-1" data-bs-toggle="offcanvas" data-bs-target="#cartOffcanvas">
+        <button class="btn btn-outline-dark position-relative btn-sm px-2 py-1" data-bs-toggle="offcanvas" data-bs-target="#cartOffcanvas" title="Cart" aria-label="Cart">
           <i class="bi bi-bag-heart fs-5"></i>
           <span id="navCartCount" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">0</span>
-        </button>
-        <button class="btn btn-outline-secondary btn-sm px-2 py-1" type="button" data-bs-toggle="offcanvas" data-bs-target="#menuOffcanvas">
-          <i class="bi bi-list fs-4"></i>
         </button>
       </div>
     </div>
   </nav>
 
   <!-- SIDEBAR MENU -->
-  <div class="offcanvas offcanvas-end" tabindex="-1" id="menuOffcanvas">
+  <div class="offcanvas offcanvas-start" tabindex="-1" id="menuOffcanvas">
     <div class="offcanvas-header" style="background-color: var(--primary-green); color: #fff;">
       <div class="d-flex align-items-center gap-2">
         <img src="assets/logo.png" alt="Logo" class="brand-logo-img" style="width:36px;height:36px;">
@@ -63,7 +65,23 @@
               <i class="bi bi-receipt-cutoff me-2"></i>My Orders
             </a>
           </li>
-                    <li class="list-group-item bg-transparent">
+                    <!-- ADMIN ONLY (login ke baad dikhte hain, logout tak bane rehte hain) -->
+          <li class="list-group-item bg-transparent admin-only d-none">
+            <a href="javascript:void(0)" class="text-decoration-none fw-semibold" style="color: var(--accent-gold);" data-bs-toggle="offcanvas" data-bs-target="#myOrdersOffcanvas">
+              <i class="bi bi-receipt-cutoff me-2"></i>All Orders (Admin)
+            </a>
+          </li>
+          <li class="list-group-item bg-transparent admin-only d-none">
+            <a href="javascript:void(0)" class="text-decoration-none fw-semibold" style="color: var(--accent-gold);" onclick="openAllCustomersModal()" data-bs-dismiss="offcanvas">
+              <i class="bi bi-people me-2"></i>Customers &amp; Orders (Admin)
+            </a>
+          </li>
+          <li class="list-group-item bg-transparent admin-only d-none">
+            <button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="adminLogout()">
+              <i class="bi bi-box-arrow-right me-1"></i>Admin Logout
+            </button>
+          </li>
+          <li class="list-group-item bg-transparent">
             <a href="about.html" class="text-decoration-none text-dark fw-semibold">
               <i class="bi bi-info-circle me-2"></i>About Us
             </a>
@@ -106,8 +124,16 @@
 
   <!-- HOME VIEW -->
   <div id="homeView">
+    <!-- FESTIVE OFFER RIBBON (animated marquee) -->
+    <div class="offer-ribbon" role="region" aria-label="Festive offers">
+      <div class="offer-track" id="offerTrack"></div>
+    </div>
+
     <section class="hero-section text-center">
-      <div class="container">
+      <div class="hero-accent hero-accent-1" aria-hidden="true">✦</div>
+      <div class="hero-accent hero-accent-2" aria-hidden="true">❖</div>
+      <div class="hero-accent hero-accent-3" aria-hidden="true">✧</div>
+      <div class="container position-relative">
         <p class="text-uppercase small fw-semibold mb-1" style="color: var(--accent-gold); letter-spacing: 1.5px;">Handmade Jewellery</p>
         <h1 class="display-5 fw-bold mb-2" style="color: var(--primary-green);">Timeless Beauty, Made by Hand</h1>
         <p class="text-muted mx-auto mb-4" style="max-width: 520px;">Explore our exclusive collection of handmade jewellery crafted with love and perfection.</p>
@@ -115,11 +141,19 @@
           <button class="btn btn-green px-4 py-2 rounded-pill" onclick="openProductsView('All')">
             <i class="bi bi-bag-check me-1"></i> Shop All Products
           </button>
-          <button class="btn btn-outline-dark px-4 py-2 rounded-pill" onclick="openProductsView('Choker')">
+          <!-- <button class="btn btn-outline-dark px-4 py-2 rounded-pill" onclick="openProductsView('Choker')">
             Explore Chokers
-          </button>
+          </button> -->
         </div>
       </div>
+    </section>
+
+    <!-- HIGHLIGHTED OFFER CARDS -->
+    <section class="container mt-4">
+      <div class="text-center mb-3">
+        <h3 class="section-title shimmer-text">✦ Festive Offers ✦</h3>
+      </div>
+      <div class="row g-3" id="offerCardsGrid"></div>
     </section>
 
     <!-- NEW ARRIVALS SECTION -->
@@ -168,8 +202,13 @@
             <option value="default">Sort by: Featured</option>
             <option value="low-high">Price: Low to High</option>
             <option value="high-low">Price: High to Low</option>
+            <option value="az">Alphabetically, A - Z</option>
+            <option value="za">Alphabetically, Z - A</option>
             <option value="under-500">Under ₹500</option>
             <option value="500-1000">₹500 - ₹1000</option>
+            <option value="1000-1500">₹1000 - ₹1500</option>
+            <option value="1500-2000">₹1500 - ₹2000</option>
+            <option value="above-2000">Above ₹2000</option>
           </select>
         </div>
       </div>
@@ -198,13 +237,27 @@
 
             <div class="col-md-6">
               <h4 class="brand-font fw-bold mb-1" id="modalTitle" style="color: var(--primary-green);">Product Name</h4>
-              <div class="d-flex align-items-center gap-3 my-2">
+              <div class="d-flex align-items-center flex-wrap gap-2 my-2">
                 <h4 class="fw-bold m-0" style="color: #b0881e;">₹<span id="modalPrice">0</span></h4>
+                <span class="actual-price fs-6" id="modalActualPrice">₹0</span>
+                <span class="discount-badge" id="modalDiscountBadge">0% OFF</span>
                 <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1" id="modalStockBadge">
                   Available Stock: 2 pcs
                 </span>
               </div>
               <p class="small text-muted mb-3" id="modalDesc"></p>
+
+              <!-- Stock 0 : Available Soon + direct enquiry -->
+              <div id="modalSoonBox" class="soon-box d-none">
+                <div class="fw-semibold mb-1"><i class="bi bi-hourglass-split me-1"></i>Available Soon</div>
+                <p class="small text-muted mb-2">This piece is currently out of stock. Still want it? Call or WhatsApp us and we will let you know when it is ready (or make it for you).</p>
+                <div class="d-grid gap-2 d-sm-flex">
+                  <a id="soonCallBtn" href="#" class="btn btn-outline-dark btn-sm flex-fill"><i class="bi bi-telephone me-1"></i>Call Now</a>
+                  <a id="soonWaBtn" href="#" target="_blank" rel="noopener" class="btn btn-green btn-sm flex-fill"><i class="bi bi-whatsapp me-1"></i>WhatsApp Enquiry</a>
+                </div>
+              </div>
+
+              <div id="modalOrderControls">
 
               <div class="mb-2">
                 <label class="form-label fw-semibold small mb-1">Select Size:</label>
@@ -261,6 +314,7 @@
                   </div>
                 </div>
               </div>
+              </div><!-- /modalOrderControls -->
 
             </div>
           </div>
@@ -282,7 +336,8 @@
             <p class="small text-muted mb-3">All fields are required so we can process your order and send your order summary on WhatsApp.</p>
             <div class="mb-2">
               <label class="form-label small fw-semibold">Full Name *</label>
-              <input type="text" id="custName" class="form-control form-control-sm" required placeholder="Enter full name">
+              <input type="text" id="custName" class="form-control form-control-sm" required minlength="2" maxlength="60" pattern="[A-Za-z][A-Za-z\s]*" autocomplete="name" placeholder="Enter full name (letters only)">
+              <div class="invalid-feedback">Name me sirf letters (A-Z) aur space allowed hain.</div>
             </div>
             <div class="mb-2">
               <label class="form-label small fw-semibold">Mobile / WhatsApp Number *</label>
@@ -293,9 +348,11 @@
               <textarea id="custAddress" class="form-control form-control-sm" rows="2" required placeholder="House/Flat no., Street, Landmark"></textarea>
             </div>
             <div class="row g-2">
-              <div class="col-6">
+              <div class="col-6 position-relative">
                 <label class="form-label small fw-semibold">City *</label>
-                <input type="text" id="custCity" class="form-control form-control-sm" required placeholder="e.g. Pune">
+                <input type="text" id="custCity" class="form-control form-control-sm" required list="cityList" autocomplete="off" maxlength="40" placeholder="Type city, e.g. Pune">
+                <datalist id="cityList"></datalist>
+                <div id="citySuggestions" class="city-suggest d-none" role="listbox"></div>
               </div>
               <div class="col-6">
                 <label class="form-label small fw-semibold">Pincode *</label>
@@ -312,6 +369,51 @@
     </div>
   </div>
 
+  <!-- ORDER REVIEW & CONFIRMATION MODAL -->
+  <div class="modal fade" id="confirmOrderModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+      <div class="modal-content" style="background-color: var(--cream-bg); border-radius: 16px;">
+        <div class="modal-header" style="background-color: var(--primary-green); color: #fff;">
+          <h5 class="modal-title brand-font"><i class="bi bi-clipboard-check me-2"></i>Please Confirm Your Order</h5>
+        </div>
+        <div class="modal-body">
+          <p class="small text-muted mb-2">Order bhejne se pehle ek baar details check kar lein.</p>
+          <div id="confirmOrderBody" class="p-3 rounded-3 bg-white border" style="border-color:#eadbc8 !important;"></div>
+        </div>
+        <div class="modal-footer border-0 flex-column align-items-stretch gap-2">
+          <button type="button" class="btn btn-green fw-semibold rounded-pill" onclick="confirmAndSendOrder()">
+            <i class="bi bi-whatsapp me-1"></i> Yes, Confirm &amp; Send on WhatsApp
+          </button>
+          <div class="d-flex gap-2">
+            <button type="button" class="btn btn-outline-dark btn-sm flex-fill rounded-pill" onclick="editOrderDetails()">
+              <i class="bi bi-pencil-square me-1"></i> Edit Details
+            </button>
+            <button type="button" class="btn btn-outline-danger btn-sm flex-fill rounded-pill" onclick="cancelOrderConfirmation()">
+              <i class="bi bi-x-circle me-1"></i> No, Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- REMOVE FROM CART CONFIRMATION -->
+  <div class="modal fade" id="removeCartModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+      <div class="modal-content text-center" style="background-color: var(--cream-bg); border-radius: 16px;">
+        <div class="modal-body p-4">
+          <div class="fs-1 text-danger"><i class="bi bi-trash3"></i></div>
+          <h6 class="fw-bold mt-2">Do you want to remove this product from cart?</h6>
+          <p class="small text-muted mb-3" id="removeCartName"></p>
+          <div class="d-flex gap-2 justify-content-center">
+            <button type="button" class="btn btn-outline-dark btn-sm px-4 rounded-pill" onclick="cancelRemoveCartItem()">No</button>
+            <button type="button" class="btn btn-danger btn-sm px-4 rounded-pill" onclick="confirmRemoveCartItem()">Yes</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- CART OFFCANVAS -->
   <div class="offcanvas offcanvas-end" tabindex="-1" id="cartOffcanvas">
     <div class="offcanvas-header" style="background-color: var(--primary-green); color: #fff;">
@@ -321,6 +423,9 @@
     <div class="offcanvas-body d-flex flex-column justify-content-between" style="background-color: var(--cream-bg);">
       <div id="cartItemsContainer"></div>
       <div class="border-top pt-3 mt-3">
+        <div id="cartSavingsRow" class="small text-success fw-semibold mb-2 d-none">
+          <i class="bi bi-piggy-bank me-1"></i>You save ₹<span id="cartSavings">0</span> on this cart 🎉
+        </div>
         <div class="d-flex justify-content-between align-items-center mb-3">
           <span class="fw-bold fs-5">Total Amount:</span>
           <span class="fw-bold fs-5" style="color: var(--primary-green);">₹<span id="cartTotal">0</span></span>
@@ -339,7 +444,15 @@
       <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"></button>
     </div>
     <div class="offcanvas-body d-flex flex-column justify-content-between" style="background-color: var(--cream-bg);">
-      <div id="myOrdersListContainer"></div>
+      <div>
+        <select id="orderFilter" class="form-select form-select-sm mb-3" onchange="renderMyOrders()" aria-label="Filter orders">
+          <option value="all">All Orders</option>
+          <option value="notshipped">Not Yet Shipped</option>
+          <option value="last30">Date-wise: Last 30 Days</option>
+          <option value="last3m">Date-wise: Last 3 Months</option>
+        </select>
+        <div id="myOrdersListContainer"></div>
+      </div>
       <div class="border-top pt-2 mt-2 text-center">
         <small class="text-muted d-block mb-2" style="font-size: 11px;">Orders placed on this device are saved here automatically.</small>
         <button class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="clearOrderHistory()">Clear History</button>
@@ -375,6 +488,8 @@
           <p class="small text-muted mb-3">
             Thank you for shopping with <strong>Jewellery by Riddhi</strong>! Your order details have been sent to our WhatsApp.
           </p>
+
+          <div class="order-note text-start mb-3" id="successStatusNote"></div>
 
           <!-- Order Summary Card Inside Popup -->
           <div class="text-start p-3 rounded-3 mb-3 shadow-sm" style="background-color: #fff; border: 1px solid #eadbc8;" id="successOrderSummaryBox">
@@ -443,6 +558,7 @@
             <div class="d-flex gap-2">
               <button type="button" class="btn btn-outline-dark btn-sm" onclick="refreshAdminPanel()"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</button>
               <button type="button" class="btn btn-outline-success btn-sm" onclick="exportOrdersCsv()"><i class="bi bi-download me-1"></i>CSV</button>
+              <button type="button" class="btn btn-outline-secondary btn-sm" onclick="resetStock()" title="Is device par stock wapas original karein"><i class="bi bi-box-seam me-1"></i>Reset Stock</button>
               <button type="button" class="btn btn-outline-danger btn-sm" onclick="adminLogout()"><i class="bi bi-box-arrow-right me-1"></i>Logout</button>
             </div>
           </div>
@@ -529,6 +645,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
   <script src="js/data.js"></script>
+  <script src="js/extras.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

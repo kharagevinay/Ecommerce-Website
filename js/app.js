@@ -3,72 +3,192 @@ function esc(v) {
   return String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
+// ==========================================
+// PRICE / DISCOUNT HELPERS
+// ==========================================
+function getProduct(id) {
+  return PRODUCTS.find(p => p.id === id);
+}
+// actualPrice (asli) vs price (offer) -> discount %
+function discountPct(p) {
+  return p && p.actualPrice > p.price ? Math.round(((p.actualPrice - p.price) / p.actualPrice) * 100) : 0;
+}
+function priceBlockHtml(p) {
+  const pct = discountPct(p);
+  return `<span class="price-row"><span class="price-tag">₹${p.price}</span>` +
+    (pct ? `<span class="actual-price">₹${p.actualPrice}</span>` : "") + `</span>`;
+}
+
+// ==========================================
+// LIVE STOCK (runtime state + localStorage)
+// Original stock data.js se aata hai. Bika hua quantity localStorage me "sold" ke roop me save hota hai,
+// isliye data.js me stock badhane par wo khud apply ho jata hai.
+// ==========================================
+const SOLD_KEY = "riddhi_sold";
+const ORIGINAL_STOCK = {};
+PRODUCTS.forEach(p => { ORIGINAL_STOCK[p.id] = p.availableStock; });
+
+function getSoldMap() {
+  try { return JSON.parse(localStorage.getItem(SOLD_KEY) || "{}") || {}; } catch (e) { return {}; }
+}
+function applyStockFromStorage() {
+  const sold = getSoldMap();
+  PRODUCTS.forEach(p => {
+    p.availableStock = Math.max(0, ORIGINAL_STOCK[p.id] - (Number(sold[p.id]) || 0));
+  });
+}
+function deductStock(items) {
+  const sold = getSoldMap();
+  items.forEach(it => {
+    const p = getProduct(it.id);
+    if (!p) return;
+    sold[it.id] = Math.min(ORIGINAL_STOCK[it.id], (Number(sold[it.id]) || 0) + it.qty);
+    p.availableStock = Math.max(0, ORIGINAL_STOCK[it.id] - sold[it.id]);
+  });
+  try { localStorage.setItem(SOLD_KEY, JSON.stringify(sold)); } catch (e) { /* storage band: sirf runtime me ghatega */ }
+  refreshStockViews();
+}
+function resetStock() {
+  if (!confirm("Is device par saare products ka stock original (data.js wala) kar dein?")) return;
+  try { localStorage.removeItem(SOLD_KEY); } catch (e) { /* ignore */ }
+  applyStockFromStorage();
+  refreshStockViews();
+  alert("Stock reset ho gaya.");
+}
+function refreshStockViews() {
+  renderNewArrivals(false);
+  renderOffers();
+  const list = document.getElementById("productListView");
+  if (list && !list.classList.contains("d-none")) applyFilters(false);
+  updateCartUI();
+}
+// Ek product ke total qty (cart ki saari lines mila kar)
+function cartQtyOf(id) {
+  return cart.filter(i => i.id === id).reduce((n, i) => n + i.qty, 0);
+}
+// items me se jinka stock kam hai unki list (same product ki lines jod kar check hota hai)
+function stockProblems(items) {
+  const need = {};
+  items.forEach(it => { need[it.id] = (need[it.id] || 0) + it.qty; });
+  return Object.keys(need).filter(id => {
+    const p = getProduct(id);
+    return !p || p.availableStock < need[id];
+  }).map(id => {
+    const p = getProduct(id);
+    return `${p ? p.name : id} (ready: ${p ? p.availableStock : 0}, aapko chahiye: ${need[id]})`;
+  });
+}
+
 let cart = [];
 let currentProduct = null;
 let currentActiveMedia = { type: "image", src: "" };
-let pendingAction = null; // 'add_to_cart' or 'order_single'
+let pendingAction = null; // 'order_single' or 'order_cart'
 let productModalInstance = null;
 let customerModalInstance = null;
 let policyModalInstance = null;
 let orderSuccessModalInstance = null;
+let confirmOrderModalInstance = null;
+let removeCartModalInstance = null;
 
 document.addEventListener("DOMContentLoaded", () => {
-  if (document.getElementById("productModal")) {
-    productModalInstance = new bootstrap.Modal(document.getElementById("productModal"));
-  }
-  if (document.getElementById("customerDetailsModal")) {
-    customerModalInstance = new bootstrap.Modal(document.getElementById("customerDetailsModal"));
-  }
-  if (document.getElementById("policyModal")) {
-    policyModalInstance = new bootstrap.Modal(document.getElementById("policyModal"));
-  }
-  if (document.getElementById("orderSuccessModal")) {
-    orderSuccessModalInstance = new bootstrap.Modal(document.getElementById("orderSuccessModal"));
+  const mk = id => document.getElementById(id) ? new bootstrap.Modal(document.getElementById(id)) : null;
+  productModalInstance = mk("productModal");
+  customerModalInstance = mk("customerDetailsModal");
+  policyModalInstance = mk("policyModal");
+  orderSuccessModalInstance = mk("orderSuccessModal");
+  confirmOrderModalInstance = mk("confirmOrderModal");
+  removeCartModalInstance = mk("removeCartModal");
+
+  // Har step alag try/catch me: ek feature fail ho to baaki (products, categories) phir bhi dikhein
+  [applyStockFromStorage, renderOffers, renderNewArrivals, renderCategories, updateCartUI, renderMyOrders,
+   syncPendingOrders, updateAdminMenuLabel, checkAdminHash, refreshAdminHistory, refreshMyOrderStatuses,
+   initNameField, initCityAutocomplete].forEach(fn => {
+    try { fn(); } catch (e) { console.error("Init error in " + fn.name, e); }
+  });
+});
+
+// ==========================================
+// FESTIVE OFFERS (ribbon + highlighted cards)
+// ==========================================
+function renderOffers() {
+  const maxOff = Math.max(0, ...PRODUCTS.map(discountPct));
+
+  const track = document.getElementById("offerTrack");
+  if (track) {
+    const one = (typeof FESTIVE_OFFERS === "undefined" ? [] : FESTIVE_OFFERS).map(t => `<span class="offer-item">${esc(t.replace("{maxOff}", maxOff))}</span>`).join("");
+    track.innerHTML = one + one; // 2 baar: taaki marquee beech me ruke bina chalta rahe
   }
 
-  renderNewArrivals();
-  renderCategories();
-  updateCartUI();
-  renderMyOrders();
-  syncPendingOrders();
-  updateAdminMenuLabel();
-  checkAdminHash();
-  refreshAdminHistory();
-  refreshMyOrderStatuses();
-});
+  const grid = document.getElementById("offerCardsGrid");
+  if (!grid) return;
+  const under500 = PRODUCTS.filter(p => p.price < 500 && p.availableStock > 0).length;
+  const combos = PRODUCTS.filter(p => p.category === "Combo Set" && p.actualPrice > p.price);
+  const bestCombo = combos.sort((a, b) => (b.actualPrice - b.price) - (a.actualPrice - a.price))[0];
+  const lowStock = PRODUCTS.filter(p => p.availableStock > 0 && p.availableStock <= 2).length;
+
+  const cards = [
+    { tag: "HOT", big: `Up to ${maxOff}% OFF`, title: "Festive Mega Offer", sub: "On handmade jewellery - special offer prices",
+      go: "openProductsView('All')" },
+    { tag: "BUDGET", big: "Under ₹500", title: "Budget Picks", sub: `${under500} pieces at offer price`,
+      go: "openProductsView('All','under-500')" }
+  ];
+  if (bestCombo) {
+    cards.push({ tag: "BEST VALUE", big: `Save ₹${bestCombo.actualPrice - bestCombo.price}`, title: "Wedding Combo Deal", sub: bestCombo.name,
+      go: "openProductsView('Combo Set')" });
+  }
+  cards.push({ tag: "HURRY", big: "Only 1-2 pcs", title: "Limited Stock", sub: `${lowStock} designs are almost gone`,
+    go: "openProductsView('All')" });
+
+  grid.innerHTML = cards.map((c, i) => `
+    <div class="col-6 col-md-3">
+      <div class="offer-card reveal-card" style="--i:${i}" onclick="${c.go}">
+        <span class="offer-tag">${esc(c.tag)}</span>
+        <div class="offer-big mt-3">${esc(c.big)}</div>
+        <div class="offer-title">${esc(c.title)}</div>
+        <div class="offer-sub">${esc(c.sub)}</div>
+      </div>
+    </div>`).join("");
+}
+
+// ==========================================
+// PRODUCT CARD (New Arrivals + All Products)
+// ==========================================
+function productCardHtml(prod, opts) {
+  const soon = prod.availableStock <= 0;
+  const pct = discountPct(prod);
+  return `
+    <div class="${opts.colClass}">
+      <div class="product-card ${opts.animate ? "reveal-card" : ""} ${soon ? "sold-out" : ""}" style="--i:${opts.idx}" onclick="openProductDetail('${prod.id}')">
+        <div>
+          <div class="position-relative">
+            <img src="${prod.images[0]}" alt="${esc(prod.name)}">
+            ${opts.isNew ? `<span class="badge bg-warning text-dark position-absolute top-0 start-0 m-2" style="font-size: 10px;">NEW</span>` : ""}
+            <span class="badge bg-dark bg-opacity-75 position-absolute top-0 end-0 m-2" style="font-size: 10px;">Stock: ${prod.availableStock}</span>
+            ${pct ? `<span class="discount-badge position-absolute bottom-0 start-0 m-2">${pct}% OFF</span>` : ""}
+            ${soon ? `<span class="badge soon-badge position-absolute bottom-0 end-0 m-2" style="font-size: 10px;">Available Soon</span>` : ""}
+          </div>
+          <div class="p-2 p-md-3">
+            <small class="text-muted d-block" style="font-size: 11px;">${esc(prod.category)}</small>
+            <h6 class="fw-semibold mb-1 text-dark small">${esc(prod.name)}</h6>
+          </div>
+        </div>
+        <div class="px-2 px-md-3 pb-3 d-flex justify-content-between align-items-center gap-1 flex-wrap">
+          ${priceBlockHtml(prod)}
+          <span class="btn btn-sm btn-green rounded-pill px-3">${soon ? "Enquire" : "View"}</span>
+        </div>
+      </div>
+    </div>`;
+}
 
 // ==========================================
 // NEW ARRIVALS ON HOME PAGE
 // ==========================================
-function renderNewArrivals() {
+function renderNewArrivals(animate = true) {
   const container = document.getElementById("newArrivalsGrid");
   if (!container) return;
   const newItems = PRODUCTS.filter(p => p.isNewArrival).slice(0, 4);
-  container.innerHTML = "";
-
-  newItems.forEach(prod => {
-    container.innerHTML += `
-      <div class="col-6 col-md-3">
-        <div class="product-card" onclick="openProductDetail('${prod.id}')">
-          <div>
-            <div class="position-relative">
-              <img src="${prod.images[0]}" alt="${prod.name}">
-              <span class="badge bg-warning text-dark position-absolute top-0 start-0 m-2" style="font-size: 10px;">NEW</span>
-              <span class="badge bg-dark bg-opacity-75 position-absolute top-0 end-0 m-2" style="font-size: 10px;">Stock: ${prod.availableStock}</span>
-            </div>
-            <div class="p-2 p-md-3">
-              <small class="text-muted d-block" style="font-size: 11px;">${prod.category}</small>
-              <h6 class="fw-semibold mb-1 text-dark small">${prod.name}</h6>
-            </div>
-          </div>
-          <div class="px-2 px-md-3 pb-3 d-flex justify-content-between align-items-center">
-            <span class="price-tag">₹${prod.price}</span>
-            <span class="btn btn-sm btn-green rounded-pill px-3">View</span>
-          </div>
-        </div>
-      </div>
-    `;
-  });
+  container.innerHTML = newItems.map((prod, i) =>
+    productCardHtml(prod, { colClass: "col-6 col-md-3", isNew: true, idx: i, animate })).join("");
 }
 
 // ==========================================
@@ -122,17 +242,17 @@ function navigateTo(viewName) {
   window.scrollTo(0, 0);
 }
 
-function openProductsView(selectedCat = "All") {
+function openProductsView(selectedCat = "All", priceFilter = "default") {
   hideAllViews();
   document.getElementById("productListView").classList.remove("d-none");
   document.getElementById("filterCategory").value = selectedCat;
   document.getElementById("filterSearch").value = "";
-  document.getElementById("filterPrice").value = "default";
+  document.getElementById("filterPrice").value = priceFilter;
   applyFilters();
   window.scrollTo(0, 0);
 }
 
-function applyFilters() {
+function applyFilters(animate = true) {
   const selectedCat = document.getElementById("filterCategory").value;
   const searchText = document.getElementById("filterSearch").value.toLowerCase().trim();
   const priceSort = document.getElementById("filterPrice").value;
@@ -148,44 +268,28 @@ function applyFilters() {
     return matchCat && matchSearch;
   });
 
-  if (priceSort === "under-500") filtered = filtered.filter(p => p.price < 500);
-  else if (priceSort === "500-1000") filtered = filtered.filter(p => p.price >= 500 && p.price <= 1000);
-  else if (priceSort === "low-high") filtered.sort((a, b) => a.price - b.price);
-  else if (priceSort === "high-low") filtered = filtered.sort((a, b) => b.price - a.price);
+  // Price filters offer price (jo customer ko dena hai) par chalte hain
+  switch (priceSort) {
+    case "under-500":  filtered = filtered.filter(p => p.price < 500); break;
+    case "500-1000":   filtered = filtered.filter(p => p.price >= 500 && p.price <= 1000); break;
+    case "1000-1500":  filtered = filtered.filter(p => p.price > 1000 && p.price <= 1500); break;
+    case "1500-2000":  filtered = filtered.filter(p => p.price > 1500 && p.price <= 2000); break;
+    case "above-2000": filtered = filtered.filter(p => p.price > 2000); break;
+    case "low-high":   filtered.sort((a, b) => a.price - b.price); break;
+    case "high-low":   filtered.sort((a, b) => b.price - a.price); break;
+    case "az":         filtered.sort((a, b) => a.name.localeCompare(b.name, "en", { sensitivity: "base" })); break;
+    case "za":         filtered.sort((a, b) => b.name.localeCompare(a.name, "en", { sensitivity: "base" })); break;
+  }
 
   document.getElementById("productCountBadge").innerText = filtered.length + " Items";
   const grid = document.getElementById("productsGrid");
-  grid.innerHTML = "";
 
   if (filtered.length === 0) {
     grid.innerHTML = `<div class="col-12 text-center py-5 text-muted">No products found matching your filter.</div>`;
     return;
   }
-
-  filtered.forEach(prod => {
-    grid.innerHTML += `
-      <div class="col-6 col-md-4 col-lg-3">
-        <div class="product-card" onclick="openProductDetail('${prod.id}')">
-          <div>
-            <div class="position-relative">
-              <img src="${prod.images[0]}" alt="${prod.name}">
-              <span class="badge bg-dark bg-opacity-75 position-absolute top-0 end-0 m-2" style="font-size: 10px;">
-                Stock: ${prod.availableStock}
-              </span>
-            </div>
-            <div class="p-2 p-md-3">
-              <small class="text-muted d-block" style="font-size: 11px;">${prod.category}</small>
-              <h6 class="fw-semibold mb-1 text-dark small">${prod.name}</h6>
-            </div>
-          </div>
-          <div class="px-2 px-md-3 pb-3 d-flex justify-content-between align-items-center">
-            <span class="price-tag">₹${prod.price}</span>
-            <span class="btn btn-sm btn-green rounded-pill px-3">View</span>
-          </div>
-        </div>
-      </div>
-    `;
-  });
+  grid.innerHTML = filtered.map((prod, i) =>
+    productCardHtml(prod, { colClass: "col-6 col-md-4 col-lg-3", isNew: false, idx: i, animate })).join("");
 }
 
 // ==========================================
@@ -199,8 +303,32 @@ function openProductDetail(productId) {
   document.getElementById("modalTitle").innerText = currentProduct.name;
   document.getElementById("modalPrice").innerText = currentProduct.price;
   document.getElementById("modalDesc").innerText = currentProduct.desc;
-  document.getElementById("modalStockBadge").innerText = `Available Stock: ${currentProduct.availableStock} pcs`;
-  document.getElementById("maxStockHint").innerText = `(Max ${currentProduct.availableStock} ready)`;
+
+  // Actual price vs offer price + discount badge
+  const pct = discountPct(currentProduct);
+  const actualEl = document.getElementById("modalActualPrice");
+  const pctEl = document.getElementById("modalDiscountBadge");
+  actualEl.innerText = `₹${currentProduct.actualPrice}`;
+  pctEl.innerText = `${pct}% OFF`;
+  actualEl.classList.toggle("d-none", !pct);
+  pctEl.classList.toggle("d-none", !pct);
+
+  // Stock / "Available Soon"
+  const stock = currentProduct.availableStock;
+  const soon = stock <= 0;
+  const stockBadge = document.getElementById("modalStockBadge");
+  stockBadge.innerText = soon ? "Stock: 0 | Available Soon" : `Available Stock: ${stock} pcs`;
+  stockBadge.className = soon
+    ? "badge soon-badge border px-2 py-1"
+    : "badge bg-success-subtle text-success border border-success-subtle px-2 py-1";
+  document.getElementById("maxStockHint").innerText = `(Max ${stock} ready)`;
+  document.getElementById("modalSoonBox").classList.toggle("d-none", !soon);
+  document.getElementById("modalOrderControls").classList.toggle("d-none", soon);
+  if (soon) {
+    const text = `Hello Jewellery by Riddhi! I am interested in "${currentProduct.name}" (${currentProduct.id}), currently showing Available Soon. Please let me know when it is available.`;
+    document.getElementById("soonCallBtn").href = `tel:+${WHATSAPP_NUMBER}`;
+    document.getElementById("soonWaBtn").href = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(text)}`;
+  }
 
   document.getElementById("modalSize").selectedIndex = 0;
   document.getElementById("modalQty").value = 1;
@@ -305,8 +433,85 @@ function sendBulkEnquiryWhatsApp() {
 }
 
 // ==========================================
-// COMPULSORY CUSTOMER DETAILS GATEWAY
+// CUSTOMER DETAILS (validation) -> ORDER CONFIRMATION -> WHATSAPP
+// Add to Cart par details nahi maangi jaati: product seedha cart me jata hai.
+// Details sirf "Order Now" / "Order All on WhatsApp" par maangi jaati hain.
 // ==========================================
+let pendingDraft = null;     // {items, total, multi} - order button dabate waqt ka snapshot
+let pendingCustomer = null;
+
+const NAME_RE = /^[A-Za-z]+(?: [A-Za-z]+)*$/;
+function cleanName(v) {
+  return String(v || "").replace(/[^A-Za-z\s]/g, "").replace(/\s{2,}/g, " ").replace(/^\s+/, "");
+}
+function cleanCity(v) {
+  return String(v || "").replace(/[^A-Za-z\s.\-]/g, "").replace(/\s{2,}/g, " ").replace(/^\s+/, "");
+}
+
+// Full Name: typing ke saath hi letters/space ke alawa sab hat jata hai
+function initNameField() {
+  const el = document.getElementById("custName");
+  if (!el) return;
+  el.addEventListener("input", () => {
+    const v = cleanName(el.value);
+    if (v !== el.value) el.value = v;
+    el.classList.remove("is-invalid");
+  });
+}
+
+// City: live suggestions dropdown (India cities). Native <datalist> sirf fallback hai, taaki 2 popup na aayein.
+function initCityAutocomplete() {
+  const input = document.getElementById("custCity");
+  const box = document.getElementById("citySuggestions");
+  const dl = document.getElementById("cityList");
+  if (!input || !box || typeof INDIAN_CITIES === "undefined") return;
+  if (dl) dl.innerHTML = INDIAN_CITIES.map(c => `<option value="${esc(c)}"></option>`).join("");
+  input.removeAttribute("list");
+
+  let matches = [];
+  let active = -1;
+
+  const hide = () => { box.classList.add("d-none"); active = -1; };
+  const pick = city => { input.value = city; hide(); };
+  const paint = () => {
+    box.querySelectorAll("button").forEach((b, i) => b.classList.toggle("active", i === active));
+  };
+  const show = () => {
+    const q = input.value.trim().toLowerCase();
+    if (!q) return hide();
+    const starts = INDIAN_CITIES.filter(c => c.toLowerCase().startsWith(q));
+    const has = INDIAN_CITIES.filter(c => !c.toLowerCase().startsWith(q) && c.toLowerCase().includes(q));
+    matches = starts.concat(has).slice(0, 8);
+    if (!matches.length) return hide();
+    box.innerHTML = matches.map((c, i) => {
+      const at = c.toLowerCase().indexOf(q);
+      return `<button type="button" role="option" data-i="${i}">${esc(c.slice(0, at))}<mark>${esc(c.slice(at, at + q.length))}</mark>${esc(c.slice(at + q.length))}</button>`;
+    }).join("");
+    active = -1;
+    box.classList.remove("d-none");
+  };
+
+  input.addEventListener("input", () => {
+    const v = cleanCity(input.value);
+    if (v !== input.value) input.value = v;
+    show();
+  });
+  input.addEventListener("focus", show);
+  input.addEventListener("blur", () => setTimeout(hide, 150));
+  input.addEventListener("keydown", e => {
+    if (box.classList.contains("d-none")) return;
+    if (e.key === "ArrowDown") { e.preventDefault(); active = (active + 1) % matches.length; paint(); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); active = (active - 1 + matches.length) % matches.length; paint(); }
+    else if (e.key === "Enter" && active > -1) { e.preventDefault(); pick(matches[active]); }
+    else if (e.key === "Escape") { hide(); }
+  });
+  // mousedown (click se pehle) taaki input ka blur dropdown na band kar de
+  box.addEventListener("mousedown", e => {
+    const btn = e.target.closest("button[data-i]");
+    if (btn) { e.preventDefault(); pick(matches[Number(btn.dataset.i)]); }
+  });
+}
+
 function getSavedCustomer() {
   try {
     return JSON.parse(localStorage.getItem("riddhi_customer") || "null");
@@ -319,46 +524,145 @@ function openCustomerModal(actionType) {
   pendingAction = actionType;
   const saved = getSavedCustomer();
   if (saved) {
-    document.getElementById("custName").value = saved.name || "";
+    document.getElementById("custName").value = cleanName(saved.name);
     document.getElementById("custMobile").value = saved.mobile || "";
     document.getElementById("custAddress").value = saved.address || "";
-    document.getElementById("custCity").value = saved.city || "";
+    document.getElementById("custCity").value = cleanCity(saved.city);
     document.getElementById("custPincode").value = saved.pincode || "";
   }
+  document.getElementById("custName").classList.remove("is-invalid");
   customerModalInstance.show();
 }
 
 function submitCustomerDetails(e) {
   e.preventDefault();
-  const name = document.getElementById("custName").value.trim();
+  const nameEl = document.getElementById("custName");
+  const name = cleanName(nameEl.value).trim();
   const mobile = document.getElementById("custMobile").value.trim();
   const address = document.getElementById("custAddress").value.trim();
-  const city = document.getElementById("custCity").value.trim();
+  const city = cleanCity(document.getElementById("custCity").value).trim();
   const pincode = document.getElementById("custPincode").value.trim();
 
+  if (!NAME_RE.test(name) || name.length < 2) {
+    nameEl.classList.add("is-invalid");
+    nameEl.focus();
+    return;
+  }
   if (!name || !mobile || !address || !city || !pincode) {
     alert("Please fill all required fields: Name, Mobile Number, Address, City, and Pincode.");
     return;
   }
 
   const customerObj = { name, mobile, address, city, pincode };
-  localStorage.setItem("riddhi_customer", JSON.stringify(customerObj));
-  customerModalInstance.hide();
+  try { localStorage.setItem("riddhi_customer", JSON.stringify(customerObj)); } catch (err) { /* ignore */ }
+  pendingCustomer = customerObj;
 
-  if (pendingAction === "add_to_cart") {
-    executeAddToCart();
-  } else if (pendingAction === "order_single") {
-    executeOrderSingle(customerObj);
-  } else if (pendingAction === "order_cart") {
-    executeOrderCart(customerObj);
-  }
+  // Details modal band hone ke baad order review/confirmation dikhayein
+  document.getElementById("customerDetailsModal").addEventListener(
+    "hidden.bs.modal", () => showOrderConfirmation(), { once: true });
+  customerModalInstance.hide();
 }
 
-function handleAddToCartClick() {
-  openCustomerModal("add_to_cart");
+// ---- Order review & confirmation step ----
+function showOrderConfirmation() {
+  if (!pendingDraft || !pendingCustomer) return;
+  const { items, total } = pendingDraft;
+  const c = pendingCustomer;
+  const savings = items.reduce((n, i) => n + Math.max(0, ((i.actualPrice || i.price) - i.price) * i.qty), 0);
+  document.getElementById("confirmOrderBody").innerHTML = `
+    <div class="small">
+      ${buildItemsHtml(items)}
+      <div class="d-flex justify-content-between fw-bold mt-2" style="color: var(--primary-green);">
+        <span>Total</span><span>₹${esc(total)}</span>
+      </div>
+      ${savings ? `<div class="text-success" style="font-size:12px;">You save ₹${esc(savings)} on this order 🎉</div>` : ""}
+      <hr class="my-2">
+      <div class="fw-semibold text-dark">👤 ${esc(c.name)}</div>
+      <div class="text-muted">📞 ${esc(c.mobile)}</div>
+      <div class="text-muted">📍 ${esc(c.address)}, ${esc(c.city)} - ${esc(c.pincode)}</div>
+    </div>`;
+  confirmOrderModalInstance.show();
+}
+
+function editOrderDetails() {
+  document.getElementById("confirmOrderModal").addEventListener(
+    "hidden.bs.modal", () => openCustomerModal(pendingAction), { once: true });
+  confirmOrderModalInstance.hide();
+}
+
+function cancelOrderConfirmation() {
+  pendingDraft = null;
+  pendingCustomer = null;
+  confirmOrderModalInstance.hide();
+}
+
+function buildOrderMessage(items, total, cust, multi) {
+  let msg = `Hello *Jewellery by Riddhi*! ✨\n*${multi ? "NEW MULTI-ITEM ORDER" : "NEW ORDER RECEIVED"}*\n\n`;
+  items.forEach((it, idx) => {
+    const mrp = it.actualPrice > it.price ? ` (MRP ~₹${it.actualPrice}~)` : "";
+    msg += `*${idx + 1}. ${it.name}* (${it.id})\n`;
+    msg += `   • Size: ${it.size}\n`;
+    msg += `   • Qty: ${it.qty} x ₹${it.price}${mrp} = *₹${it.price * it.qty}*\n`;
+    if (it.note) msg += `   • Customization: _${it.note}_\n`;
+    msg += `   • Image: ${it.image}\n\n`;
+  });
+  msg += `💰 *Grand Total: ₹${total}*\n\n`;
+  msg += formatCustomerBlock(cust);
+  return msg;
+}
+
+// "Yes, Confirm & Send on WhatsApp"
+function confirmAndSendOrder() {
+  if (!pendingDraft || !pendingCustomer) return;
+  const { items, total, multi } = pendingDraft;
+  const cust = pendingCustomer;
+
+  // stock dobara check (beech me kam ho gaya ho to)
+  const bad = stockProblems(items);
+  if (bad.length) {
+    alert("Ye items ab itne ready nahi hain:\n\n" + bad.join("\n") + "\n\nPlease cart/quantity update karein ya WhatsApp par enquiry karein.");
+    cancelOrderConfirmation();
+    return;
+  }
+
+  confirmOrderModalInstance.hide();
+  const msg = buildOrderMessage(items, total, cust, multi);
+
+  const order = saveOrderToHistory({
+    total, items, customer: cust,
+    fullMessage: `📋 *Order Receipt - Jewellery by Riddhi*\n\n` + msg
+  });
+
+  deductStock(items);   // live stock kam karein
+  dispatchOrderToSellerAndCustomer(msg, cust.mobile, buildSummaryHtml(items, total, cust));
+  syncOrderToSheet(order);
+
+  if (multi) {
+    cart = [];
+    updateCartUI();
+  }
+  pendingDraft = null;
+  pendingCustomer = null;
 }
 
 function handleOrderSingleClick() {
+  if (!currentProduct) return;
+  const p = getProduct(currentProduct.id);
+  const qty = parseInt(document.getElementById("modalQty").value) || 1;
+  if (p.availableStock <= 0) {
+    alert("Ye product abhi Available Soon hai. Please Call/WhatsApp enquiry karein.");
+    return;
+  }
+  if (qty > p.availableStock) {
+    alert(`Sirf ${p.availableStock} piece ready hain. 3+ pieces ke liye "Enquire 3+ Pcs" use karein.`);
+    return;
+  }
+  const item = {
+    id: p.id, name: p.name, size: document.getElementById("modalSize").value, qty,
+    price: p.price, actualPrice: p.actualPrice,
+    note: document.getElementById("modalCustom").value.trim(), image: p.images[0]
+  };
+  pendingDraft = { items: [item], total: p.price * qty, multi: false };
   openCustomerModal("order_single");
 }
 
@@ -367,49 +671,100 @@ function handleCheckoutCartClick() {
     alert("Your cart is empty!");
     return;
   }
+  const items = cart.map(i => ({
+    id: i.id, name: i.name, size: i.size, qty: i.qty,
+    price: i.price, actualPrice: i.actualPrice, note: i.customNote || "", image: i.images[0]
+  }));
+  const bad = stockProblems(items);
+  if (bad.length) {
+    alert("Cart me kuch items ka stock kam hai:\n\n" + bad.join("\n") + "\n\nPlease quantity kam karein ya item hata dein.");
+    return;
+  }
+  pendingDraft = { items, total: items.reduce((n, i) => n + i.price * i.qty, 0), multi: true };
   openCustomerModal("order_cart");
 }
 
 // ==========================================
-// CART & DUAL WHATSAPP ORDER DISPATCH
-// (Sends to Seller 918412981213 + Opens Copy for Customer Mobile)
+// CART  (Add to Cart = sirf cart me jodta hai, order place nahi hota)
 // ==========================================
-function executeAddToCart() {
+function handleAddToCartClick() {
+  if (!currentProduct) return;
+  const p = getProduct(currentProduct.id);
+  const qty = parseInt(document.getElementById("modalQty").value) || 1;
+  const inCart = cartQtyOf(p.id);
+
+  if (p.availableStock <= 0) {
+    alert("Ye product abhi Available Soon hai.");
+    return;
+  }
+  if (inCart + qty > p.availableStock) {
+    alert(inCart
+      ? `Cart me already ${inCart} piece hai. Sirf ${p.availableStock} piece ready hain.`
+      : `Sirf ${p.availableStock} piece ready hain.`);
+    return;
+  }
+
   const size = document.getElementById("modalSize").value;
-  const qty = parseInt(document.getElementById("modalQty").value);
   const customNote = document.getElementById("modalCustom").value.trim();
-
   const existingIndex = cart.findIndex(item =>
-    item.id === currentProduct.id && item.size === size && item.customNote === customNote
+    item.id === p.id && item.size === size && item.customNote === customNote
   );
-
   if (existingIndex > -1) {
     cart[existingIndex].qty += qty;
   } else {
-    cart.push({
-      ...currentProduct,
-      size,
-      qty,
-      customNote
-    });
+    cart.push({ ...p, size, qty, customNote });
   }
 
   updateCartUI();
+  bumpCartBadge();
   closeProductModal();
+  bootstrap.Offcanvas.getOrCreateInstance(document.getElementById("cartOffcanvas")).show();
+}
 
-  const cartCanvas = new bootstrap.Offcanvas(document.getElementById("cartOffcanvas"));
-  cartCanvas.show();
+function bumpCartBadge() {
+  const el = document.getElementById("navCartCount");
+  if (!el) return;
+  el.classList.remove("cart-bump");
+  void el.offsetWidth;
+  el.classList.add("cart-bump");
 }
 
 function updateCartItemQty(index, delta) {
-  cart[index].qty += delta;
-  if (cart[index].qty <= 0) cart.splice(index, 1);
+  const item = cart[index];
+  if (!item) return;
+  if (delta < 0 && item.qty + delta <= 0) {
+    askRemoveCartItem(index);          // qty 0 hone par seedha nahi hatate, pehle poochte hain
+    return;
+  }
+  if (delta > 0) {
+    const p = getProduct(item.id);
+    if (!p || cartQtyOf(item.id) + delta > p.availableStock) {
+      alert(`Sirf ${p ? p.availableStock : 0} piece ready hain.`);
+      return;
+    }
+  }
+  item.qty += delta;
   updateCartUI();
 }
 
-function removeCartItem(index) {
-  cart.splice(index, 1);
+// ---- Remove from cart confirmation ----
+let pendingRemoveIndex = null;
+
+function askRemoveCartItem(index) {
+  if (!cart[index]) return;
+  pendingRemoveIndex = index;
+  document.getElementById("removeCartName").innerText = cart[index].name;
+  removeCartModalInstance.show();
+}
+function confirmRemoveCartItem() {
+  if (pendingRemoveIndex !== null && cart[pendingRemoveIndex]) cart.splice(pendingRemoveIndex, 1);
+  pendingRemoveIndex = null;
+  removeCartModalInstance.hide();
   updateCartUI();
+}
+function cancelRemoveCartItem() {
+  pendingRemoveIndex = null;
+  removeCartModalInstance.hide();
 }
 
 function updateCartUI() {
@@ -417,14 +772,17 @@ function updateCartUI() {
   if (!container) return;
   const navCount = document.getElementById("navCartCount");
   const floatBtn = document.getElementById("floatingCartBtn");
+  const saveRow = document.getElementById("cartSavingsRow");
 
   let totalQty = 0;
   let totalPrice = 0;
+  let totalSavings = 0;
 
   if (cart.length === 0) {
     container.innerHTML = `<div class="text-center text-muted my-5"><i class="bi bi-bag-x fs-1"></i><p class="mt-2">Your cart is empty.</p></div>`;
     navCount.innerText = "0";
     document.getElementById("cartTotal").innerText = "0";
+    if (saveRow) saveRow.classList.add("d-none");
     floatBtn.classList.add("d-none");
     return;
   }
@@ -433,17 +791,27 @@ function updateCartUI() {
   cart.forEach((item, index) => {
     totalQty += item.qty;
     totalPrice += item.price * item.qty;
+    const pct = discountPct(item);
+    if (pct) totalSavings += (item.actualPrice - item.price) * item.qty;
+    const live = getProduct(item.id);
+    const stockWarn = live && live.availableStock < cartQtyOf(item.id)
+      ? `<small class="text-danger d-block" style="font-size: 11px;"><i class="bi bi-exclamation-triangle me-1"></i>${live.availableStock <= 0 ? "Available Soon - please remove" : `Only ${live.availableStock} ready`}</small>`
+      : "";
 
     container.innerHTML += `
       <div class="card mb-3 border-0 shadow-sm">
         <div class="card-body p-2 d-flex gap-2 align-items-center">
           <img src="${item.images[0]}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 8px;">
           <div class="flex-grow-1">
-            <h6 class="mb-0 small fw-bold">${item.name}</h6>
-            <small class="text-muted d-block" style="font-size: 11px;">Size: ${item.size}</small>
+            <h6 class="mb-0 small fw-bold">${esc(item.name)}</h6>
+            <small class="text-muted d-block" style="font-size: 11px;">Size: ${esc(item.size)}</small>
             ${item.customNote ? `<small class="text-success d-block" style="font-size: 11px;"><strong>Note:</strong> ${esc(item.customNote)}</small>` : ""}
+            ${stockWarn}
             <div class="d-flex justify-content-between align-items-center mt-1">
-              <span class="fw-bold small" style="color: var(--primary-green);">₹${item.price * item.qty}</span>
+              <span class="price-row">
+                <span class="fw-bold small" style="color: var(--primary-green);">₹${item.price * item.qty}</span>
+                ${pct ? `<span class="actual-price" style="font-size:11px;">₹${item.actualPrice * item.qty}</span><span class="discount-badge">${pct}% OFF</span>` : ""}
+              </span>
               <div class="btn-group btn-group-sm">
                 <button class="btn btn-outline-secondary py-0 px-2" onclick="updateCartItemQty(${index}, -1)">-</button>
                 <span class="btn btn-light py-0 px-2 disabled text-dark fw-bold">${item.qty}</span>
@@ -451,7 +819,7 @@ function updateCartUI() {
               </div>
             </div>
           </div>
-          <button class="btn btn-sm text-danger" onclick="removeCartItem(${index})"><i class="bi bi-trash"></i></button>
+          <button class="btn btn-sm text-danger" onclick="askRemoveCartItem(${index})" aria-label="Remove from cart"><i class="bi bi-trash"></i></button>
         </div>
       </div>
     `;
@@ -459,6 +827,10 @@ function updateCartUI() {
 
   navCount.innerText = totalQty;
   document.getElementById("cartTotal").innerText = totalPrice;
+  if (saveRow) {
+    saveRow.classList.toggle("d-none", totalSavings <= 0);
+    document.getElementById("cartSavings").innerText = totalSavings;
+  }
   floatBtn.classList.remove("d-none");
   document.getElementById("floatCount").innerText = totalQty;
   document.getElementById("floatTotal").innerText = totalPrice;
@@ -471,76 +843,19 @@ function formatCustomerBlock(cust) {
          `• Address: ${cust.address}, ${cust.city} - ${cust.pincode}\n`;
 }
 
-function executeOrderSingle(cust) {
-  const size = document.getElementById("modalSize").value;
-  const qty = parseInt(document.getElementById("modalQty").value);
-  const customNote = document.getElementById("modalCustom").value.trim();
-  const total = currentProduct.price * qty;
-
-  let msg = `Hello *Jewellery by Riddhi*! ✨\n*NEW ORDER RECEIVED*\n\n`;
-  msg += `🛍️ *Product:* ${currentProduct.name} (${currentProduct.id})\n`;
-  msg += `• Size: ${size}\n`;
-  msg += `• Qty: ${qty} x ₹${currentProduct.price} = *₹${total}*\n`;
-  if (customNote) msg += `• Customization: _${customNote}_\n`;
-  msg += `• Product Image: ${currentProduct.images[0]}\n\n`;
-  msg += formatCustomerBlock(cust);
-
-  const items = [{
-    id: currentProduct.id, name: currentProduct.name, size, qty,
-    price: currentProduct.price, note: customNote, image: currentProduct.images[0]
-  }];
-
-  const order = saveOrderToHistory({
-    total, items, customer: cust,
-    fullMessage: `📋 *Order Receipt - Jewellery by Riddhi*\n\n` + msg
-  });
-
-  dispatchOrderToSellerAndCustomer(msg, cust.mobile, buildSummaryHtml(items, total, cust));
-  syncOrderToSheet(order);
-}
-
-function executeOrderCart(cust) {
-  let grandTotal = 0;
-  let msg = `Hello *Jewellery by Riddhi*! ✨\n*NEW MULTI-ITEM ORDER*\n\n`;
-
-  const items = cart.map(item => ({
-    id: item.id, name: item.name, size: item.size, qty: item.qty,
-    price: item.price, note: item.customNote || "", image: item.images[0]
-  }));
-
-  cart.forEach((item, idx) => {
-    const sub = item.price * item.qty;
-    grandTotal += sub;
-    msg += `*${idx + 1}. ${item.name}* (${item.id})\n`;
-    msg += `   • Size: ${item.size} | Qty: ${item.qty} | Price: ₹${sub}\n`;
-    if (item.customNote) msg += `   • Customization: _${item.customNote}_\n`;
-    msg += `   • Image: ${item.images[0]}\n\n`;
-  });
-
-  msg += `💰 *Grand Total: ₹${grandTotal}*\n\n`;
-  msg += formatCustomerBlock(cust);
-
-  const order = saveOrderToHistory({
-    total: grandTotal, items, customer: cust,
-    fullMessage: `📋 *Order Receipt - Jewellery by Riddhi*\n\n` + msg
-  });
-
-  dispatchOrderToSellerAndCustomer(msg, cust.mobile, buildSummaryHtml(items, grandTotal, cust));
-  syncOrderToSheet(order);
-
-  // order ho gaya -> cart khaali karein
-  cart = [];
-  updateCartUI();
-}
-
 // Order ki items list ko safe HTML me badalta hai (customer ka likha text escape hota hai)
 // ==========================================
 // ORDER STATUS
 // ==========================================
-const ORDER_STATUSES = ["Pending", "Confirmed", "Packed", "Shipped", "Delivered", "Cancelled"];
+// "Custom Making" / "Partial Stock Ready": jab customer ko 3-4+ pieces chahiye aur stock kam ho, admin ye status daalta hai
+const ORDER_STATUSES = ["Pending", "Confirmed", "Custom Making", "Partial Stock Ready", "Packed", "Shipped", "Delivered", "Cancelled"];
+const NOT_SHIPPED_STATUSES = ["Pending", "Confirmed", "Custom Making", "Partial Stock Ready", "Packed"];
 const STATUS_META = {
-  Pending:   { label: "Order Placed (Pending)", cls: "bg-secondary",         msg: "Aapka order mil gaya hai. Hum jaldi confirm karenge." },
+  Pending:   { label: "Order Placed (Pending)", cls: "bg-secondary",         msg: "Aapka order mil gaya hai. Hum jaldi confirm karenge. Customer ko call/WhatsApp karenge aur payment lenge tabhi order confirmed hoga.",
+               waMsg: "Aapka order mil gaya hai. Hum jaldi confirm karenge." },
   Confirmed: { label: "Confirmed",              cls: "bg-primary",           msg: "Aapka order confirm ho gaya hai." },
+  "Custom Making":       { label: "Custom Making",       cls: "bg-dark",            msg: "Aapke extra pieces custom banaye ja rahe hain. Ready hote hi hum aapko batayenge." },
+  "Partial Stock Ready": { label: "Partial Stock Ready", cls: "bg-info text-dark",  msg: "Aapke order ka kuch stock ready hai, baaki pieces ban rahe hain. Hum aapse WhatsApp par baat karenge." },
   Packed:    { label: "Packed",                 cls: "bg-info text-dark",    msg: "Aapka order pack ho gaya hai." },
   Shipped:   { label: "Shipped",                cls: "bg-warning text-dark", msg: "Aapka order ship ho gaya hai." },
   Delivered: { label: "Delivered",              cls: "bg-success",           msg: "Aapka order deliver ho gaya hai. Dhanyavaad!" },
@@ -562,7 +877,8 @@ function customerStatusHtml(ord) {
   const meta = STATUS_META[st];
   let tracker = "";
   if (st !== "Cancelled") {
-    const idx = STATUS_FLOW.indexOf(st);
+    // Custom Making / Partial Stock Ready "Confirmed" aur "Packed" ke beech ka step hai
+    const idx = STATUS_FLOW.includes(st) ? STATUS_FLOW.indexOf(st) : STATUS_FLOW.indexOf("Confirmed");
     tracker = `<div class="d-flex align-items-center my-2" aria-hidden="true">` + STATUS_FLOW.map((step, i) => `
       <div class="text-center" style="flex:1;">
         <div class="mx-auto rounded-circle" style="width:12px;height:12px;background:${i <= idx ? "var(--primary-green)" : "#d9d2c5"};"></div>
@@ -585,7 +901,7 @@ function adminStatusControl(orderId, status, custName, custMobile) {
   const st = normStatus(status);
   let wa = String(custMobile || "").replace(/[^0-9]/g, "");
   if (wa.length === 10) wa = "91" + wa;
-  const text = `Namaste ${custName || ""}! 🌸\nAapke order ${orderId} ka status: *${STATUS_META[st].label}*\n${STATUS_META[st].msg}\n- Jewellery by Riddhi`;
+  const text = `Namaste ${custName || ""}! 🌸\nAapke order ${orderId} ka status: *${STATUS_META[st].label}*\n${STATUS_META[st].waMsg || STATUS_META[st].msg}\n- Jewellery by Riddhi`;
   return `
     <div class="d-flex flex-wrap align-items-center gap-2 my-2">
       <select class="form-select form-select-sm w-auto" data-oid="${esc(orderId)}" onchange="adminChangeStatus(this)" aria-label="Order status">
@@ -607,7 +923,7 @@ async function adminChangeStatus(sel) {
       const r = await callScript({ action: "updateStatus", token: s.token, orderId, status });
       if (!r.ok) {
         if (r.error === "auth") {
-          sessionStorage.removeItem("riddhi_admin_session");
+          localStorage.removeItem("riddhi_admin_session");
           updateAdminMenuLabel();
           alert("Session expire ho gaya. Dobara admin login karein.");
           return;
@@ -707,6 +1023,8 @@ function dispatchOrderToSellerAndCustomer(orderMessage, customerMobile, summaryH
   const summaryBox = document.getElementById("successOrderSummaryBox");
   const custBtn = document.getElementById("customerWhatsAppCopyBtn");
   if (summaryBox) summaryBox.innerHTML = summaryHtml;
+  const noteBox = document.getElementById("successStatusNote");
+  if (noteBox) noteBox.innerHTML = `<i class="bi bi-info-circle-fill me-1" style="color: var(--accent-gold);"></i><strong>Order Status: ${esc(STATUS_META.Pending.label)}</strong><br>${esc(STATUS_META.Pending.msg)}`;
   if (custBtn) custBtn.href = custWaUrl;
   if (orderSuccessModalInstance) orderSuccessModalInstance.show();
 }
@@ -783,14 +1101,46 @@ function saveOrderToHistory(orderRecord) {
   return order;
 }
 
+// ---- My Orders filters: All / Not Yet Shipped / Date-wise (30 days, 3 months, year) ----
+function filterOrders(list, f) {
+  const now = Date.now();
+  const DAY = 24 * 60 * 60 * 1000;
+  if (f === "notshipped") return list.filter(o => NOT_SHIPPED_STATUSES.includes(normStatus(o.status)));
+  if (f === "last30") return list.filter(o => (o.timestamp || 0) >= now - 30 * DAY);
+  if (f === "last3m") return list.filter(o => (o.timestamp || 0) >= now - 90 * DAY);
+  if (f.startsWith("year-")) {
+    const y = Number(f.slice(5));
+    return list.filter(o => new Date(o.timestamp || 0).getFullYear() === y);
+  }
+  return list;
+}
+
+// Year-wise options orders ke saal ke hisaab se khud ban jaate hain (current saal hamesha)
+function syncYearOptions(orders) {
+  const sel = document.getElementById("orderFilter");
+  if (!sel) return;
+  const years = new Set([new Date().getFullYear()]);
+  orders.forEach(o => { const y = new Date(o.timestamp || 0).getFullYear(); if (y > 2000) years.add(y); });
+  const cur = sel.value;
+  sel.querySelectorAll("option[data-year]").forEach(o => o.remove());
+  Array.from(years).sort((a, b) => b - a).forEach(y => {
+    const opt = new Option(`Date-wise: Year ${y}`, `year-${y}`);
+    opt.dataset.year = "1";
+    sel.add(opt);
+  });
+  sel.value = Array.from(sel.options).some(o => o.value === cur) ? cur : "all";
+}
+
 function renderMyOrders() {
   const container = document.getElementById("myOrdersListContainer");
   const badge = document.getElementById("navOrdersCount");
   const adminView = isAdminLoggedIn();
   // Admin ko yahan saare customers ke orders dikhte hain, customer ko sirf apne
-  const orders = adminView
+  const allOrders = adminView
     ? adminOrders.slice().sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
     : getLocalOrders();
+  syncYearOptions(allOrders);
+  const orders = filterOrders(allOrders, (document.getElementById("orderFilter") || {}).value || "all");
 
   const warn = adminView && (getAdminSession() || {}).mode === "local"
     ? `<div class="alert alert-warning small py-2"><strong>Google Sheet connect nahi hai.</strong> Sirf is device ke orders dikh rahe hain. <code>js/data.js</code> me <code>APPS_SCRIPT_URL</code> daalein (SETUP-HINDI.md dekhein), phir dobara login karein.</div>`
@@ -804,8 +1154,8 @@ function renderMyOrders() {
   if (footEl) footEl.classList.toggle("d-none", adminView);
 
   if (badge) {
-    if (orders.length > 0) {
-      badge.innerText = orders.length;
+    if (allOrders.length > 0) {
+      badge.innerText = allOrders.length;
       badge.classList.remove("d-none");
     } else {
       badge.classList.add("d-none");
@@ -817,7 +1167,7 @@ function renderMyOrders() {
     container.innerHTML = warn + `
       <div class="text-center text-muted my-5">
         <i class="bi bi-receipt fs-1"></i>
-        <p class="mt-2 small">${adminView ? "No orders yet." : "You haven't placed any orders on this device yet."}</p>
+        <p class="mt-2 small">${allOrders.length ? "No orders match this filter." : adminView ? "No orders yet." : "You haven't placed any orders on this device yet."}</p>
       </div>`;
     return;
   }
@@ -930,14 +1280,15 @@ async function syncPendingOrders() {
 let adminOrders = [];
 
 function getAdminSession() {
-  try { return JSON.parse(sessionStorage.getItem("riddhi_admin_session") || "null"); } catch (e) { return null; }
+  try { return JSON.parse(localStorage.getItem("riddhi_admin_session") || "null"); } catch (e) { return null; }
 }
 function isAdminLoggedIn() {
   return !!getAdminSession();
 }
 function updateAdminMenuLabel() {
-  const el = document.getElementById("adminMenuLabel");
-  if (el) el.textContent = isAdminLoggedIn() ? "Admin Panel (Customers & Orders)" : "Admin Login";
+  const on = isAdminLoggedIn();
+  // Sidebar ke admin-only items (All Orders (Admin), Customers panel, Logout) login ke baad hi dikhte hain
+  document.querySelectorAll(".admin-only").forEach(el => el.classList.toggle("d-none", !on));
 }
 
 async function sha256Hex(text) {
@@ -1090,7 +1441,7 @@ async function submitAdminLogin(e) {
     }
 
     clearAdminFails();
-    sessionStorage.setItem("riddhi_admin_session", JSON.stringify(session));
+    localStorage.setItem("riddhi_admin_session", JSON.stringify(session));
     updateAdminMenuLabel();
     renderMyOrders();
 
@@ -1105,8 +1456,13 @@ async function submitAdminLogin(e) {
 }
 
 async function adminLogout() {
+  if (!confirm("Admin se logout karna hai?")) return;
+  ["menuOffcanvas", "myOrdersOffcanvas"].forEach(id => {
+    const inst = bootstrap.Offcanvas.getInstance(document.getElementById(id));
+    if (inst) inst.hide();
+  });
   const s = getAdminSession();
-  sessionStorage.removeItem("riddhi_admin_session");
+  localStorage.removeItem("riddhi_admin_session");
   adminOrders = [];
   updateAdminMenuLabel();
   renderMyOrders();
@@ -1127,7 +1483,7 @@ async function loadAdminOrders() {
     const r = await callScript({ action: "getOrders", token: s.token });
     if (!r.ok) {
       // session expire ho gaya
-      sessionStorage.removeItem("riddhi_admin_session");
+      localStorage.removeItem("riddhi_admin_session");
       updateAdminMenuLabel();
       return false;
     }

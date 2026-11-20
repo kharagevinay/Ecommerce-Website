@@ -17,9 +17,9 @@ const HEADERS = ['Timestamp', 'Order ID', 'Date', 'Name', 'Mobile', 'Address', '
                  'Items', 'Total (INR)', 'Items JSON', 'Image 1', 'Image 2', 'Image 3', 'Image Links', 'Status', 'Status Updated'];
 const READ_COLS = 17;                // Status Updated tak (purani sheets ke saath bhi chalta hai)
 const STATUS_COL = 16;               // Sheet ka "Status" column (P)
-const STATUSES = ['Pending', 'Confirmed', 'Packed', 'Shipped', 'Delivered', 'Cancelled'];
+const STATUSES = ['Pending', 'Confirmed', 'Custom Making', 'Partial Stock Ready', 'Packed', 'Shipped', 'Delivered', 'Cancelled'];
 const MAX_IMG_COLS = 3;
-const TOKEN_TTL_SEC = 2 * 60 * 60;   // admin login 2 ghante chalta hai
+const TOKEN_TTL_SEC = 6 * 60 * 60;   // admin login 6 ghante chalta hai (Google cache ki max limit)
 const MAX_FAILS = 5;                 // itni galat koshish ke baad lock
 const LOCK_SEC = 10 * 60;            // 10 minute lock
 

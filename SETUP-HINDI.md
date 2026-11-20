@@ -45,3 +45,20 @@ Google Sheet mode me hoti hai. Naya local password banane ke liye browser consol
 - Sheet me seedha **Status** column ka dropdown badalne se bhi status update hota hai.
 - Customer ko **My Orders** me status badge + progress tracker dikhta hai. Wo "Refresh Order Status" dabane par ya My Orders kholne par update hota hai.
 - Isko chalane ke liye naya `Code.gs` paste karke **Deploy -> Manage deployments -> Edit -> New version -> Deploy** karein.
+
+## E. Naye features (is update me add hue)
+- **Prices:** `js/extras.js` ke `ACTUAL_PRICES` me har product ka asli/MRP price hai, aur `js/data.js` ka `price` offer price hai (data.js ab bilkul original hai). Discount % khud banta hai. Maine MRP andaaze se daale hain -- apne asli rate se badal lein.
+- **Offers ribbon/cards:** ribbon ka text `data.js` ke `FESTIVE_OFFERS` me hai. Offer cards products ke data se khud bante hain.
+- **Add to Cart:** sirf cart me jodta hai, order place nahi karta. Details tabhi maangi jaati hain jab "Order Now" / "Order All" dabaaya jaye. Phir order review popup aata hai (Edit Details / Yes, Confirm & Send / No, Cancel).
+- **Cart se hatana:** trash icon ya quantity 0 karne par "Do you want to remove this product from cart? Yes / No" poochta hai.
+- **Live stock:** order confirm hote hi stock kam hota hai, 0 hone par "Available Soon" + Call/WhatsApp Enquiry dikhta hai.
+  - Ye stock **customer ke apne browser (localStorage)** me ghatta hai. Alag phone/browser par stock alag dikhega. Asli stock `data.js` ke `availableStock` se hi chalta hai -- use hamesha wahi update karein.
+  - Admin panel me **Reset Stock** button is device ka stock wapas original kar deta hai (testing ke baad use karein).
+- **Custom order:** 3-4+ pieces ke liye admin order status me **Custom Making** ya **Partial Stock Ready** chun sakta hai; customer ko My Orders me dikhega.
+  - Iske liye `apps-script/Code.gs` dobara paste karke **Deploy -> Manage deployments -> Edit -> New version -> Deploy** karein (nahi to Sheet in 2 status ko reject karegi).
+- **My Orders filters:** All Orders, Not Yet Shipped, Last 30 Days, Last 3 Months, Year-wise.
+
+## F. Admin login / logout
+- Login ke baad sidebar menu me **All Orders (Admin)**, **Customers & Orders (Admin)** aur **Admin Logout** button dikhte hain.
+- Admin login ab browser band karne par bhi bana rehta hai; **Admin Logout** dabane par hi logout hota hai.
+- Google Sheet mode me server ka login token 6 ghante chalta hai (Google ki limit). Uske baad ek baar dobara login karna padega. Isse badalne ke liye `Code.gs` naya deploy karein (New version).
