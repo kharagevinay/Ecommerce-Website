@@ -1,3 +1,16 @@
+// ==========================================
+// ADMIN & GOOGLE SHEET SETTINGS  (sirf yahin badalna hai)
+// ==========================================
+// 1) Google Apps Script "Web app" URL yahan paste karein (apps-script/Code.gs deploy karne ke baad).
+//    Jab tak ye khaali hai, orders sirf is device ke localStorage me save honge.
+const APPS_SCRIPT_URL = "";
+
+// 2) Admin login (sirf tab use hota hai jab APPS_SCRIPT_URL khaali ho -- local testing mode).
+//    URL set hone par username/password Google Apps Script (Code.gs) me check hota hai, is file me nahi.
+//    Local mode ka hash banane ke liye browser console me chalayein:  makeAdminHash("username","password")
+const ADMIN_USERNAME = "riddhi_admin";
+const ADMIN_LOCAL_HASH = "2dcf8808c2c4f7c31879ae82c690838fb1ea44a0629e93366dbdb3e94eccb226";
+
 const WHATSAPP_NUMBER = "918412981213";
 const BRAND_PHONE_DISPLAY = "+91 84129 81213";
 const INSTAGRAM_HANDLE = "@jewellery_by_riddhi";

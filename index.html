@@ -14,7 +14,7 @@
   <!-- NAVBAR -->
   <nav class="navbar sticky-top px-2 px-md-3">
     <div class="container d-flex justify-content-between align-items-center">
-      <div class="d-flex align-items-center gap-2" style="cursor:pointer;" onclick="navigateTo('home')">
+      <div class="d-flex align-items-center gap-2" style="cursor:pointer;" onclick="navigateTo('home'); adminLogoTap()">
         <img src="assets/logo.png" alt="Jewellery by Riddhi Logo" class="brand-logo-img">
         <span class="brand-font fw-bold fs-5" style="color: var(--primary-green);">Jewellery by Riddhi</span>
       </div>
@@ -63,7 +63,7 @@
               <i class="bi bi-receipt-cutoff me-2"></i>My Orders
             </a>
           </li>
-          <li class="list-group-item bg-transparent">
+                    <li class="list-group-item bg-transparent">
             <a href="about.html" class="text-decoration-none text-dark fw-semibold">
               <i class="bi bi-info-circle me-2"></i>About Us
             </a>
@@ -392,6 +392,77 @@
               Continue Shopping
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+    <!-- ADMIN LOGIN MODAL -->
+  <div class="modal fade" id="adminLoginModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+      <div class="modal-content" style="background-color: var(--cream-bg); border-radius: 16px;">
+        <div class="modal-header" style="background-color: var(--primary-green); color: #fff;">
+          <h5 class="modal-title brand-font"><i class="bi bi-shield-lock me-2"></i>Admin Login</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <form onsubmit="submitAdminLogin(event)" autocomplete="off">
+          <div class="modal-body">
+            <div id="adminLoginError" class="alert alert-danger py-2 small d-none" role="alert"></div>
+            <div class="mb-2">
+              <label class="form-label small fw-semibold" for="adminUser">Username</label>
+              <input type="text" id="adminUser" class="form-control form-control-sm" required autocomplete="username" autocapitalize="none" spellcheck="false">
+            </div>
+            <div class="mb-1">
+              <label class="form-label small fw-semibold" for="adminPass">Password</label>
+              <div class="input-group input-group-sm">
+                <input type="password" id="adminPass" class="form-control" required autocomplete="current-password">
+                <button class="btn btn-outline-secondary" type="button" onclick="const f=document.getElementById('adminPass'); f.type = f.type==='password' ? 'text' : 'password'" aria-label="Show or hide password"><i class="bi bi-eye"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer border-0">
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" id="adminLoginBtn" class="btn btn-green btn-sm px-4 rounded-pill">Login</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ADMIN PANEL: ALL CUSTOMERS & ORDERS (login ke baad hi khulta hai) -->
+  <div class="modal fade" id="allCustomersModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+      <div class="modal-content" style="background-color: var(--cream-bg); border-radius: 16px;">
+        <div class="modal-header" style="background-color: var(--primary-green); color: #fff;">
+          <h5 class="modal-title brand-font"><i class="bi bi-people me-2"></i>Admin: Customers & Orders</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <span id="adminSourceBadge" class="badge bg-secondary">Source</span>
+            <div class="d-flex gap-2">
+              <button type="button" class="btn btn-outline-dark btn-sm" onclick="refreshAdminPanel()"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</button>
+              <button type="button" class="btn btn-outline-success btn-sm" onclick="exportOrdersCsv()"><i class="bi bi-download me-1"></i>CSV</button>
+              <button type="button" class="btn btn-outline-danger btn-sm" onclick="adminLogout()"><i class="bi bi-box-arrow-right me-1"></i>Logout</button>
+            </div>
+          </div>
+          <div class="row g-2 mb-3">
+            <div class="col-12 col-sm-7">
+              <input type="text" id="customerSearchInput" class="form-control form-control-sm" placeholder="Search by Customer Name or Mobile Number..." oninput="renderAllCustomersSummary()">
+            </div>
+            <div class="col-12 col-sm-5">
+              <select id="customerFilterType" class="form-select form-select-sm" onchange="renderAllCustomersSummary()">
+                <option value="all">All Orders (Past & Recent)</option>
+                <option value="present">Recent (last 7 days)</option>
+                <option value="past">Older than 7 days</option>
+              </select>
+            </div>
+          </div>
+          <div id="customerStatsBar" class="small fw-semibold mb-3 text-muted"></div>
+          <div id="allCustomersListContainer"></div>
+        </div>
+        <div class="modal-footer border-0">
+          <button type="button" class="btn btn-green btn-sm px-4 rounded-pill" data-bs-dismiss="modal">Close</button>
         </div>
       </div>
     </div>

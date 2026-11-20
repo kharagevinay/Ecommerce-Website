@@ -1,3 +1,8 @@
+// Kisi bhi user-written text ko HTML me dikhane se pehle escape karta hai (XSS se bachav)
+function esc(v) {
+  return String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
 let cart = [];
 let currentProduct = null;
 let currentActiveMedia = { type: "image", src: "" };
@@ -25,6 +30,9 @@ document.addEventListener("DOMContentLoaded", () => {
   renderCategories();
   updateCartUI();
   renderMyOrders();
+  syncPendingOrders();
+  updateAdminMenuLabel();
+  checkAdminHash();
 });
 
 // ==========================================
@@ -431,7 +439,7 @@ function updateCartUI() {
           <div class="flex-grow-1">
             <h6 class="mb-0 small fw-bold">${item.name}</h6>
             <small class="text-muted d-block" style="font-size: 11px;">Size: ${item.size}</small>
-            ${item.customNote ? `<small class="text-success d-block" style="font-size: 11px;"><strong>Note:</strong> ${item.customNote}</small>` : ""}
+            ${item.customNote ? `<small class="text-success d-block" style="font-size: 11px;"><strong>Note:</strong> ${esc(item.customNote)}</small>` : ""}
             <div class="d-flex justify-content-between align-items-center mt-1">
               <span class="fw-bold small" style="color: var(--primary-green);">₹${item.price * item.qty}</span>
               <div class="btn-group btn-group-sm">
@@ -475,30 +483,28 @@ function executeOrderSingle(cust) {
   msg += `• Product Image: ${currentProduct.images[0]}\n\n`;
   msg += formatCustomerBlock(cust);
 
-  const summaryHtml = `
-    <div class="small">
-      <div class="fw-bold text-dark mb-1">🛍️ ${currentProduct.name} (${currentProduct.id})</div>
-      <div class="text-muted">Size: ${size} | Qty: ${qty} | <strong>Total: ₹${total}</strong></div>
-      ${customNote ? `<div class="text-success">Note: ${customNote}</div>` : ""}
-      <hr class="my-2">
-      <div class="fw-semibold text-dark">👤 ${cust.name} (${cust.mobile})</div>
-      <div class="text-muted">${cust.address}, ${cust.city} - ${cust.pincode}</div>
-    </div>
-  `;
+  const items = [{
+    id: currentProduct.id, name: currentProduct.name, size, qty,
+    price: currentProduct.price, note: customNote, image: currentProduct.images[0]
+  }];
 
-  saveOrderToHistory({
-    total: total,
-    itemsHtml: `<div><strong>${currentProduct.name}</strong> (${currentProduct.id})<br><span class="text-muted" style="font-size:11px;">Size: ${size} | Qty: ${qty}${customNote ? ` | Note: ${customNote}` : ""}</span></div>`,
-    customer: cust,
+  const order = saveOrderToHistory({
+    total, items, customer: cust,
     fullMessage: `📋 *Order Receipt - Jewellery by Riddhi*\n\n` + msg
   });
 
-  dispatchOrderToSellerAndCustomer(msg, cust.mobile, summaryHtml);
+  dispatchOrderToSellerAndCustomer(msg, cust.mobile, buildSummaryHtml(items, total, cust));
+  syncOrderToSheet(order);
 }
 
 function executeOrderCart(cust) {
   let grandTotal = 0;
   let msg = `Hello *Jewellery by Riddhi*! ✨\n*NEW MULTI-ITEM ORDER*\n\n`;
+
+  const items = cart.map(item => ({
+    id: item.id, name: item.name, size: item.size, qty: item.qty,
+    price: item.price, note: item.customNote || "", image: item.images[0]
+  }));
 
   cart.forEach((item, idx) => {
     const sub = item.price * item.qty;
@@ -512,38 +518,52 @@ function executeOrderCart(cust) {
   msg += `💰 *Grand Total: ₹${grandTotal}*\n\n`;
   msg += formatCustomerBlock(cust);
 
-  const summaryHtml = `
-    <div class="small">
-      <div class="fw-bold text-dark mb-1">🛍️ ${currentProduct.name} (${currentProduct.id})</div>
-      <div class="text-muted">Size: ${size} | Qty: ${qty} | <strong>Total: ₹${total}</strong></div>
-      ${customNote ? `<div class="text-success">Note: ${customNote}</div>` : ""}
-      <hr class="my-2">
-      <div class="fw-semibold text-dark">👤 ${cust.name} (${cust.mobile})</div>
-      <div class="text-muted">${cust.address}, ${cust.city} - ${cust.pincode}</div>
-    </div>
-  `;
-
-  saveOrderToHistory({
-    total: total,
-    itemsHtml: `<div><strong>${currentProduct.name}</strong> (${currentProduct.id})<br><span class="text-muted" style="font-size:11px;">Size: ${size} | Qty: ${qty}${customNote ? ` | Note: ${customNote}` : ""}</span></div>`,
-    customer: cust,
+  const order = saveOrderToHistory({
+    total: grandTotal, items, customer: cust,
     fullMessage: `📋 *Order Receipt - Jewellery by Riddhi*\n\n` + msg
   });
 
-  dispatchOrderToSellerAndCustomer(msg, cust.mobile, summaryHtml);
+  dispatchOrderToSellerAndCustomer(msg, cust.mobile, buildSummaryHtml(items, grandTotal, cust));
+  syncOrderToSheet(order);
+
+  // order ho gaya -> cart khaali karein
+  cart = [];
+  updateCartUI();
+}
+
+// Order ki items list ko safe HTML me badalta hai (customer ka likha text escape hota hai)
+function safeImgUrl(u) {
+  return /^https:\/\/[^\s"'<>]+$/.test(String(u || "")) ? u : "";
+}
+
+function buildItemsHtml(items) {
+  return (items || []).map(it => `
+    <div class="mb-1 d-flex gap-2 align-items-start">
+      ${safeImgUrl(it.image) ? `<img src="${esc(safeImgUrl(it.image))}" alt="" referrerpolicy="no-referrer" style="width:44px;height:44px;object-fit:cover;border-radius:6px;flex-shrink:0;">` : ""}
+      <div><strong>${esc(it.name)}</strong> (${esc(it.id)})<br>
+      <span class="text-muted" style="font-size:11px;">Size: ${esc(it.size)} | Qty: ${esc(it.qty)} | ₹${esc(it.price * it.qty)}${it.note ? ` | Note: ${esc(it.note)}` : ""}</span></div>
+    </div>`).join("");
+}
+
+function buildSummaryHtml(items, total, cust) {
+  return `
+    <div class="small">
+      ${buildItemsHtml(items)}
+      <div class="fw-bold mt-1" style="color: var(--primary-green);">Total: ₹${esc(total)}</div>
+      <hr class="my-2">
+      <div class="fw-semibold text-dark">👤 ${esc(cust.name)} (${esc(cust.mobile)})</div>
+      <div class="text-muted">${esc(cust.address)}, ${esc(cust.city)} - ${esc(cust.pincode)}</div>
+    </div>`;
 }
 
 function dispatchOrderToSellerAndCustomer(orderMessage, customerMobile, summaryHtml = "") {
-  // 1. Open WhatsApp to Seller (918412981213) immediately on user click
+  // 1. Seller ko WhatsApp
   sendWhatsAppUrl(WHATSAPP_NUMBER, orderMessage);
 
-  // 2. Clean customer mobile number (add 91 if 10 digits)
+  // 2. Customer ka number clean karein (10 digit ho to 91 lagayein)
   let cleanCustPhone = customerMobile.replace(/[^0-9]/g, "");
-  if (cleanCustPhone.length === 10) {
-    cleanCustPhone = "91" + cleanCustPhone;
-  }
+  if (cleanCustPhone.length === 10) cleanCustPhone = "91" + cleanCustPhone;
 
-  // Prepare customer order summary copy for their own WhatsApp
   const customerCopyMsg =
     `📋 *Order Receipt - Jewellery by Riddhi*\n` +
     `Thank you for your order! Here are your ordered product & delivery details:\n\n` +
@@ -551,7 +571,7 @@ function dispatchOrderToSellerAndCustomer(orderMessage, customerMobile, summaryH
 
   const custWaUrl = `https://wa.me/${cleanCustPhone}?text=${encodeURIComponent(customerCopyMsg)}`;
 
-  // 3. Close modals/offcanvas and show Order Placed Successfully Popup
+  // 3. Popups band karke "Order Placed" popup dikhayein
   closeProductModal();
   const cartEl = document.getElementById("cartOffcanvas");
   const cartOffcanvasInst = bootstrap.Offcanvas.getInstance(cartEl);
@@ -559,16 +579,9 @@ function dispatchOrderToSellerAndCustomer(orderMessage, customerMobile, summaryH
 
   const summaryBox = document.getElementById("successOrderSummaryBox");
   const custBtn = document.getElementById("customerWhatsAppCopyBtn");
-
-  if (summaryBox) {
-    summaryBox.innerHTML = summaryHtml;
-  }
-  if (custBtn) {
-    custBtn.href = custWaUrl;
-  }
-  if (orderSuccessModalInstance) {
-    orderSuccessModalInstance.show();
-  }
+  if (summaryBox) summaryBox.innerHTML = summaryHtml;
+  if (custBtn) custBtn.href = custWaUrl;
+  if (orderSuccessModalInstance) orderSuccessModalInstance.show();
 }
 
 function sendWhatsAppUrl(phone, text) {
@@ -614,27 +627,38 @@ function openPolicyModal(type) {
 
 
 // ==========================================
-// MY ORDERS HISTORY (LOCALSTORAGE)
+// MY ORDERS HISTORY (LOCALSTORAGE - sirf is device ke liye)
 // ==========================================
-function saveOrderToHistory(orderRecord) {
+function getLocalOrders() {
   try {
-    const orders = JSON.parse(localStorage.getItem("riddhi_orders") || "[]");
-    orders.unshift({
-      orderId: "ORD-" + Date.now().toString().slice(-6),
-      date: new Date().toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }),
-      ...orderRecord
-    });
+    return JSON.parse(localStorage.getItem("riddhi_orders") || "[]");
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveOrderToHistory(orderRecord) {
+  const order = {
+    orderId: "ORD-" + Date.now().toString().slice(-6) + Math.floor(10 + Math.random() * 90),
+    timestamp: Date.now(),
+    date: new Date().toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }),
+    ...orderRecord
+  };
+  try {
+    const orders = getLocalOrders();
+    orders.unshift(order);
     localStorage.setItem("riddhi_orders", JSON.stringify(orders));
     renderMyOrders();
   } catch (e) {
     console.error("Failed to save order history", e);
   }
+  return order;
 }
 
 function renderMyOrders() {
   const container = document.getElementById("myOrdersListContainer");
   const badge = document.getElementById("navOrdersCount");
-  const orders = JSON.parse(localStorage.getItem("riddhi_orders") || "[]");
+  const orders = getLocalOrders();
 
   if (badge) {
     if (orders.length > 0) {
@@ -644,7 +668,6 @@ function renderMyOrders() {
       badge.classList.add("d-none");
     }
   }
-
   if (!container) return;
 
   if (orders.length === 0) {
@@ -652,35 +675,35 @@ function renderMyOrders() {
       <div class="text-center text-muted my-5">
         <i class="bi bi-receipt fs-1"></i>
         <p class="mt-2 small">You haven't placed any orders on this device yet.</p>
-      </div>
-    `;
+      </div>`;
     return;
   }
 
   container.innerHTML = orders.map(ord => {
-    let cleanCustPhone = (ord.customer.mobile || "").replace(/[^0-9]/g, "");
+    const cust = ord.customer || {};
+    let cleanCustPhone = (cust.mobile || "").replace(/[^0-9]/g, "");
     if (cleanCustPhone.length === 10) cleanCustPhone = "91" + cleanCustPhone;
     const waSelfUrl = `https://wa.me/${cleanCustPhone}?text=${encodeURIComponent(ord.fullMessage || "")}`;
+    const itemsHtml = ord.items ? buildItemsHtml(ord.items) : (ord.itemsHtml || "");
 
     return `
       <div class="card mb-3 border-0 shadow-sm">
         <div class="card-body p-3 small">
           <div class="d-flex justify-content-between align-items-center mb-1">
-            <span class="badge" style="background-color: var(--primary-green);">${ord.orderId}</span>
-            <span class="fw-bold" style="color: var(--primary-green);">₹${ord.total}</span>
+            <span class="badge" style="background-color: var(--primary-green);">${esc(ord.orderId)}</span>
+            <span class="fw-bold" style="color: var(--primary-green);">₹${esc(ord.total)}</span>
           </div>
-          <div class="text-muted mb-2" style="font-size: 11px;"><i class="bi bi-clock me-1"></i>${ord.date}</div>
-          <div class="mb-2">${ord.itemsHtml}</div>
+          <div class="text-muted mb-2" style="font-size: 11px;"><i class="bi bi-clock me-1"></i>${esc(ord.date)}</div>
+          <div class="mb-2">${itemsHtml}</div>
           <div class="p-2 rounded bg-light text-muted mb-2" style="font-size: 11px;">
-            <strong class="text-dark">👤 ${ord.customer.name}</strong> (${ord.customer.mobile})<br>
-            ${ord.customer.address}, ${ord.customer.city} - ${ord.customer.pincode}
+            <strong class="text-dark">👤 ${esc(cust.name)}</strong> (${esc(cust.mobile)})<br>
+            ${esc(cust.address)}, ${esc(cust.city)} - ${esc(cust.pincode)}
           </div>
-          <a href="${waSelfUrl}" target="_blank" class="btn btn-outline-success btn-sm w-100 rounded-pill" style="font-size: 11px;">
+          <a href="${waSelfUrl}" target="_blank" rel="noopener" class="btn btn-outline-success btn-sm w-100 rounded-pill" style="font-size: 11px;">
             <i class="bi bi-whatsapp me-1"></i> Send Copy to My WhatsApp
           </a>
         </div>
-      </div>
-    `;
+      </div>`;
   }).join("");
 }
 
@@ -689,4 +712,429 @@ function clearOrderHistory() {
     localStorage.removeItem("riddhi_orders");
     renderMyOrders();
   }
+}
+
+// ==========================================
+// GOOGLE SHEET SYNC (har device ka order ek hi Sheet me)
+// ==========================================
+async function callScript(payload) {
+  const res = await fetch(APPS_SCRIPT_URL, {
+    method: "POST",
+    // text/plain rakhne se browser "preflight" nahi bhejta, Apps Script isi ke saath chalta hai
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify(payload)
+  });
+  return res.json();
+}
+
+function getPendingSync() {
+  try { return JSON.parse(localStorage.getItem("riddhi_pending_sync") || "[]"); } catch (e) { return []; }
+}
+function setPendingSync(list) {
+  localStorage.setItem("riddhi_pending_sync", JSON.stringify(list));
+}
+
+function toSheetOrder(o) {
+  return {
+    orderId: o.orderId, timestamp: o.timestamp, date: o.date, total: o.total,
+    customer: o.customer, items: o.items || []
+  };
+}
+
+async function syncOrderToSheet(order) {
+  if (!APPS_SCRIPT_URL || !order) return;
+  try {
+    const r = await callScript({ action: "newOrder", order: toSheetOrder(order) });
+    if (!r.ok) throw new Error(r.error || "sync failed");
+  } catch (e) {
+    // internet/server issue: baad me dobara try hoga
+    const q = getPendingSync();
+    if (!q.some(x => x.orderId === order.orderId)) q.push(toSheetOrder(order));
+    setPendingSync(q);
+  }
+}
+
+async function syncPendingOrders() {
+  if (!APPS_SCRIPT_URL) return;
+  const q = getPendingSync();
+  if (!q.length) return;
+  const left = [];
+  for (const o of q) {
+    try {
+      const r = await callScript({ action: "newOrder", order: o });
+      if (!r.ok) left.push(o);
+    } catch (e) {
+      left.push(o);
+    }
+  }
+  setPendingSync(left);
+}
+
+// ==========================================
+// ADMIN LOGIN (sirf admin ko customers/orders dikhte hain)
+// ==========================================
+let adminOrders = [];
+
+function getAdminSession() {
+  try { return JSON.parse(sessionStorage.getItem("riddhi_admin_session") || "null"); } catch (e) { return null; }
+}
+function isAdminLoggedIn() {
+  return !!getAdminSession();
+}
+function updateAdminMenuLabel() {
+  const el = document.getElementById("adminMenuLabel");
+  if (el) el.textContent = isAdminLoggedIn() ? "Admin Panel (Customers & Orders)" : "Admin Login";
+}
+
+async function sha256Hex(text) {
+  if (!(window.crypto && crypto.subtle)) {
+    throw new Error("no-crypto");
+  }
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+// Local mode ka naya password hash banane ke liye console me:  makeAdminHash("user","pass")
+window.makeAdminHash = async function (user, pass) {
+  const h = await sha256Hex(user + ":" + pass);
+  console.log(h);
+  return h;
+};
+
+const ADMIN_MAX_FAILS = 5;
+const ADMIN_LOCK_MS = 5 * 60 * 1000;
+
+function getAdminLockInfo() {
+  try { return JSON.parse(localStorage.getItem("riddhi_admin_fail") || "{}"); } catch (e) { return {}; }
+}
+function adminLockRemainingMs() {
+  const info = getAdminLockInfo();
+  return info.until && info.until > Date.now() ? info.until - Date.now() : 0;
+}
+function registerAdminFail() {
+  const info = getAdminLockInfo();
+  const count = (info.count || 0) + 1;
+  if (count >= ADMIN_MAX_FAILS) {
+    localStorage.setItem("riddhi_admin_fail", JSON.stringify({ count: 0, until: Date.now() + ADMIN_LOCK_MS }));
+  } else {
+    localStorage.setItem("riddhi_admin_fail", JSON.stringify({ count, until: 0 }));
+  }
+}
+function clearAdminFails() {
+  localStorage.removeItem("riddhi_admin_fail");
+}
+
+function showAdminLoginError(msg) {
+  const box = document.getElementById("adminLoginError");
+  if (!box) return;
+  box.textContent = msg;
+  box.classList.toggle("d-none", !msg);
+}
+
+// Admin link customers ko menu me nahi dikhta. Admin ke raaste:
+//  1) site ka link  index.html#admin  kholna
+//  2) top-left logo/naam par jaldi-jaldi 5 baar tap karna
+let adminTapCount = 0, adminTapTimer = null;
+function adminLogoTap() {
+  adminTapCount++;
+  clearTimeout(adminTapTimer);
+  adminTapTimer = setTimeout(() => { adminTapCount = 0; }, 2000);
+  if (adminTapCount >= 5) {
+    adminTapCount = 0;
+    handleAdminClick();
+  }
+}
+function checkAdminHash() {
+  if (location.hash === "#admin") {
+    history.replaceState(null, "", location.pathname + location.search);
+    handleAdminClick();
+  }
+}
+window.addEventListener("hashchange", checkAdminHash);
+
+function handleAdminClick() {
+  if (isAdminLoggedIn()) openAllCustomersModal();
+  else openAdminLogin();
+}
+
+function openAdminLogin() {
+  const el = document.getElementById("adminLoginModal");
+  if (!el) return;
+  document.getElementById("adminUser").value = "";
+  document.getElementById("adminPass").value = "";
+  showAdminLoginError("");
+  bootstrap.Modal.getOrCreateInstance(el).show();
+}
+
+async function submitAdminLogin(e) {
+  e.preventDefault();
+  const username = document.getElementById("adminUser").value.trim();
+  const password = document.getElementById("adminPass").value;
+  const btn = document.getElementById("adminLoginBtn");
+
+  const lockMs = adminLockRemainingMs();
+  if (lockMs > 0) {
+    showAdminLoginError(`Bahut zyada galat koshish. ${Math.ceil(lockMs / 60000)} minute baad try karein.`);
+    return;
+  }
+
+  btn.disabled = true;
+  const oldLabel = btn.innerHTML;
+  btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span>Checking...`;
+  showAdminLoginError("");
+
+  try {
+    let session;
+    if (APPS_SCRIPT_URL) {
+      let r;
+      try {
+        r = await callScript({ action: "adminLogin", username, password });
+      } catch (netErr) {
+        showAdminLoginError("Server se connect nahi ho paya. Internet check karke dobara try karein.");
+        return;
+      }
+      if (!r.ok) {
+        if (r.error !== "locked") registerAdminFail();
+        showAdminLoginError(r.error === "locked"
+          ? "Bahut zyada galat koshish. Kuch der baad try karein."
+          : "Username ya password galat hai.");
+        return;
+      }
+      session = { mode: "sheet", token: r.token };
+      adminOrders = r.orders || [];
+    } else {
+      let hash;
+      try {
+        hash = await sha256Hex(username + ":" + password);
+      } catch (cryptoErr) {
+        showAdminLoginError("Login ke liye site ko https:// ya localhost par kholein.");
+        return;
+      }
+      if (username !== ADMIN_USERNAME || hash !== ADMIN_LOCAL_HASH) {
+        registerAdminFail();
+        showAdminLoginError("Username ya password galat hai.");
+        return;
+      }
+      session = { mode: "local" };
+      adminOrders = getLocalOrders();
+    }
+
+    clearAdminFails();
+    sessionStorage.setItem("riddhi_admin_session", JSON.stringify(session));
+    updateAdminMenuLabel();
+
+    const loginEl = document.getElementById("adminLoginModal");
+    loginEl.addEventListener("hidden.bs.modal", () => openAllCustomersModal(true), { once: true });
+    bootstrap.Modal.getOrCreateInstance(loginEl).hide();
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = oldLabel;
+    document.getElementById("adminPass").value = "";
+  }
+}
+
+async function adminLogout() {
+  const s = getAdminSession();
+  sessionStorage.removeItem("riddhi_admin_session");
+  adminOrders = [];
+  updateAdminMenuLabel();
+  const panel = document.getElementById("allCustomersModal");
+  if (panel) bootstrap.Modal.getOrCreateInstance(panel).hide();
+  if (s && s.mode === "sheet" && APPS_SCRIPT_URL) {
+    try { await callScript({ action: "adminLogout", token: s.token }); } catch (e) { /* ignore */ }
+  }
+}
+
+// ==========================================
+// ADMIN PANEL: ALL CUSTOMERS & ORDERS
+// ==========================================
+async function loadAdminOrders() {
+  const s = getAdminSession();
+  if (!s) return false;
+  if (s.mode === "sheet") {
+    const r = await callScript({ action: "getOrders", token: s.token });
+    if (!r.ok) {
+      // session expire ho gaya
+      sessionStorage.removeItem("riddhi_admin_session");
+      updateAdminMenuLabel();
+      return false;
+    }
+    adminOrders = r.orders || [];
+  } else {
+    adminOrders = getLocalOrders();
+  }
+  return true;
+}
+
+async function openAllCustomersModal(skipReload = false) {
+  if (!isAdminLoggedIn()) {
+    openAdminLogin();
+    return;
+  }
+  const modalEl = document.getElementById("allCustomersModal");
+  if (!modalEl) return;
+
+  document.getElementById("customerSearchInput").value = "";
+  document.getElementById("customerFilterType").value = "all";
+
+  const s = getAdminSession();
+  const srcEl = document.getElementById("adminSourceBadge");
+  if (srcEl) {
+    srcEl.className = "badge " + (s.mode === "sheet" ? "bg-success" : "bg-warning text-dark");
+    srcEl.textContent = s.mode === "sheet" ? "Source: Google Sheet (saare devices)" : "Source: Sirf is device ka data";
+  }
+
+  bootstrap.Modal.getOrCreateInstance(modalEl).show();
+  if (!skipReload) await refreshAdminPanel();
+  else renderAllCustomersSummary();
+}
+
+async function refreshAdminPanel() {
+  const container = document.getElementById("allCustomersListContainer");
+  if (container) {
+    container.innerHTML = `<div class="text-center text-muted py-4 small"><span class="spinner-border spinner-border-sm me-2"></span>Loading orders...</div>`;
+  }
+  try {
+    const ok = await loadAdminOrders();
+    if (!ok) {
+      bootstrap.Modal.getOrCreateInstance(document.getElementById("allCustomersModal")).hide();
+      openAdminLogin();
+      showAdminLoginError("Session expire ho gaya. Dobara login karein.");
+      return;
+    }
+  } catch (e) {
+    if (container) container.innerHTML = `<div class="text-center text-danger py-4 small">Orders load nahi ho paaye. Internet check karke Refresh dabayein.</div>`;
+    return;
+  }
+  renderAllCustomersSummary();
+}
+
+const RECENT_DAYS = 7;
+
+function groupOrdersByCustomer(orders) {
+  const map = {};
+  const recentCutoff = Date.now() - RECENT_DAYS * 24 * 60 * 60 * 1000;
+
+  orders.forEach(ord => {
+    const cust = ord.customer || {};
+    const cleanPhone = String(cust.mobile || "").replace(/[^0-9]/g, "");
+    const key = cleanPhone.slice(-10) || String(cust.name || "Unknown").toLowerCase();
+    const period = (ord.timestamp || 0) >= recentCutoff ? "Present" : "Past";
+
+    if (!map[key]) {
+      map[key] = {
+        name: cust.name || "Unknown",
+        mobile: cust.mobile || "-",
+        address: [cust.address, cust.city].filter(Boolean).join(", ") + (cust.pincode ? " - " + cust.pincode : ""),
+        orders: []
+      };
+    }
+    map[key].orders.push({
+      orderId: ord.orderId, date: ord.date, timestamp: ord.timestamp || 0, period,
+      total: Number(ord.total || 0),
+      itemsHtml: ord.items ? buildItemsHtml(ord.items) : (ord.itemsHtml || "")
+    });
+  });
+  return Object.values(map);
+}
+
+function renderAllCustomersSummary() {
+  const container = document.getElementById("allCustomersListContainer");
+  const statsBar = document.getElementById("customerStatsBar");
+  if (!container || !isAdminLoggedIn()) return;
+
+  const searchQ = (document.getElementById("customerSearchInput")?.value || "").toLowerCase().trim();
+  const filterPeriod = document.getElementById("customerFilterType")?.value || "all";
+
+  let customers = groupOrdersByCustomer(adminOrders);
+
+  if (searchQ) {
+    customers = customers.filter(c =>
+      c.name.toLowerCase().includes(searchQ) || String(c.mobile).toLowerCase().includes(searchQ)
+    );
+  }
+  if (filterPeriod !== "all") {
+    customers = customers
+      .map(c => ({ ...c, orders: c.orders.filter(o => o.period.toLowerCase() === filterPeriod) }))
+      .filter(c => c.orders.length > 0);
+  }
+  customers.forEach(c => {
+    c.orders.sort((a, b) => b.timestamp - a.timestamp);
+    c.orderCount = c.orders.length;
+    c.totalSpent = c.orders.reduce((sum, o) => sum + o.total, 0);
+  });
+  customers.sort((a, b) => (b.orders[0]?.timestamp || 0) - (a.orders[0]?.timestamp || 0));
+
+  const totalOrdersCount = customers.reduce((sum, c) => sum + c.orderCount, 0);
+  const revenue = customers.reduce((sum, c) => sum + c.totalSpent, 0);
+
+  if (statsBar) {
+    statsBar.innerHTML = `Customers: <span style="color: var(--primary-green);">${customers.length}</span> | Orders: <span style="color: var(--primary-green);">${totalOrdersCount}</span> | Total: <span style="color: var(--primary-green);">₹${revenue}</span>`;
+  }
+
+  if (customers.length === 0) {
+    container.innerHTML = `<div class="text-center text-muted py-4 small">No matching customer order records found.</div>`;
+    return;
+  }
+
+  container.innerHTML = customers.map(c => {
+    let wa = String(c.mobile).replace(/[^0-9]/g, "");
+    if (wa.length === 10) wa = "91" + wa;
+
+    const historyHtml = c.orders.map(o => `
+      <div class="p-2 rounded mb-1" style="background-color: #fdfaf5; border: 1px solid #efe3d2;">
+        <div class="d-flex justify-content-between align-items-center">
+          <span class="fw-bold text-dark">${esc(o.orderId)} <span class="badge ${o.period === "Present" ? "bg-success" : "bg-secondary"}" style="font-size:10px;">${o.period === "Present" ? "Recent" : "Past"}</span></span>
+          <span class="fw-bold" style="color: var(--primary-green);">₹${esc(o.total)}</span>
+        </div>
+        <div class="text-muted" style="font-size:11px;">${esc(o.date)}</div>
+        <div class="mt-1">${o.itemsHtml}</div>
+      </div>`).join("");
+
+    return `
+      <div class="card mb-3 border-0 shadow-sm">
+        <div class="card-body p-3 small">
+          <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+            <div>
+              <div class="fw-bold fs-6 text-dark">👤 ${esc(c.name)} ${c.orderCount > 1 ? `<span class="badge bg-info text-dark" style="font-size:10px;">Repeat</span>` : ""}</div>
+              <div class="text-muted"><i class="bi bi-telephone me-1"></i>${esc(c.mobile)}</div>
+              <div class="text-muted" style="font-size:11px;">${esc(c.address)}</div>
+            </div>
+            <div class="text-end">
+              <span class="badge bg-warning text-dark">${c.orderCount} Order(s)</span>
+              <div class="fw-bold mt-1" style="color: var(--primary-green);">Total: ₹${esc(c.totalSpent)}</div>
+              <a href="https://wa.me/${wa}" target="_blank" rel="noopener" class="btn btn-outline-success btn-sm py-0 px-2 mt-1" style="font-size: 11px;"><i class="bi bi-whatsapp"></i> Chat</a>
+            </div>
+          </div>
+          ${historyHtml}
+        </div>
+      </div>`;
+  }).join("");
+}
+
+// CSV export (Excel me khulta hai)
+function csvCell(v) {
+  let t = String(v ?? "").replace(/\r?\n/g, " ");
+  if (/^[=+\-@]/.test(t)) t = "'" + t; // Excel formula injection se bachav
+  return '"' + t.replace(/"/g, '""') + '"';
+}
+
+function exportOrdersCsv() {
+  if (!isAdminLoggedIn()) return;
+  const rows = [["Order ID", "Date", "Name", "Mobile", "Address", "City", "Pincode", "Items", "Image Links", "Total (INR)"]];
+  adminOrders.forEach(o => {
+    const c = o.customer || {};
+    const items = (o.items || []).map(i => `${i.name} (${i.id}) x${i.qty} [${i.size}]${i.note ? " note: " + i.note : ""}`).join(" | ");
+    const imgs = (o.items || []).map(i => i.image || "").filter(Boolean).join(" | ");
+    rows.push([o.orderId, o.date, c.name, c.mobile, c.address, c.city, c.pincode, items, imgs, o.total]);
+  });
+  const csv = "\uFEFF" + rows.map(r => r.map(csvCell).join(",")).join("\r\n");
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "riddhi-orders-" + new Date().toISOString().slice(0, 10) + ".csv";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
