@@ -8,7 +8,7 @@ function getFullImageUrl(imgPath) {
   if (!imgPath) return "";
   if (/^https?:\/\//i.test(imgPath)) return imgPath;
   try {
-    return new URL(imgPath, window.location.href).href;
+    return encodeURI(new URL(imgPath, window.location.href).href);
   } catch (e) {
     return imgPath;
   }
