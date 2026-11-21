@@ -645,7 +645,20 @@ function openProductDetail(productId) {
     availSoonBox.classList.remove("d-none");
 
     const enquiryText = `Hello *Jewellery by Riddhi*! ✨\nI saw *${currentProduct.name}* (${currentProduct.id}) is currently marked *Available Soon (Stock: 0)*.\nPrice: ₹${currentProduct.price}\nPlease let me know when it can be made available!`;
-    document.getElementById("availSoonWaBtn").href = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(enquiryText)}`;
+    const waSoonBtn = document.getElementById("availSoonWaBtn");
+    waSoonBtn.href = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(enquiryText)}`;
+    waSoonBtn.onclick = () => {
+      logEnquiryToSheet({
+        productId: currentProduct.id,
+        category: currentProduct.category,
+        productName: currentProduct.name,
+        size: "Free Size (Adjustable Dori)",
+        availableStock: 0,
+        requestedQty: 1,
+        note: "Out of Stock / Available Soon Enquiry",
+        image: (currentProduct.images && currentProduct.images[0]) || ""
+      });
+    };
   } else {
     stockBadge.className = "badge bg-success-subtle text-success border border-success-subtle px-2 py-1";
     stockBadge.innerText = `Stock: ${stock} pcs`;
@@ -738,7 +751,11 @@ function changeModalQty(delta) {
   let val = parseInt(qtyInput.value) + delta;
   if (val < 1) val = 1;
   if (val > currentProduct.availableStock) {
-    alert(`Only ${currentProduct.availableStock} pieces are ready in stock. Use "Enquire 3+ Pcs" for custom bulk quantity!`);
+    const bulkBox = document.getElementById("bulkEnquiryBox");
+    const bulkInp = document.getElementById("bulkQtyInput");
+    if (bulkBox) bulkBox.classList.remove("d-none");
+    if (bulkInp) bulkInp.value = val;
+    alert(`Only ${currentProduct.availableStock} pieces are ready in stock. We opened the custom enquiry box below for ${val} pieces—click Send to submit your enquiry!`);
     val = currentProduct.availableStock;
   }
   qtyInput.value = val;
