@@ -949,6 +949,32 @@ function getSavedCustomer() {
   }
 }
 
+function getFullImageUrl(imgPath) {
+  if (!imgPath) return "";
+  if (/^https?:\/\//i.test(imgPath)) return imgPath;
+  try {
+    // GitHub Pages ke live URL ke saath full https:// link banayega
+    return encodeURI(new URL(imgPath, window.location.href).href);
+  } catch (e) {
+    return imgPath;
+  }
+}
+
+function toSheetOrder(o) {
+  const mappedItems = (o.items || []).map(it => ({
+    ...it,
+    image: getFullImageUrl(it.image)
+  }));
+  return {
+    orderId: o.orderId,
+    timestamp: o.timestamp,
+    date: o.date,
+    total: o.total,
+    customer: o.customer,
+    items: mappedItems
+  };
+}
+
 function handleOrderSingleClick() {
   if (!currentProduct) return;
   const stock = Math.max(0, parseInt(currentProduct.availableStock, 10) || 0);
@@ -1437,8 +1463,12 @@ async function refreshMyOrderStatuses() {
   } catch (e) { /* offline fallback */ }
 }
 
+// function safeImgUrl(u) {
+//   return /^https:\/\/[^\s"'<>]+$/.test(String(u || "")) ? u : "";
+// }
 function safeImgUrl(u) {
-  return /^https:\/\/[^\s"'<>]+$/.test(String(u || "")) ? u : "";
+  const full = getFullImageUrl(u);
+  return /^https?:\/\/[^\s"'<>]+$/i.test(full) ? full : "";
 }
 
 function buildItemsHtml(items) {
