@@ -2,15 +2,15 @@
  * Jewellery by Riddhi - Google Sheet order & live stock backend (Google Apps Script)
  *
  * Kaam:
- *  1) Website se aaya har order Google Sheet me ek row ban jata hai + product stock automatically deduct hota hai.
- *  2) Live stock Google Sheet ke "Stock" tab me save rehta hai taaki saare devices par real-time stock dikhe.
+ *  1) Website se aaya har order "Orders" tab me row ban jata hai + product stock automatically deduct hota hai.
+ *  2) Saare products ka catalog aur live stock "Stock" tab me (Date, Product ID, Product Name, Image, Available Stock, Last Updated) columns ke saath save rehta hai.
  *  3) Admin ka username/password server par check hota hai.
  *  4) Cancel Reason + Toggleable Auto-Delivered Timer (5 days after Shipped).
  */
 
 // ====== SIRF YE 2 LINES BADLEIN ======
-const ADMIN_USERNAME = 'riddhi@admin';
-const ADMIN_PASSWORD = 'Admin@2026';   // <-- deploy karne se pehle zaroor badal dein
+const ADMIN_USERNAME = 'Riddhi';
+const ADMIN_PASSWORD = 'Riddhi@2026';   // <-- deploy karne se pehle zaroor badal dein
 // =====================================
 
 const SHEET_NAME = 'Orders';
@@ -18,6 +18,7 @@ const STOCK_SHEET_NAME = 'Stock';
 const HEADERS = ['Timestamp', 'Order ID', 'Date', 'Name', 'Mobile', 'Address', 'City', 'Pincode',
                  'Items', 'Total (INR)', 'Items JSON', 'Image 1', 'Image 2', 'Image 3', 'Image Links',
                  'Status', 'Status Updated', 'Cancel Reason'];
+const STOCK_HEADERS = ['Date', 'Product ID', 'Product Name', 'Image', 'Available Stock', 'Last Updated'];
 const READ_COLS = 18;
 const STATUS_COL = 16;               // Sheet ka "Status" column (P)
 const CANCEL_REASON_COL = 18;        // Sheet ka "Cancel Reason" column (R)
@@ -38,7 +39,8 @@ function doPost(e) {
     switch (body.action) {
       case 'newOrder':          return json_(addOrder_(body.order));
       case 'getStock':          return json_({ ok: true, stock: readStockMap_() });
-      case 'setStock':          return json_(setStock_(body.token, body.productId, body.stock, body.productName));
+      case 'syncCatalog':       return json_(syncCatalog_(body.products));
+      case 'setStock':          return json_(setStock_(body.token, body.productId, body.stock, body.productName, body.image));
       case 'adminLogin':        return json_(adminLogin_(body.username, body.password));
       case 'getOrders':         return json_(getOrders_(body.token));
       case 'adminLogout':       return json_(adminLogout_(body.token));
@@ -93,14 +95,44 @@ function sheet_() {
 }
 
 // ---------- LIVE GLOBAL STOCK SHEET ("Stock" tab) ----------
+// Columns: Date | Product ID | Product Name | Image | Available Stock | Last Updated
 function stockSheet_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sh = ss.getSheetByName(STOCK_SHEET_NAME);
   if (!sh) {
     sh = ss.insertSheet(STOCK_SHEET_NAME);
-    sh.appendRow(['Product ID', 'Product Name', 'Available Stock', 'Last Updated']);
+    sh.appendRow(STOCK_HEADERS);
     sh.setFrozenRows(1);
-    sh.getRange(1, 1, 1, 4).setFontWeight('bold').setBackground('#15321e').setFontColor('#ffffff');
+    sh.getRange(1, 1, 1, STOCK_HEADERS.length).setFontWeight('bold').setBackground('#15321e').setFontColor('#ffffff');
+    sh.setColumnWidth(1, 150);
+    sh.setColumnWidth(2, 110);
+    sh.setColumnWidth(3, 240);
+    sh.setColumnWidth(4, 110);
+    sh.setColumnWidth(5, 130);
+    sh.setColumnWidth(6, 170);
+  } else {
+    const firstHeader = String(sh.getRange(1, 1).getValue() || '').trim();
+    if (firstHeader !== 'Date' || sh.getLastColumn() < STOCK_HEADERS.length) {
+      // Agar purane 4 columns (Product ID, Product Name, Available Stock, Last Updated) hain toh unhe migrate karein
+      const last = sh.getLastRow();
+      const oldData = last >= 2 ? sh.getRange(2, 1, last - 1, sh.getLastColumn()).getValues() : [];
+      sh.clear();
+      sh.appendRow(STOCK_HEADERS);
+      sh.setFrozenRows(1);
+      sh.getRange(1, 1, 1, STOCK_HEADERS.length).setFontWeight('bold').setBackground('#15321e').setFontColor('#ffffff');
+      sh.setColumnWidth(1, 150);
+      sh.setColumnWidth(2, 110);
+      sh.setColumnWidth(3, 240);
+      sh.setColumnWidth(4, 110);
+      sh.setColumnWidth(5, 130);
+      sh.setColumnWidth(6, 170);
+      const todayStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone() || 'Asia/Kolkata', 'dd MMM yyyy');
+      oldData.forEach(function (r) {
+        if (r[0]) {
+          sh.appendRow([todayStr, r[0], r[1] || '', '', Math.max(0, parseInt(r[2], 10) || 0), r[3] || new Date()]);
+        }
+      });
+    }
   }
   return sh;
 }
@@ -110,36 +142,78 @@ function readStockMap_() {
   const last = sh.getLastRow();
   const map = {};
   if (last < 2) return map;
-  const rows = sh.getRange(2, 1, last - 1, 3).getValues();
+  const rows = sh.getRange(2, 1, last - 1, 6).getValues();
   rows.forEach(function (r) {
-    const pid = String(r[0] || '').trim();
+    const pid = String(r[1] || '').trim();
     if (pid) {
-      map[pid] = Math.max(0, parseInt(r[2], 10) || 0);
+      map[pid] = Math.max(0, parseInt(r[4], 10) || 0);
     }
   });
   return map;
 }
 
-function upsertStockRow_(sh, productId, productName, newStock) {
+function upsertStockRow_(sh, productId, productName, newStock, imageUrl, onlyIfMissing) {
   const pid = safe_(productId, 30);
   const pname = safe_(productName || '', 120);
   const qty = Math.max(0, parseInt(newStock, 10) || 0);
+  const cleanImg = imgUrl_(imageUrl);
+  const imgFormula = cleanImg ? '=IMAGE("' + cleanImg + '")' : '';
+  const now = new Date();
+  const dateStr = Utilities.formatDate(now, Session.getScriptTimeZone() || 'Asia/Kolkata', 'dd MMM yyyy');
+
   const last = sh.getLastRow();
   if (last >= 2) {
-    const ids = sh.getRange(2, 1, last - 1, 1).getValues();
+    const ids = sh.getRange(2, 2, last - 1, 1).getValues();
     for (let i = 0; i < ids.length; i++) {
       if (String(ids[i][0]).trim() === pid) {
-        if (pname) sh.getRange(i + 2, 2).setValue(pname);
-        sh.getRange(i + 2, 3, 1, 2).setValues([[qty, new Date()]]);
+        const rowNum = i + 2;
+        if (onlyIfMissing) {
+          if (pname) sh.getRange(rowNum, 3).setValue(pname);
+          if (imgFormula) {
+            sh.getRange(rowNum, 4).setFormula(imgFormula);
+            sh.setRowHeight(rowNum, 90);
+          }
+          return Math.max(0, parseInt(sh.getRange(rowNum, 5).getValue(), 10) || 0);
+        }
+        if (pname) sh.getRange(rowNum, 3).setValue(pname);
+        if (imgFormula) {
+          sh.getRange(rowNum, 4).setFormula(imgFormula);
+          sh.setRowHeight(rowNum, 90);
+        }
+        sh.getRange(rowNum, 5, 1, 2).setValues([[qty, now]]);
         return qty;
       }
     }
   }
-  sh.appendRow([pid, pname, qty, new Date()]);
+
+  sh.appendRow([dateStr, pid, pname, '', qty, now]);
+  const newRowNum = sh.getLastRow();
+  if (imgFormula) {
+    sh.getRange(newRowNum, 4).setFormula(imgFormula);
+    sh.setRowHeight(newRowNum, 90);
+  }
   return qty;
 }
 
-function setStock_(token, productId, stock, productName) {
+function syncCatalog_(productsList) {
+  if (!Array.isArray(productsList) || productsList.length === 0) {
+    return { ok: true, stock: readStockMap_() };
+  }
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const sh = stockSheet_();
+    productsList.slice(0, 200).forEach(function (p) {
+      if (!p || !p.id) return;
+      upsertStockRow_(sh, p.id, p.name || '', p.availableStock, p.image || '', true);
+    });
+    return { ok: true, stock: readStockMap_() };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function setStock_(token, productId, stock, productName, imageUrl) {
   if (!validToken_(token)) return { ok: false, error: 'auth' };
   const pid = safe_(productId, 30);
   if (!pid) return { ok: false, error: 'bad_product' };
@@ -147,7 +221,7 @@ function setStock_(token, productId, stock, productName) {
   lock.waitLock(15000);
   try {
     const sh = stockSheet_();
-    upsertStockRow_(sh, pid, productName, stock);
+    upsertStockRow_(sh, pid, productName, stock, imageUrl, false);
     return { ok: true, stock: readStockMap_() };
   } finally {
     lock.releaseLock();
@@ -165,7 +239,7 @@ function deductStockFromSheet_(items) {
       : Math.max(0, parseInt(it.currentStock, 10) || 0);
     const updated = Math.max(0, baseStock - (Math.max(1, parseInt(it.qty, 10) || 1)));
     currentMap[pid] = updated;
-    upsertStockRow_(sh, pid, it.name, updated);
+    upsertStockRow_(sh, pid, it.name, updated, it.image, false);
   });
   return currentMap;
 }

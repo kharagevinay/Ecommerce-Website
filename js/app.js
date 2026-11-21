@@ -191,7 +191,13 @@ function applyServerStockMap(stockMap) {
 async function syncGlobalStockFromSheet() {
   if (!APPS_SCRIPT_URL) return;
   try {
-    const r = await callScript({ action: "getStock" });
+    const catalogPayload = PRODUCTS.map(p => ({
+      id: p.id,
+      name: p.name,
+      image: getFullImageUrl((p.images && p.images[0]) || ""),
+      availableStock: Math.max(0, parseInt(p.availableStock, 10) || 0)
+    }));
+    const r = await callScript({ action: "syncCatalog", products: catalogPayload });
     if (r && r.ok && r.stock) {
       applyServerStockMap(r.stock);
     }
@@ -218,6 +224,7 @@ async function saveSingleProductStockFromUI(prefix) {
         token: s.token,
         productId: prod.id,
         productName: prod.name,
+        image: getFullImageUrl((prod.images && prod.images[0]) || ""),
         stock: newStock
       });
       if (r && r.ok && r.stock) {
