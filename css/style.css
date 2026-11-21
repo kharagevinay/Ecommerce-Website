@@ -1,6 +1,8 @@
-:root {
+ :root {
   --primary-green: #15321e;
+  --primary-green-light: #1f492c;
   --accent-gold: #c59b27;
+  --accent-gold-light: #e6c35c;
   --cream-bg: #fdfaf3;
   --card-peach: #fae8d4;
   --text-dark: #2c2c2c;
@@ -10,17 +12,133 @@ body {
   font-family: 'Poppins', sans-serif;
   background-color: var(--cream-bg);
   color: var(--text-dark);
+  overflow-x: hidden;
 }
 
 h1, h2, h3, h4, .brand-font {
   font-family: 'Playfair Display', serif;
 }
 
-/* Navbar & Brand Logo */
+/* ==========================================
+   ANIMATIONS & KEYFRAMES
+   ========================================== */
+@keyframes goldShimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+@keyframes floatAccent {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-8px) rotate(3deg); }
+}
+
+@keyframes pulseUrgency {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(197, 155, 39, 0.45); }
+  50% { transform: scale(1.03); box-shadow: 0 0 0 8px rgba(197, 155, 39, 0); }
+}
+
+@keyframes marqueeScroll {
+  0% { transform: translateX(0%); }
+  100% { transform: translateX(-50%); }
+}
+
+@keyframes cardReveal {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.stagger-card {
+  animation: cardReveal 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.gold-shimmer-text {
+  background: linear-gradient(90deg, var(--primary-green) 0%, #8b6914 35%, var(--accent-gold) 50%, #8b6914 65%, var(--primary-green) 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: goldShimmer 4.5s linear infinite;
+}
+
+/* ==========================================
+   FESTIVE OFFER MARQUEE RIBBON
+   ========================================== */
+.offer-marquee-bar {
+  background: linear-gradient(90deg, #102617, var(--primary-green), #1b4027, var(--primary-green), #102617);
+  color: #fff;
+  border-bottom: 1.5px solid var(--accent-gold);
+  overflow: hidden;
+  white-space: nowrap;
+  padding: 7px 0;
+  font-size: 12.5px;
+  letter-spacing: 0.4px;
+  position: relative;
+  z-index: 1031;
+}
+
+.offer-marquee-track {
+  display: inline-flex;
+  width: max-content;
+  animation: marqueeScroll 28s linear infinite;
+}
+
+.offer-marquee-bar:hover .offer-marquee-track {
+  animation-play-state: paused;
+}
+
+.offer-marquee-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 28px;
+  color: #fdfaf3;
+  font-weight: 500;
+}
+
+.offer-marquee-item .gold-pill {
+  background: linear-gradient(135deg, var(--accent-gold), #e5be46);
+  color: #15321e;
+  font-weight: 700;
+  padding: 1px 8px;
+  border-radius: 50px;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+/* ==========================================
+   NAVBAR & CENTERED BRAND LOGO
+   ========================================== */
 .navbar {
   background-color: #ffffff;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+  box-shadow: 0 2px 12px rgba(21, 50, 30, 0.08);
+  padding-top: 8px;
+  padding-bottom: 8px;
 }
+
+.navbar-grid {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  width: 100%;
+}
+
+.nav-left-slot {
+  justify-self: start;
+}
+
+.nav-center-slot {
+  justify-self: center;
+}
+
+.nav-right-slot {
+  justify-self: end;
+}
+
 .brand-logo-img {
   width: 90px;
   height: 90px;
@@ -28,25 +146,94 @@ h1, h2, h3, h4, .brand-font {
   border-radius: 50%;
   background-color: #15321e;
   padding: 2px;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
-/* Hero Section */
+.brand-logo-img:hover {
+  transform: scale(1.04);
+  box-shadow: 0 4px 14px rgba(197, 155, 39, 0.35);
+}
+
+@media (max-width: 576px) {
+  .brand-logo-img {
+    width: 64px;
+    height: 64px;
+  }
+}
+
+/* ==========================================
+   HERO SECTION & FLOATING ACCENTS
+   ========================================== */
 .hero-section {
-  background: linear-gradient(rgba(253, 250, 243, 0.82), rgba(245, 232, 210, 0.88)),
+  background: linear-gradient(rgba(253, 250, 243, 0.85), rgba(245, 232, 210, 0.91)),
               url('https://images.unsplash.com/photo-1611591437281-460bfbe1220a?auto=format&fit=crop&w=1200&q=80') center/cover;
-  padding: 45px 15px;
+  padding: 46px 15px 40px;
   border-bottom: 1px solid #eadbc8;
+  position: relative;
+  overflow: hidden;
+}
+
+.hero-float-badge {
+  position: absolute;
+  color: rgba(197, 155, 39, 0.25);
+  font-size: 2.2rem;
+  pointer-events: none;
+  animation: floatAccent 4.5s ease-in-out infinite;
+}
+
+.hero-float-1 { top: 18px; left: 8%; animation-delay: 0s; }
+.hero-float-2 { bottom: 20px; right: 10%; animation-delay: 1.5s; }
+.hero-float-3 { top: 28px; right: 18%; font-size: 1.5rem; animation-delay: 0.8s; }
+
+/* ==========================================
+   HOME PAGE HIGHLIGHTED OFFER CARDS
+   ========================================== */
+.offer-highlight-card {
+  background: linear-gradient(135deg, #fffdf9 0%, #fae8d4 100%);
+  border: 1.5px solid #e2be78;
+  border-radius: 14px;
+  padding: 16px 18px;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.28s ease, box-shadow 0.28s ease;
+  height: 100%;
+  cursor: pointer;
+}
+
+.offer-highlight-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 22px rgba(21, 50, 30, 0.13);
+}
+
+.offer-highlight-card.featured-green {
+  background: linear-gradient(135deg, #15321e 0%, #224d30 100%);
+  border-color: var(--accent-gold);
+  color: #fff;
+}
+
+.offer-urgency-pill {
+  display: inline-block;
+  background: #dc3545;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 9px;
+  border-radius: 50px;
+  letter-spacing: 0.4px;
+  animation: pulseUrgency 2.4s infinite;
 }
 
 .btn-green {
   background-color: var(--primary-green);
   color: #fff;
   border: none;
-  transition: 0.25s;
+  transition: all 0.25s ease;
 }
 .btn-green:hover {
   background-color: #1f492c;
   color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(21, 50, 30, 0.2);
 }
 
 .btn-gold {
@@ -54,10 +241,12 @@ h1, h2, h3, h4, .brand-font {
   color: #fff;
   border: none;
   font-weight: 500;
+  transition: all 0.25s ease;
 }
 .btn-gold:hover {
   background-color: #b0881e;
   color: #fff;
+  transform: translateY(-1px);
 }
 
 /* Section Titles */
@@ -73,18 +262,23 @@ h1, h2, h3, h4, .brand-font {
   border: 1px solid #eed6bc;
   border-radius: 12px;
   overflow: hidden;
-  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
   cursor: pointer;
   height: 100%;
 }
 .custom-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 18px rgba(21, 50, 30, 0.12);
+  transform: translateY(-5px);
+  border-color: var(--accent-gold);
+  box-shadow: 0 10px 20px rgba(21, 50, 30, 0.14);
 }
 .custom-card img {
   width: 100%;
-  height: 170px;
-  object-fit: cover;
+  height: auto;
+  object-fit: inherit !important;
+  transition: transform 0.4s ease;
+}
+.custom-card:hover img {
+  transform: scale(1.04);
 }
 .card-footer-title {
   padding: 10px 8px;
@@ -101,7 +295,7 @@ h1, h2, h3, h4, .brand-font {
   border: 1px solid #eadbc8;
   border-radius: 12px;
   overflow: hidden;
-  transition: 0.25s;
+  transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
   cursor: pointer;
   height: 100%;
   display: flex;
@@ -109,18 +303,82 @@ h1, h2, h3, h4, .brand-font {
   justify-content: space-between;
 }
 .product-card:hover {
-  box-shadow: 0 8px 20px rgba(0,0,0,0.08);
-  transform: translateY(-3px);
+  box-shadow: 0 10px 24px rgba(21, 50, 30, 0.12);
+  border-color: var(--accent-gold);
+  transform: translateY(-4px);
 }
 .product-card img {
   width: 100%;
-  height: 190px;
-  object-fit: cover;
+  height: 240px;
+  object-fit: inherit;
+  transition: transform 0.4s ease;
 }
+.product-card:hover img {
+  transform: scale(1.03);
+}
+
+/* Price & Discount Badges */
 .price-tag {
   color: var(--primary-green);
-  font-weight: 600;
+  font-weight: 700;
   font-size: 1.05rem;
+}
+.actual-price {
+  text-decoration: line-through;
+  color: #8c8c8c;
+  font-size: 0.82rem;
+  font-weight: 400;
+}
+.discount-badge {
+  background: linear-gradient(135deg, #d6334c, #b01e35);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 50px;
+  letter-spacing: 0.3px;
+}
+
+/* Out of stock / Available Soon styling */
+.product-card.out-of-stock img {
+  filter: grayscale(50%) opacity(0.88);
+}
+
+/* Custom City Autocomplete Dropdown */
+.city-autocomplete-wrap {
+  position: relative;
+}
+.city-suggestions-list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 1060;
+  background: #fff;
+  border: 1px solid #d8c3a5;
+  border-top: none;
+  border-radius: 0 0 10px 10px;
+  max-height: 175px;
+  overflow-y: auto;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12);
+}
+.city-suggestion-item {
+  padding: 7px 12px;
+  font-size: 12.5px;
+  cursor: pointer;
+  border-bottom: 1px solid #f5eee4;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.city-suggestion-item:last-child {
+  border-bottom: none;
+}
+.city-suggestion-item:hover,
+.city-suggestion-item.active {
+  background-color: #fae8d4;
+  color: var(--primary-green);
+  font-weight: 600;
 }
 
 /* Product Detail Gallery & Fullscreen Trigger */
@@ -140,7 +398,7 @@ h1, h2, h3, h4, .brand-font {
 .media-main-box video {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: inherit;
   cursor: zoom-in;
 }
 .fullscreen-btn {
@@ -259,6 +517,10 @@ h1, h2, h3, h4, .brand-font {
   align-items: center;
   gap: 8px;
   cursor: pointer;
+  transition: transform 0.25s ease;
+}
+.floating-cart:hover {
+  transform: scale(1.04);
 }
 
 /* Info / Page Cards */
@@ -278,245 +540,34 @@ footer {
 }
 
 
-/* =====================================================
-   HEADER: menu (left) | logo (center) | orders + cart (right)
-   ===================================================== */
-.header-grid {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  width: 100%;
-}
-.header-left { justify-self: start; }
-.header-right { justify-self: end; }
-.header-center { justify-self: center; line-height: 0; }
-.navbar .header-center .brand-logo-img {
-  width: 72px;
-  height: 72px;
-  transition: transform .3s ease, box-shadow .3s ease;
-}
-.navbar .header-center:hover .brand-logo-img {
-  transform: scale(1.06);
-  box-shadow: 0 0 0 3px rgba(197,155,39,.45);
-}
-@media (min-width: 768px) {
-  .navbar .header-center .brand-logo-img { width: 84px; height: 84px; }
-}
-
-/* =====================================================
-   PRICES: actual vs offer + discount badge
-   ===================================================== */
-.actual-price {
-  color: #8a8a8a;
-  text-decoration: line-through;
-  font-weight: 400;
-  font-size: .85rem;
-}
-.discount-badge {
-  display: inline-block;
-  background: linear-gradient(135deg, #c0392b, #e74c3c);
-  color: #fff;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: .3px;
-  padding: 3px 7px;
-  border-radius: 20px;
-  white-space: nowrap;
-}
-.price-row { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px; }
-
-/* Stock badges */
-.soon-badge {
-  background: linear-gradient(135deg, #c59b27, #e6c65c) !important;
-  color: #2c2c2c !important;
-}
-.soon-box {
-  background: #fff8eb;
-  border: 1px dashed var(--accent-gold);
-  border-radius: 12px;
-  padding: 12px;
-  margin-bottom: 12px;
-}
-.product-card.sold-out img { filter: grayscale(.45); }
-
-/* =====================================================
-   FESTIVE OFFER RIBBON + OFFER CARDS
-   ===================================================== */
-.offer-ribbon {
-  background: linear-gradient(90deg, #15321e, #1f492c, #15321e);
-  color: #fff;
-  overflow: hidden;
-  white-space: nowrap;
-  border-bottom: 2px solid var(--accent-gold);
-  font-size: 13px;
-  font-weight: 500;
-  position: relative;
-}
-.offer-ribbon::after {      /* gold shimmer sweeping across the ribbon */
-  content: "";
+/* ==========================================
+   FAVORITES / WISHLIST HEART BUTTON
+   ========================================== */
+.fav-heart-btn {
   position: absolute;
-  inset: 0;
-  background: linear-gradient(100deg, transparent 35%, rgba(255,226,140,.28) 50%, transparent 65%);
-  transform: translateX(-100%);
-  animation: ribbonShine 5s ease-in-out infinite;
-  pointer-events: none;
-}
-.offer-track {
-  display: inline-flex;
-  padding: 8px 0;
-  animation: marquee 32s linear infinite;
-  will-change: transform;
-}
-.offer-ribbon:hover .offer-track { animation-play-state: paused; }
-.offer-item { padding: 0 38px; position: relative; }
-.offer-item::after { content: "✦"; color: var(--accent-gold); position: absolute; right: -6px; }
-@keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-@keyframes ribbonShine { 0%, 55% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
-
-.offer-card {
-  position: relative;
-  height: 100%;
-  border-radius: 14px;
-  padding: 16px 14px;
-  background: linear-gradient(145deg, #fff8e6, #fae8d4);
-  border: 1.5px solid var(--accent-gold);
-  box-shadow: 0 4px 14px rgba(197,155,39,.18);
-  cursor: pointer;
-  overflow: hidden;
-  transition: transform .3s ease, box-shadow .3s ease;
-}
-.offer-card:hover { transform: translateY(-5px) scale(1.02); box-shadow: 0 12px 26px rgba(197,155,39,.35); }
-.offer-card::before {
-  content: "";
-  position: absolute;
-  top: 0; left: -80%;
-  width: 60%; height: 100%;
-  background: linear-gradient(100deg, transparent, rgba(255,255,255,.7), transparent);
-  transform: skewX(-20deg);
-  animation: cardShine 4.5s ease-in-out infinite;
-}
-.offer-card .offer-big {
-  font-family: 'Playfair Display', serif;
-  font-weight: 700;
-  font-size: 1.55rem;
-  color: #b3261e;
-  line-height: 1.1;
-}
-.offer-card .offer-title { font-weight: 600; color: var(--primary-green); font-size: .9rem; }
-.offer-card .offer-sub { font-size: 11.5px; color: #6b5a3a; }
-.offer-tag {
-  position: absolute; top: 8px; right: 8px;
-  font-size: 9px; font-weight: 600; letter-spacing: .6px;
-  background: var(--primary-green); color: #fff;
-  padding: 2px 8px; border-radius: 20px;
-  animation: pulseTag 1.8s ease-in-out infinite;
-}
-@keyframes cardShine { 0%, 60% { left: -80%; } 100% { left: 140%; } }
-@keyframes pulseTag { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
-
-/* =====================================================
-   ANIMATIONS: gold shimmer, floating hero accents, card reveal
-   ===================================================== */
-.shimmer-text {
-  background: linear-gradient(90deg, var(--primary-green) 20%, var(--accent-gold) 45%, #f3d77a 50%, var(--accent-gold) 55%, var(--primary-green) 80%);
-  background-size: 250% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  animation: goldShimmer 4s linear infinite;
-}
-@keyframes goldShimmer { from { background-position: 150% 0; } to { background-position: -100% 0; } }
-
-.hero-section { position: relative; overflow: hidden; }
-.hero-accent {
-  position: absolute;
-  color: var(--accent-gold);
-  opacity: .55;
-  pointer-events: none;
-  animation: floaty 6s ease-in-out infinite;
-}
-.hero-accent-1 { top: 14%; left: 8%;  font-size: 26px; }
-.hero-accent-2 { top: 58%; right: 9%; font-size: 34px; animation-delay: -2s; }
-.hero-accent-3 { bottom: 12%; left: 22%; font-size: 20px; animation-delay: -4s; }
-@keyframes floaty {
-  0%, 100% { transform: translateY(0) rotate(0deg); }
-  50% { transform: translateY(-14px) rotate(12deg); }
-}
-
-.btn-green { position: relative; overflow: hidden; }
-.btn-green::after {
-  content: "";
-  position: absolute; top: 0; left: -120%;
-  width: 60%; height: 100%;
-  background: linear-gradient(100deg, transparent, rgba(255,226,140,.45), transparent);
-  transform: skewX(-20deg);
-}
-.btn-green:hover::after { left: 140%; transition: left .7s ease; }
-.btn-green:hover { transform: translateY(-1px); box-shadow: 0 6px 14px rgba(21,50,30,.25); }
-
-.reveal-card {
-  opacity: 0;
-  transform: translateY(22px);
-  animation: revealUp .6s ease forwards;
-  animation-delay: calc(var(--i, 0) * 90ms);
-}
-@keyframes revealUp { to { opacity: 1; transform: translateY(0); } }
-
-.product-card img, .custom-card img { transition: transform .5s ease; }
-.product-card:hover img, .custom-card:hover img { transform: scale(1.06); }
-.product-card .position-relative, .custom-card { overflow: hidden; }
-.navbar .btn { transition: transform .2s ease, box-shadow .2s ease; }
-.navbar .btn:hover { transform: translateY(-2px); }
-.floating-cart { animation: cartPulse 2.4s ease-in-out infinite; transition: transform .2s ease; }
-.floating-cart:hover { transform: scale(1.06); }
-@keyframes cartPulse {
-  0%, 100% { box-shadow: 0 4px 15px rgba(0,0,0,.25); }
-  50% { box-shadow: 0 4px 22px rgba(197,155,39,.65); }
-}
-.cart-bump { animation: bump .4s ease; }
-@keyframes bump { 30% { transform: scale(1.35); } 100% { transform: scale(1); } }
-
-/* =====================================================
-   CITY AUTOCOMPLETE + FORM VALIDATION
-   ===================================================== */
-.city-suggest {
-  position: absolute;
-  left: 8px; right: 8px;
-  top: 100%;
-  z-index: 30;
-  max-height: 190px;
-  overflow-y: auto;
-  background: #fff;
+  bottom: 8px;
+  right: 8px;
+  z-index: 4;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.94);
   border: 1px solid #eadbc8;
-  border-radius: 8px;
-  box-shadow: 0 8px 20px rgba(0,0,0,.14);
+  color: #8c8c8c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  transition: transform 0.2s ease, color 0.2s ease, background-color 0.2s ease;
+  cursor: pointer;
 }
-.city-suggest button {
-  display: block;
-  width: 100%;
-  text-align: left;
-  padding: 7px 12px;
-  font-size: 13px;
-  background: none;
-  border: 0;
-  border-bottom: 1px solid #f3ece0;
+.fav-heart-btn:hover {
+  transform: scale(1.12);
+  color: #dc3545;
 }
-.city-suggest button:hover, .city-suggest button.active { background: #fff3d6; }
-.city-suggest button:last-child { border-bottom: 0; }
-.city-suggest mark { background: none; color: var(--accent-gold); font-weight: 700; padding: 0; }
-
-/* Order placed note */
-.order-note {
-  background: #fff8eb;
-  border-left: 4px solid var(--accent-gold);
-  border-radius: 8px;
-  padding: 10px 12px;
-  font-size: 12.5px;
-  color: #4a3b17;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation: none !important; transition: none !important; }
-  .reveal-card { opacity: 1; transform: none; }
-  .offer-track { overflow-x: auto; }
+.fav-heart-btn.active {
+  color: #dc3545;
+  background: #fff0f3;
+  border-color: #f5c2c7;
 }

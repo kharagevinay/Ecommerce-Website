@@ -11,44 +11,127 @@
 </head>
 <body>
 
-  <!-- NAVBAR : Menu (left) | Logo (center) | My Orders + Cart (right) -->
+  <!-- FESTIVE OFFER MARQUEE RIBBON -->
+  <div class="offer-marquee-bar">
+    <div class="offer-marquee-track">
+      <div class="offer-marquee-item">
+        <span class="gold-pill">Festive Offer</span>
+        <span>Up to <strong>30% OFF</strong> on Handcrafted Chokers, Nath &amp; Bridal Combos!</span>
+      </div>
+      <div class="offer-marquee-item">
+        <span class="gold-pill">Limited Stock</span>
+        <span>Only 1–2 Ready Pieces per Design — Book Yours Before It Sells Out!</span>
+      </div>
+      <div class="offer-marquee-item">
+        <span class="gold-pill">Custom Bulk</span>
+        <span>Need 3–4+ Pieces for Weddings or Haldi? Custom Making Available!</span>
+      </div>
+      <div class="offer-marquee-item">
+        <span class="gold-pill">Festive Offer</span>
+        <span>Up to <strong>30% OFF</strong> on Handcrafted Chokers, Nath &amp; Bridal Combos!</span>
+      </div>
+      <div class="offer-marquee-item">
+        <span class="gold-pill">Limited Stock</span>
+        <span>Only 1–2 Ready Pieces per Design — Book Yours Before It Sells Out!</span>
+      </div>
+      <div class="offer-marquee-item">
+        <span class="gold-pill">Custom Bulk</span>
+        <span>Need 3–4+ Pieces for Weddings or Haldi? Custom Making Available!</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- NAVBAR: LEFT MENU (offcanvas-start) | CENTER BRAND LOGO | RIGHT FAVORITES + MY ORDERS + CART -->
   <nav class="navbar sticky-top px-2 px-md-3">
-    <div class="container header-grid">
-      <div class="header-left">
-        <button class="btn btn-outline-secondary btn-sm px-2 py-1" type="button" data-bs-toggle="offcanvas" data-bs-target="#menuOffcanvas" aria-label="Open menu">
-          <i class="bi bi-list fs-4"></i>
-        </button>
-      </div>
+    <div class="container">
+      <div class="navbar-grid">
+        <!-- Left: Menu Button -->
+        <div class="nav-left-slot d-flex align-items-center">
+          <button class="btn btn-outline-dark btn-sm px-2 px-md-3 py-1 d-flex align-items-center gap-1 rounded-pill" type="button" data-bs-toggle="offcanvas" data-bs-target="#menuOffcanvas" aria-label="Open Menu">
+            <i class="bi bi-list fs-5"></i>
+            <span class="d-none d-sm-inline small fw-semibold">Menu</span>
+          </button>
+        </div>
 
-      <div class="header-center" style="cursor:pointer;" onclick="navigateTo('home'); adminLogoTap()">
-        <img src="assets/logo.png" alt="Jewellery by Riddhi Logo" class="brand-logo-img">
-      </div>
+        <!-- Center: Brand Logo -->
+        <div class="nav-center-slot text-center">
+          <div class="d-inline-flex flex-column align-items-center" style="cursor:pointer;" onclick="navigateTo('home'); adminLogoTap()">
+            <img src="assets/logo.png" alt="Jewellery by Riddhi Logo" class="brand-logo-img">
+          </div>
+        </div>
 
-      <div class="header-right d-flex align-items-center gap-2 gap-md-3">
-        <!-- My Orders Button -->
-        <button class="btn btn-outline-success position-relative btn-sm px-2 py-1" data-bs-toggle="offcanvas" data-bs-target="#myOrdersOffcanvas" title="My Orders" aria-label="My Orders">
-          <i class="bi bi-receipt-cutoff fs-5"></i>
-          <span id="navOrdersCount" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-success d-none">0</span>
-        </button>
-        <button class="btn btn-outline-dark position-relative btn-sm px-2 py-1" data-bs-toggle="offcanvas" data-bs-target="#cartOffcanvas" title="Cart" aria-label="Cart">
-          <i class="bi bi-bag-heart fs-5"></i>
-          <span id="navCartCount" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">0</span>
-        </button>
+        <!-- Right: Favorites + My Orders + Cart Icons -->
+        <div class="nav-right-slot d-flex align-items-center gap-2 gap-md-3">
+          <button class="btn btn-outline-danger position-relative btn-sm px-2 py-1" onclick="openFavoritesView()" title="My Favorites">
+            <i class="bi bi-heart fs-5"></i>
+            <span id="navFavCount" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none">0</span>
+          </button>
+          <button class="btn btn-outline-success position-relative btn-sm px-2 py-1" data-bs-toggle="offcanvas" data-bs-target="#myOrdersOffcanvas" title="My Orders">
+            <i class="bi bi-receipt-cutoff fs-5"></i>
+            <span id="navOrdersCount" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-success d-none">0</span>
+          </button>
+          <button class="btn btn-outline-dark position-relative btn-sm px-2 py-1" data-bs-toggle="offcanvas" data-bs-target="#cartOffcanvas" title="Shopping Cart">
+            <i class="bi bi-bag-heart fs-5"></i>
+            <span id="navCartCount" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">0</span>
+          </button>
+        </div>
       </div>
     </div>
   </nav>
 
-  <!-- SIDEBAR MENU -->
+  <!-- LEFT SIDEBAR MENU (offcanvas-start) -->
   <div class="offcanvas offcanvas-start" tabindex="-1" id="menuOffcanvas">
     <div class="offcanvas-header" style="background-color: var(--primary-green); color: #fff;">
       <div class="d-flex align-items-center gap-2">
-        <img src="assets/logo.png" alt="Logo" class="brand-logo-img" style="width:36px;height:36px;">
-        <h5 class="offcanvas-title brand-font m-0">Jewellery by Riddhi</h5>
+        <img src="assets/logo.png" alt="Logo" class="brand-logo-img" style="width:60px;height:60px;">
       </div>
       <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"></button>
     </div>
     <div class="offcanvas-body d-flex flex-column justify-content-between" style="background-color: var(--cream-bg);">
       <div>
+        <!-- ADMIN PERSISTENT SIDEBAR SECTION (Visible whenever admin is logged in, stays logged in even after closing popup) -->
+        <div id="sidebarAdminSection" class="d-none mb-3 p-2 rounded-3 border shadow-sm" style="background-color: #fff8eb; border-color: var(--accent-gold) !important;">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="badge" style="background-color: var(--primary-green);"><i class="bi bi-shield-check me-1"></i>Admin Active</span>
+            <button type="button" class="btn btn-outline-danger btn-sm py-0 px-2" style="font-size: 11px;" onclick="adminLogout()">
+              <i class="bi bi-box-arrow-right me-1"></i>Logout
+            </button>
+          </div>
+
+          <button type="button" class="btn btn-green btn-sm w-100 rounded-pill mb-2 fw-semibold" onclick="openAllCustomersModal()" data-bs-dismiss="offcanvas">
+            <i class="bi bi-people me-1"></i> Customers &amp; Orders Panel
+          </button>
+
+          <!-- Individual Product Stock Update with Category Filter in Sidebar -->
+          <div class="p-2 rounded bg-white border mb-2">
+            <div class="small fw-bold mb-1" style="color: var(--primary-green); font-size: 11.5px;">
+              <i class="bi bi-box-seam me-1"></i>Individual Product Stock Update
+            </div>
+            <select id="sidebarStockCategoryFilter" class="form-select form-select-sm mb-1" style="font-size: 11.5px;" onchange="syncStockCategoryFilter('sidebar')">
+              <option value="All">Filter Category: All Categories</option>
+            </select>
+            <select id="sidebarStockProductSelect" class="form-select form-select-sm mb-1" style="font-size: 11.5px;" onchange="onStockProductSelectChange('sidebar')"></select>
+            <div class="input-group input-group-sm">
+              <span class="input-group-text" style="font-size: 11px;">Stock</span>
+              <input type="number" id="sidebarStockQtyInput" class="form-control" min="0" max="999" value="2">
+              <button type="button" class="btn btn-green" onclick="saveSingleProductStockFromUI('sidebar')">Update</button>
+            </div>
+          </div>
+
+          <!-- Auto-Delivered Timer Manual Control in Sidebar -->
+          <div class="p-2 rounded bg-white border">
+            <div class="form-check form-switch m-0 d-flex align-items-center justify-content-between ps-0">
+              <label class="form-check-label small fw-semibold text-dark" for="sidebarAutoDeliverSwitch" style="font-size: 11px;">
+                <i class="bi bi-clock-history me-1 text-warning"></i>Auto-Delivered (5d)
+              </label>
+              <input class="form-check-input ms-2" type="checkbox" role="switch" id="sidebarAutoDeliverSwitch" checked onchange="toggleAutoDeliverSetting(this.checked)">
+            </div>
+            <div id="sidebarAutoDeliverHint" class="text-muted mt-1" style="font-size: 10px;">
+              ON: Shipped orders auto-mark Delivered in 5 days. Turn OFF for manual Delivered status only.
+            </div>
+          </div>
+        </div>
+
         <ul class="list-group list-group-flush mb-3">
           <li class="list-group-item bg-transparent">
             <a href="javascript:void(0)" class="text-decoration-none text-dark fw-semibold" onclick="navigateTo('home')" data-bs-dismiss="offcanvas">
@@ -60,26 +143,15 @@
               <i class="bi bi-grid me-2"></i>All Products (Filter)
             </a>
           </li>
-                    <li class="list-group-item bg-transparent">
+          <li class="list-group-item bg-transparent">
+            <a href="javascript:void(0)" class="text-decoration-none text-dark fw-semibold" onclick="openFavoritesView()" data-bs-dismiss="offcanvas">
+              <i class="bi bi-heart text-danger me-2"></i>My Favorites
+            </a>
+          </li>
+          <li class="list-group-item bg-transparent">
             <a href="javascript:void(0)" class="text-decoration-none text-dark fw-semibold" data-bs-toggle="offcanvas" data-bs-target="#myOrdersOffcanvas">
               <i class="bi bi-receipt-cutoff me-2"></i>My Orders
             </a>
-          </li>
-                    <!-- ADMIN ONLY (login ke baad dikhte hain, logout tak bane rehte hain) -->
-          <li class="list-group-item bg-transparent admin-only d-none">
-            <a href="javascript:void(0)" class="text-decoration-none fw-semibold" style="color: var(--accent-gold);" data-bs-toggle="offcanvas" data-bs-target="#myOrdersOffcanvas">
-              <i class="bi bi-receipt-cutoff me-2"></i>All Orders (Admin)
-            </a>
-          </li>
-          <li class="list-group-item bg-transparent admin-only d-none">
-            <a href="javascript:void(0)" class="text-decoration-none fw-semibold" style="color: var(--accent-gold);" onclick="openAllCustomersModal()" data-bs-dismiss="offcanvas">
-              <i class="bi bi-people me-2"></i>Customers &amp; Orders (Admin)
-            </a>
-          </li>
-          <li class="list-group-item bg-transparent admin-only d-none">
-            <button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="adminLogout()">
-              <i class="bi bi-box-arrow-right me-1"></i>Admin Logout
-            </button>
           </li>
           <li class="list-group-item bg-transparent">
             <a href="about.html" class="text-decoration-none text-dark fw-semibold">
@@ -124,21 +196,16 @@
 
   <!-- HOME VIEW -->
   <div id="homeView">
-    <!-- FESTIVE OFFER RIBBON (animated marquee) -->
-    <div class="offer-ribbon" role="region" aria-label="Festive offers">
-      <div class="offer-track" id="offerTrack"></div>
-    </div>
-
     <section class="hero-section text-center">
-      <div class="hero-accent hero-accent-1" aria-hidden="true">✦</div>
-      <div class="hero-accent hero-accent-2" aria-hidden="true">❖</div>
-      <div class="hero-accent hero-accent-3" aria-hidden="true">✧</div>
+      <i class="bi bi-stars hero-float-badge hero-float-1"></i>
+      <i class="bi bi-gem hero-float-badge hero-float-2"></i>
+      <i class="bi bi-sparkle hero-float-badge hero-float-3"></i>
       <div class="container position-relative">
-        <p class="text-uppercase small fw-semibold mb-1" style="color: var(--accent-gold); letter-spacing: 1.5px;">Handmade Jewellery</p>
-        <h1 class="display-5 fw-bold mb-2" style="color: var(--primary-green);">Timeless Beauty, Made by Hand</h1>
-        <p class="text-muted mx-auto mb-4" style="max-width: 520px;">Explore our exclusive collection of handmade jewellery crafted with love and perfection.</p>
+        <p class="text-uppercase small fw-semibold mb-1" style="color: var(--accent-gold); letter-spacing: 1.8px;">✦ Handcrafted Traditional Elegance ✦</p>
+        <h1 class="display-5 fw-bold mb-2 gold-shimmer-text">Timeless Beauty, Made by Hand</h1>
+        <p class="text-muted mx-auto mb-4" style="max-width: 530px;">Explore our exclusive collection of handmade Maharashtrian &amp; festive jewellery crafted with love and perfection.</p>
         <div class="d-flex justify-content-center gap-2 flex-wrap">
-          <button class="btn btn-green px-4 py-2 rounded-pill" onclick="openProductsView('All')">
+          <button class="btn btn-green px-4 py-2 rounded-pill shadow-sm" onclick="openProductsView('All')">
             <i class="bi bi-bag-check me-1"></i> Shop All Products
           </button>
           <!-- <button class="btn btn-outline-dark px-4 py-2 rounded-pill" onclick="openProductsView('Choker')">
@@ -148,12 +215,45 @@
       </div>
     </section>
 
-    <!-- HIGHLIGHTED OFFER CARDS -->
-    <section class="container mt-4">
-      <div class="text-center mb-3">
-        <h3 class="section-title shimmer-text">✦ Festive Offers ✦</h3>
+    <!-- HIGHLIGHTED OFFER CARDS BANNER SECTION -->
+    <section class="container mt-4 mb-2">
+      <div class="row g-3">
+        <div class="col-12 col-md-4 stagger-card" style="animation-delay: 0.05s;">
+          <div class="offer-highlight-card featured-green" onclick="openProductsView('Combo Set')">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span class="offer-urgency-pill">LIMITED TIME DEAL</span>
+              <span class="badge" style="background-color: var(--accent-gold); color: #15321e;">FLAT ₹400 OFF</span>
+            </div>
+            <h5 class="brand-font fw-bold mb-1" style="color: var(--accent-gold-light);">Bridal &amp; Festive Combos</h5>
+            <p class="small mb-2 opacity-90">Complete Choker + Necklace + Earrings + Mangalsutra sets at special festive offer prices.</p>
+            <span class="small fw-semibold text-warning">Shop Combos <i class="bi bi-arrow-right"></i></span>
+          </div>
+        </div>
+
+        <div class="col-12 col-md-4 stagger-card" style="animation-delay: 0.15s;">
+          <div class="offer-highlight-card" onclick="openProductsView('All')">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span class="badge bg-danger">HURRY • 1–2 PCS LEFT</span>
+              <span class="badge bg-success-subtle text-success border border-success-subtle">READY TO SHIP</span>
+            </div>
+            <h5 class="brand-font fw-bold mb-1" style="color: var(--primary-green);">Exclusive Handmade Drops</h5>
+            <p class="small text-muted mb-2">Each piece is handcrafted in small batches. Grab ready stock before it switches to Available Soon!</p>
+            <span class="small fw-semibold" style="color: var(--primary-green);">Browse Ready Stock <i class="bi bi-arrow-right"></i></span>
+          </div>
+        </div>
+
+        <div class="col-12 col-md-4 stagger-card" style="animation-delay: 0.25s;">
+          <div class="offer-highlight-card" onclick="openProductsView('Nath')">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span class="badge text-dark" style="background-color: var(--accent-gold-light);">WEDDING &amp; HALDI SPECIAL</span>
+              <span class="small fw-bold text-danger">25%–32% OFF</span>
+            </div>
+            <h5 class="brand-font fw-bold mb-1" style="color: var(--primary-green);">Peshwai Nath &amp; Haldi Sets</h5>
+            <p class="small text-muted mb-2">Traditional Moti Nath, Bugadi &amp; Sugar-Ball sets. Bulk 3+ custom orders welcome!</p>
+            <span class="small fw-semibold" style="color: var(--primary-green);">Explore Festive Picks <i class="bi bi-arrow-right"></i></span>
+          </div>
+        </div>
       </div>
-      <div class="row g-3" id="offerCardsGrid"></div>
     </section>
 
     <!-- NEW ARRIVALS SECTION -->
@@ -170,7 +270,8 @@
       <div class="text-center mb-4">
         <h3 class="section-title">✦ Shop by Category ✦</h3>
       </div>
-      <div class="row g-3 g-md-4" id="homeCategoryGrid"></div>
+      <div class="row g-3 g-md-4" id="homeCategoryGrid">
+      </div>
     </section>
   </div>
 
@@ -199,15 +300,15 @@
         </div>
         <div class="col-6 col-md-4">
           <select id="filterPrice" class="form-select form-select-sm" onchange="applyFilters()">
-            <option value="default">Sort by: Featured</option>
+            <option value="default">Sort / Filter: Featured</option>
+            <option value="a-z">Alphabetically: A – Z</option>
+            <option value="z-a">Alphabetically: Z – A</option>
             <option value="low-high">Price: Low to High</option>
             <option value="high-low">Price: High to Low</option>
-            <option value="az">Alphabetically, A - Z</option>
-            <option value="za">Alphabetically, Z - A</option>
             <option value="under-500">Under ₹500</option>
-            <option value="500-1000">₹500 - ₹1000</option>
-            <option value="1000-1500">₹1000 - ₹1500</option>
-            <option value="1500-2000">₹1500 - ₹2000</option>
+            <option value="500-1000">₹500 – ₹1000</option>
+            <option value="1000-1500">₹1000 – ₹1500</option>
+            <option value="1500-2000">₹1500 – ₹2000</option>
             <option value="above-2000">Above ₹2000</option>
           </select>
         </div>
@@ -217,12 +318,31 @@
     <div class="row g-3 g-md-4" id="productsGrid"></div>
   </section>
 
+  <!-- MY FAVORITES / WISHLIST VIEW -->
+  <section class="container my-4 d-none" id="favoritesView">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 pb-2 border-bottom">
+      <button class="btn btn-outline-dark btn-sm rounded-pill px-3" onclick="navigateTo('home')">
+        <i class="bi bi-arrow-left"></i> Home
+      </button>
+      <h3 class="brand-font fw-bold m-0" style="color: var(--primary-green);">
+        <i class="bi bi-heart-fill text-danger me-1"></i> My Favorite Jewellery
+      </h3>
+      <span class="badge bg-danger" id="favoritesCountBadge">0 Saved</span>
+    </div>
+    <div class="row g-3 g-md-4" id="favoritesGrid"></div>
+  </section>
+
   <!-- PRODUCT DETAIL MODAL -->
   <div class="modal fade" id="productModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
       <div class="modal-content" style="background-color: var(--cream-bg); border-radius: 16px;">
         <div class="modal-header border-0 pb-1">
-          <span class="badge" style="background-color: var(--accent-gold);" id="modalCategory">Category</span>
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge" style="background-color: var(--accent-gold);" id="modalCategory">Category</span>
+            <button type="button" id="modalFavBtn" class="btn btn-sm btn-outline-danger rounded-pill px-2 py-0" onclick="toggleCurrentProductFavorite()">
+              <i class="bi bi-heart me-1"></i><span>Save</span>
+            </button>
+          </div>
           <button type="button" class="btn-close" onclick="closeProductModal()" aria-label="Close"></button>
         </div>
         <div class="modal-body pt-1">
@@ -237,67 +357,85 @@
 
             <div class="col-md-6">
               <h4 class="brand-font fw-bold mb-1" id="modalTitle" style="color: var(--primary-green);">Product Name</h4>
-              <div class="d-flex align-items-center flex-wrap gap-2 my-2">
+              <div class="d-flex flex-wrap align-items-center gap-2 my-2">
                 <h4 class="fw-bold m-0" style="color: #b0881e;">₹<span id="modalPrice">0</span></h4>
-                <span class="actual-price fs-6" id="modalActualPrice">₹0</span>
-                <span class="discount-badge" id="modalDiscountBadge">0% OFF</span>
+                <span class="actual-price fs-6" id="modalActualPrice"></span>
+                <span class="discount-badge" id="modalDiscountBadge"></span>
                 <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1" id="modalStockBadge">
-                  Available Stock: 2 pcs
+                  Stock: 2 pcs
                 </span>
               </div>
-              <p class="small text-muted mb-3" id="modalDesc"></p>
+              <p class="small text-muted mb-2" id="modalDesc"></p>
 
-              <!-- Stock 0 : Available Soon + direct enquiry -->
-              <div id="modalSoonBox" class="soon-box d-none">
-                <div class="fw-semibold mb-1"><i class="bi bi-hourglass-split me-1"></i>Available Soon</div>
-                <p class="small text-muted mb-2">This piece is currently out of stock. Still want it? Call or WhatsApp us and we will let you know when it is ready (or make it for you).</p>
-                <div class="d-grid gap-2 d-sm-flex">
-                  <a id="soonCallBtn" href="#" class="btn btn-outline-dark btn-sm flex-fill"><i class="bi bi-telephone me-1"></i>Call Now</a>
-                  <a id="soonWaBtn" href="#" target="_blank" rel="noopener" class="btn btn-green btn-sm flex-fill"><i class="bi bi-whatsapp me-1"></i>WhatsApp Enquiry</a>
-                </div>
-              </div>
-
-              <div id="modalOrderControls">
-
-              <div class="mb-2">
-                <label class="form-label fw-semibold small mb-1">Select Size:</label>
-                <select class="form-select form-select-sm" id="modalSize">
-                  <option value="Free Size (Adjustable Dori)">Free Size (Adjustable Dori)</option>
-                  <option value="Small / Kids">Small / Kids</option>
-                  <option value="Medium (Standard)">Medium (Standard)</option>
-                  <option value="Large">Large</option>
-                </select>
-              </div>
-
-              <div class="mb-2">
-                <label class="form-label fw-semibold small mb-1">
-                  Quantity <span class="text-muted fw-normal" id="maxStockHint">(Max 2 ready)</span>:
-                </label>
-                <div class="input-group input-group-sm" style="width: 135px;">
-                  <button class="btn btn-outline-secondary" type="button" onclick="changeModalQty(-1)">-</button>
-                  <input type="text" class="form-control text-center fw-bold" id="modalQty" value="1" readonly>
-                  <button class="btn btn-outline-secondary" type="button" onclick="changeModalQty(1)">+</button>
-                </div>
-              </div>
-
+              <!-- SHIPPING POLICY LINK IN PRODUCT DETAIL -->
               <div class="mb-3">
-                <label class="form-label fw-semibold small mb-1">Customization Note (Optional):</label>
-                <textarea class="form-control form-control-sm" id="modalCustom" rows="2" placeholder="Color change, matching earrings, or dori length..."></textarea>
+                <a href="javascript:void(0)" class="small fw-semibold text-decoration-none" style="color: var(--primary-green);" onclick="openPolicyModal('shipping')">
+                  <i class="bi bi-truck me-1 text-warning"></i>View Shipping Policy &amp; Delivery Timelines <i class="bi bi-box-arrow-up-right" style="font-size: 10px;"></i>
+                </a>
               </div>
 
-              <div class="d-grid gap-2 d-sm-flex">
-                <button class="btn btn-outline-dark flex-fill fw-medium btn-sm py-2" onclick="handleAddToCartClick()">
-                  <i class="bi bi-cart-plus me-1"></i> Add to Cart
-                </button>
-                <button class="btn btn-green flex-fill fw-medium btn-sm py-2" onclick="handleOrderSingleClick()">
-                  <i class="bi bi-whatsapp me-1"></i> Order Now
-                </button>
+              <!-- IN-STOCK ORDER CONTROLS -->
+              <div id="inStockControlsBox">
+                <div class="mb-2">
+                  <label class="form-label fw-semibold small mb-1">Select Size:</label>
+                  <select class="form-select form-select-sm" id="modalSize">
+                    <option value="Free Size (Adjustable Dori)">Free Size (Adjustable Dori)</option>
+                    <option value="Small / Kids">Small / Kids</option>
+                    <option value="Medium (Standard)">Medium (Standard)</option>
+                    <option value="Large">Large</option>
+                  </select>
+                </div>
+
+                <div class="mb-2">
+                  <label class="form-label fw-semibold small mb-1">
+                    Quantity <span class="text-muted fw-normal" id="maxStockHint">(Max 2 ready)</span>:
+                  </label>
+                  <div class="input-group input-group-sm" style="width: 135px;">
+                    <button class="btn btn-outline-secondary" type="button" onclick="changeModalQty(-1)">-</button>
+                    <input type="text" class="form-control text-center fw-bold" id="modalQty" value="1" readonly>
+                    <button class="btn btn-outline-secondary" type="button" onclick="changeModalQty(1)">+</button>
+                  </div>
+                </div>
+
+                <div class="mb-3">
+                  <label class="form-label fw-semibold small mb-1">Customization Note (Optional):</label>
+                  <textarea class="form-control form-control-sm" id="modalCustom" rows="2" placeholder="Color change, matching earrings, or dori length..."></textarea>
+                </div>
+
+                <div class="d-grid gap-2 d-sm-flex">
+                  <button class="btn btn-outline-dark flex-fill fw-medium btn-sm py-2" onclick="handleAddToCartClick()">
+                    <i class="bi bi-cart-plus me-1"></i> Add to Cart
+                  </button>
+                  <button class="btn btn-green flex-fill fw-medium btn-sm py-2" onclick="handleOrderSingleClick()">
+                    <i class="bi bi-whatsapp me-1"></i> Order Now
+                  </button>
+                </div>
               </div>
 
+              <!-- OUT OF STOCK / AVAILABLE SOON ENQUIRY BOX -->
+              <div id="availableSoonBox" class="d-none p-3 rounded-3 border mb-2" style="background-color: #fff3cd; border-color: #ffe69c !important;">
+                <div class="d-flex align-items-center gap-2 mb-1">
+                  <span class="badge bg-danger">Stock: 0</span>
+                  <span class="fw-bold text-dark small">Available Soon (Made to Order)</span>
+                </div>
+                <p class="small text-muted mb-2" style="font-size: 12px;">
+                  Ready stock is currently sold out. Still want this design? Contact us directly on Call or WhatsApp to place a custom-making request!
+                </p>
+                <div class="d-flex gap-2 flex-wrap">
+                  <a id="availSoonWaBtn" href="#" target="_blank" class="btn btn-green btn-sm rounded-pill flex-fill">
+                    <i class="bi bi-whatsapp me-1"></i> WhatsApp Enquiry
+                  </a>
+                  <a href="tel:+918412981213" class="btn btn-outline-dark btn-sm rounded-pill flex-fill">
+                    <i class="bi bi-telephone-fill me-1"></i> Call Now
+                  </a>
+                </div>
+              </div>
+
+              <!-- BULK / 3-4+ PIECES CUSTOM ENQUIRY -->
               <div class="mt-3 p-2 rounded-3 border" style="background-color: #fff8eb; border-color: #eed6bc !important;">
                 <div class="d-flex justify-content-between align-items-center gap-2">
                   <span class="small text-dark" style="font-size: 12px;">
-                    <strong>Need 3, 4 or more pieces?</strong> Custom bulk enquiry available!
+                    <strong>Need 3, 4 or more pieces?</strong> Custom bulk making available!
                   </span>
                   <button class="btn btn-gold btn-sm text-nowrap" style="font-size: 11px;" onclick="toggleBulkEnquiry()">
                     Enquire 3+ Pcs
@@ -314,7 +452,6 @@
                   </div>
                 </div>
               </div>
-              </div><!-- /modalOrderControls -->
 
             </div>
           </div>
@@ -328,35 +465,42 @@
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content" style="background-color: var(--cream-bg); border-radius: 16px;">
         <div class="modal-header" style="background-color: var(--primary-green); color: #fff;">
-          <h5 class="modal-title brand-font"><i class="bi bi-person-check me-2"></i>Delivery & Contact Details</h5>
+          <h5 class="modal-title brand-font"><i class="bi bi-person-check me-2"></i>Delivery &amp; Contact Details</h5>
           <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
         </div>
-        <form onsubmit="submitCustomerDetails(event)">
+        <form onsubmit="submitCustomerDetails(event)" autocomplete="off">
           <div class="modal-body">
-            <p class="small text-muted mb-3">All fields are required so we can process your order and send your order summary on WhatsApp.</p>
+            <p class="small text-muted mb-3">All fields are required so we can process your order and review your summary before sending on WhatsApp.</p>
             <div class="mb-2">
-              <label class="form-label small fw-semibold">Full Name *</label>
-              <input type="text" id="custName" class="form-control form-control-sm" required minlength="2" maxlength="60" pattern="[A-Za-z][A-Za-z\s]*" autocomplete="name" placeholder="Enter full name (letters only)">
-              <div class="invalid-feedback">Name me sirf letters (A-Z) aur space allowed hain.</div>
+              <label class="form-label small fw-semibold">Full Name * <span class="text-muted fw-normal">(Alphabets only)</span></label>
+              <input type="text" id="custName" class="form-control form-control-sm" required pattern="[A-Za-z\s]{2,60}" oninput="sanitizeAlphaInput(this)" placeholder="Enter full name (e.g. Riddhi Kulkarni)">
+              <small id="custNameHint" class="text-danger d-none" style="font-size: 11px;">Only alphabets (A–Z) and spaces are allowed.</small>
             </div>
             <div class="mb-2">
-              <label class="form-label small fw-semibold">Mobile / WhatsApp Number *</label>
-              <input type="tel" id="custMobile" class="form-control form-control-sm" required pattern="[0-9]{10,13}" maxlength="13" oninput="this.value = this.value.replace(/[^0-9]/g, '')" placeholder="e.g. 9876543210">
+              <label class="form-label small fw-semibold">Mobile / WhatsApp Number * <span class="text-muted fw-normal">(Exact 10 digits)</span></label>
+              <input type="tel" id="custMobile" class="form-control form-control-sm" required pattern="[0-9]{10}" minlength="10" maxlength="10" oninput="sanitizeTenDigitMobile(this)" placeholder="e.g. 9876543210">
+              <small id="custMobileHint" class="text-danger d-none" style="font-size: 11px;">Please enter an exact 10-digit Indian mobile number.</small>
             </div>
             <div class="mb-2">
               <label class="form-label small fw-semibold">Complete Address *</label>
               <textarea id="custAddress" class="form-control form-control-sm" rows="2" required placeholder="House/Flat no., Street, Landmark"></textarea>
             </div>
             <div class="row g-2">
-              <div class="col-6 position-relative">
+              <div class="col-6">
                 <label class="form-label small fw-semibold">City *</label>
-                <input type="text" id="custCity" class="form-control form-control-sm" required list="cityList" autocomplete="off" maxlength="40" placeholder="Type city, e.g. Pune">
-                <datalist id="cityList"></datalist>
-                <div id="citySuggestions" class="city-suggest d-none" role="listbox"></div>
+                <div class="city-autocomplete-wrap">
+                  <div class="input-group input-group-sm">
+                    <input type="text" id="custCity" class="form-control" required placeholder="Select or type city..." oninput="handleCityInput(this.value)" onfocus="handleCityInput(this.value)">
+                    <button class="btn btn-outline-secondary" type="button" onclick="toggleCityDropdownBtn()" title="Show city list" aria-label="Show city list">
+                      <i class="bi bi-chevron-down"></i>
+                    </button>
+                  </div>
+                  <div id="citySuggestionsDropdown" class="city-suggestions-list d-none"></div>
+                </div>
               </div>
               <div class="col-6">
                 <label class="form-label small fw-semibold">Pincode *</label>
-                <input type="text" id="custPincode" class="form-control form-control-sm" required pattern="[0-9]{6}" maxlength="6" oninput="this.value = this.value.replace(/[^0-9]/g, '')" placeholder="6-digit PIN">
+                <input type="text" id="custPincode" class="form-control form-control-sm" required pattern="[0-9]{6}" minlength="6" maxlength="6" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0,6)" placeholder="6-digit PIN">
               </div>
             </div>
           </div>
@@ -370,26 +514,31 @@
   </div>
 
   <!-- ORDER REVIEW & CONFIRMATION MODAL -->
-  <div class="modal fade" id="confirmOrderModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
-    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
-      <div class="modal-content" style="background-color: var(--cream-bg); border-radius: 16px;">
+  <div class="modal fade" id="orderConfirmModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content" style="background-color: var(--cream-bg); border-radius: 16px; border: 2px solid var(--accent-gold);">
         <div class="modal-header" style="background-color: var(--primary-green); color: #fff;">
-          <h5 class="modal-title brand-font"><i class="bi bi-clipboard-check me-2"></i>Please Confirm Your Order</h5>
+          <h5 class="modal-title brand-font"><i class="bi bi-clipboard-check me-2"></i>Review &amp; Confirm Order</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
-          <p class="small text-muted mb-2">Order bhejne se pehle ek baar details check kar lein.</p>
-          <div id="confirmOrderBody" class="p-3 rounded-3 bg-white border" style="border-color:#eadbc8 !important;"></div>
+          <p class="small text-muted mb-2">Please verify your selected items and delivery details before confirming:</p>
+          <div id="confirmOrderPreviewBox" class="p-3 rounded-3 bg-white border shadow-sm mb-3"></div>
+          <div class="p-2 rounded-3 small" style="background-color: #fff8eb; border: 1px solid #eed6bc; color: #5c4310;">
+            <i class="bi bi-info-circle-fill me-1 text-warning"></i>
+            Confirming will place your order, reserve your stock, and open WhatsApp to send your order details.
+          </div>
         </div>
-        <div class="modal-footer border-0 flex-column align-items-stretch gap-2">
-          <button type="button" class="btn btn-green fw-semibold rounded-pill" onclick="confirmAndSendOrder()">
-            <i class="bi bi-whatsapp me-1"></i> Yes, Confirm &amp; Send on WhatsApp
+        <div class="modal-footer border-0 d-flex flex-wrap justify-content-between gap-2">
+          <button type="button" class="btn btn-outline-dark btn-sm rounded-pill px-3" onclick="editOrderDetailsFromConfirm()">
+            <i class="bi bi-pencil-square me-1"></i> Edit Details
           </button>
           <div class="d-flex gap-2">
-            <button type="button" class="btn btn-outline-dark btn-sm flex-fill rounded-pill" onclick="editOrderDetails()">
-              <i class="bi bi-pencil-square me-1"></i> Edit Details
+            <button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3" data-bs-dismiss="modal">
+              No, Cancel
             </button>
-            <button type="button" class="btn btn-outline-danger btn-sm flex-fill rounded-pill" onclick="cancelOrderConfirmation()">
-              <i class="bi bi-x-circle me-1"></i> No, Cancel
+            <button type="button" class="btn btn-green btn-sm rounded-pill px-3 fw-semibold" onclick="confirmAndSendOrderWhatsApp()">
+              <i class="bi bi-whatsapp me-1"></i> Yes, Confirm &amp; Send on WhatsApp
             </button>
           </div>
         </div>
@@ -397,18 +546,57 @@
     </div>
   </div>
 
-  <!-- REMOVE FROM CART CONFIRMATION -->
-  <div class="modal fade" id="removeCartModal" tabindex="-1" aria-hidden="true">
+  <!-- CART ITEM REMOVAL CONFIRMATION MODAL -->
+  <div class="modal fade" id="removeCartConfirmModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-sm">
-      <div class="modal-content text-center" style="background-color: var(--cream-bg); border-radius: 16px;">
-        <div class="modal-body p-4">
-          <div class="fs-1 text-danger"><i class="bi bi-trash3"></i></div>
-          <h6 class="fw-bold mt-2">Do you want to remove this product from cart?</h6>
-          <p class="small text-muted mb-3" id="removeCartName"></p>
-          <div class="d-flex gap-2 justify-content-center">
-            <button type="button" class="btn btn-outline-dark btn-sm px-4 rounded-pill" onclick="cancelRemoveCartItem()">No</button>
-            <button type="button" class="btn btn-danger btn-sm px-4 rounded-pill" onclick="confirmRemoveCartItem()">Yes</button>
+      <div class="modal-content" style="background-color: var(--cream-bg); border-radius: 16px; border: 1.5px solid #e2be78;">
+        <div class="modal-header border-0 pb-0">
+          <h6 class="modal-title brand-font fw-bold" style="color: var(--primary-green);">
+            <i class="bi bi-trash3 text-danger me-1"></i> Remove Item?
+          </h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body text-center py-3">
+          <p class="small fw-semibold mb-1" id="removeCartItemTitle">Product Name</p>
+          <p class="small text-muted mb-0">Do you want to remove this product from cart?</p>
+        </div>
+        <div class="modal-footer border-0 justify-content-center gap-2 pt-0">
+          <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-4" data-bs-dismiss="modal">No</button>
+          <button type="button" class="btn btn-danger btn-sm rounded-pill px-4" onclick="confirmRemoveCartItem()">Yes</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ADMIN CANCEL REASON MODAL (High z-index so it always appears cleanly above Admin Panel) -->
+  <div class="modal fade" id="adminCancelReasonModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" style="z-index: 1080;">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content" style="background-color: var(--cream-bg); border-radius: 16px; border: 2px solid #dc3545;">
+        <div class="modal-header bg-danger text-white">
+          <h5 class="modal-title brand-font"><i class="bi bi-x-circle me-2"></i>Why Cancel Order?</h5>
+          <button type="button" class="btn-close btn-close-white" onclick="closeAdminCancelModal()"></button>
+        </div>
+        <div class="modal-body">
+          <p class="small text-muted mb-2">Order ID: <strong id="cancelModalOrderId" class="text-dark"></strong></p>
+          <div class="mb-2">
+            <label class="form-label small fw-semibold">Select Cancellation Reason *</label>
+            <select id="adminCancelReasonSelect" class="form-select form-select-sm" onchange="toggleCustomCancelNote()">
+              <option value="Customer requested cancellation">Customer requested cancellation</option>
+              <option value="Payment not received / Unconfirmed">Payment not received / Unconfirmed</option>
+              <option value="Raw material / Artisan unavailable">Raw material / Artisan unavailable</option>
+              <option value="Delivery pincode not serviceable">Delivery pincode not serviceable</option>
+              <option value="Duplicate order placed">Duplicate order placed</option>
+              <option value="Other">Other (Write Custom Reason Below)</option>
+            </select>
           </div>
+          <div class="mb-1">
+            <label class="form-label small fw-semibold">Note for Customer (Visible in Customer's My Orders)</label>
+            <textarea id="adminCancelReasonNote" class="form-control form-control-sm" rows="2" placeholder="Write note or custom reason so customer knows why it was cancelled..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer border-0">
+          <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" onclick="closeAdminCancelModal()">Back</button>
+          <button type="button" id="confirmCancelOrderBtn" class="btn btn-danger btn-sm rounded-pill px-4" onclick="submitAdminCancelOrder()">Confirm Cancel Order</button>
         </div>
       </div>
     </div>
@@ -423,8 +611,9 @@
     <div class="offcanvas-body d-flex flex-column justify-content-between" style="background-color: var(--cream-bg);">
       <div id="cartItemsContainer"></div>
       <div class="border-top pt-3 mt-3">
-        <div id="cartSavingsRow" class="small text-success fw-semibold mb-2 d-none">
-          <i class="bi bi-piggy-bank me-1"></i>You save ₹<span id="cartSavings">0</span> on this cart 🎉
+        <div class="d-flex justify-content-between align-items-center mb-1">
+          <span class="small text-muted">Total Discount / Savings:</span>
+          <span class="small fw-semibold text-success">₹<span id="cartSavingsTotal">0</span></span>
         </div>
         <div class="d-flex justify-content-between align-items-center mb-3">
           <span class="fw-bold fs-5">Total Amount:</span>
@@ -437,7 +626,7 @@
     </div>
   </div>
 
-  <!-- MY ORDERS OFFCANVAS (SAVED ORDER HISTORY) -->
+  <!-- MY ORDERS OFFCANVAS (SAVED ORDER HISTORY + FILTERS) -->
   <div class="offcanvas offcanvas-end" tabindex="-1" id="myOrdersOffcanvas">
     <div class="offcanvas-header" style="background-color: var(--primary-green); color: #fff;">
       <h5 class="offcanvas-title brand-font"><i class="bi bi-receipt-cutoff me-2"></i>My Placed Orders</h5>
@@ -445,24 +634,33 @@
     </div>
     <div class="offcanvas-body d-flex flex-column justify-content-between" style="background-color: var(--cream-bg);">
       <div>
-        <select id="orderFilter" class="form-select form-select-sm mb-3" onchange="renderMyOrders()" aria-label="Filter orders">
-          <option value="all">All Orders</option>
-          <option value="notshipped">Not Yet Shipped</option>
-          <optgroup label="By Status">
-            <option value="status-Pending">Order Placed (Awaiting Confirmation)</option>
-            <option value="status-Confirmed">Confirmed</option>
-            <option value="status-Custom Making">Custom Making</option>
-            <option value="status-Partial Stock Ready">Partial Stock Ready</option>
-            <option value="status-Packed">Packed</option>
-            <option value="status-Shipped">Shipped</option>
-            <option value="status-Delivered">Delivered</option>
-            <option value="status-Cancelled">Cancelled</option>
-          </optgroup>
-          <optgroup label="Date-wise" id="orderDateGroup">
-            <option value="last30">Last 30 Days</option>
-            <option value="last3m">Last 3 Months</option>
-          </optgroup>
-        </select>
+        <!-- PLACED ORDERS FILTERS -->
+        <div class="card border-0 shadow-sm p-2 mb-3 bg-white">
+          <div class="row g-2">
+            <div class="col-6">
+              <label class="form-label mb-1 text-muted" style="font-size: 10px; font-weight: 600;">BY STATUS</label>
+              <select id="myOrdersStatusFilter" class="form-select form-select-sm" onchange="renderMyOrders()">
+                <option value="all">All Orders</option>
+                <option value="Pending">Order Placed</option>
+                <option value="Confirmed">Confirmation</option>
+                <option value="Shipped">Shipped</option>
+                <option value="Delivered">Delivered</option>
+                <option value="Cancelled">Cancelled</option>
+              </select>
+            </div>
+            <div class="col-6">
+              <label class="form-label mb-1 text-muted" style="font-size: 10px; font-weight: 600;">DATE-WISE FILTER</label>
+              <select id="myOrdersDateFilter" class="form-select form-select-sm" onchange="renderMyOrders()">
+                <option value="all">All Dates</option>
+                <option value="30d">Last 30 Days</option>
+                <option value="3m">Last 3 Months</option>
+                <option value="2026">Year 2026</option>
+                <option value="2025">Year 2025</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
         <div id="myOrdersListContainer"></div>
       </div>
       <div class="border-top pt-2 mt-2 text-center">
@@ -484,7 +682,7 @@
     <div id="fullscreenContent"></div>
   </div>
 
-    <!-- ORDER PLACED SUCCESSFULLY POPUP MODAL -->
+  <!-- ORDER PLACED SUCCESSFULLY POPUP MODAL -->
   <div class="modal fade" id="orderSuccessModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content" style="background-color: var(--cream-bg); border-radius: 18px; border: 2px solid var(--accent-gold);">
@@ -497,11 +695,10 @@
             <i class="bi bi-check-circle-fill"></i>
           </div>
           <h3 class="brand-font fw-bold mb-1" style="color: var(--primary-green);">Order Placed Successfully!</h3>
-          <p class="small text-muted mb-3">
-            Thank you for shopping with <strong>Jewellery by Riddhi</strong>! Your order details have been sent to our WhatsApp.
-          </p>
-
-          <div class="order-note text-start mb-3" id="successStatusNote"></div>
+          <div class="alert alert-warning py-2 px-3 small text-start my-2" style="border-radius: 10px; font-size: 12px;">
+            <i class="bi bi-whatsapp text-success me-1"></i>
+            <strong>Status:</strong> We have received your order and will confirm it shortly. We will reach out to you via call or WhatsApp to complete the payment process; your order will be confirmed only after this step. Please complete the payment to confirm your order.
+          </div>
 
           <!-- Order Summary Card Inside Popup -->
           <div class="text-start p-3 rounded-3 mb-3 shadow-sm" style="background-color: #fff; border: 1px solid #eadbc8;" id="successOrderSummaryBox">
@@ -524,7 +721,7 @@
     </div>
   </div>
 
-    <!-- ADMIN LOGIN MODAL -->
+  <!-- ADMIN LOGIN MODAL -->
   <div class="modal fade" id="adminLoginModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-sm">
       <div class="modal-content" style="background-color: var(--cream-bg); border-radius: 16px;">
@@ -556,12 +753,12 @@
     </div>
   </div>
 
-  <!-- ADMIN PANEL: ALL CUSTOMERS & ORDERS (login ke baad hi khulta hai) -->
+  <!-- ADMIN PANEL: ALL CUSTOMERS, ORDERS & STOCK MANAGER (Closing does NOT logout admin) -->
   <div class="modal fade" id="allCustomersModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
       <div class="modal-content" style="background-color: var(--cream-bg); border-radius: 16px;">
         <div class="modal-header" style="background-color: var(--primary-green); color: #fff;">
-          <h5 class="modal-title brand-font"><i class="bi bi-people me-2"></i>Admin: Customers & Orders</h5>
+          <h5 class="modal-title brand-font"><i class="bi bi-people me-2"></i>Admin: Customers, Orders &amp; Stock</h5>
           <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
@@ -570,32 +767,49 @@
             <div class="d-flex gap-2">
               <button type="button" class="btn btn-outline-dark btn-sm" onclick="refreshAdminPanel()"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</button>
               <button type="button" class="btn btn-outline-success btn-sm" onclick="exportOrdersCsv()"><i class="bi bi-download me-1"></i>CSV</button>
-              <button type="button" class="btn btn-outline-secondary btn-sm" onclick="resetStock()" title="Is device par stock wapas original karein"><i class="bi bi-box-seam me-1"></i>Reset Stock</button>
               <button type="button" class="btn btn-outline-danger btn-sm" onclick="adminLogout()"><i class="bi bi-box-arrow-right me-1"></i>Logout</button>
             </div>
           </div>
+
+          <!-- PER-PRODUCT STOCK MANAGER WITH CATEGORY FILTER -->
+          <div class="card border-0 shadow-sm p-2 mb-3 bg-white">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+              <span class="small fw-bold" style="color: var(--primary-green);"><i class="bi bi-box-seam me-1"></i>Individual Product Stock Update</span>
+              <div class="form-check form-switch m-0">
+                <input class="form-check-input" type="checkbox" role="switch" id="modalAutoDeliverSwitch" checked onchange="toggleAutoDeliverSetting(this.checked)">
+                <label class="form-check-label small fw-semibold" for="modalAutoDeliverSwitch" style="font-size: 11px;">Auto-Delivered (5d)</label>
+              </div>
+            </div>
+            <div class="row g-2 align-items-center">
+              <div class="col-12 col-sm-4">
+                <select id="modalStockCategoryFilter" class="form-select form-select-sm" onchange="syncStockCategoryFilter('modal')">
+                  <option value="All">All Categories</option>
+                </select>
+              </div>
+              <div class="col-12 col-sm-4">
+                <select id="modalStockProductSelect" class="form-select form-select-sm" onchange="onStockProductSelectChange('modal')"></select>
+              </div>
+              <div class="col-7 col-sm-2">
+                <div class="input-group input-group-sm">
+                  <span class="input-group-text">Qty</span>
+                  <input type="number" id="modalStockQtyInput" class="form-control" min="0" max="999" value="2">
+                </div>
+              </div>
+              <div class="col-5 col-sm-2 d-grid">
+                <button type="button" class="btn btn-green btn-sm" onclick="saveSingleProductStockFromUI('modal')">Save</button>
+              </div>
+            </div>
+          </div>
+
           <div class="row g-2 mb-3">
-            <div class="col-12">
+            <div class="col-12 col-sm-7">
               <input type="text" id="customerSearchInput" class="form-control form-control-sm" placeholder="Search by Customer Name or Mobile Number..." oninput="renderAllCustomersSummary()">
             </div>
-            <div class="col-6">
+            <div class="col-12 col-sm-5">
               <select id="customerFilterType" class="form-select form-select-sm" onchange="renderAllCustomersSummary()">
-                <option value="all">All Orders (Past & Recent)</option>
+                <option value="all">All Orders (Past &amp; Recent)</option>
                 <option value="present">Recent (last 7 days)</option>
                 <option value="past">Older than 7 days</option>
-              </select>
-            </div>
-            <div class="col-6">
-              <select id="customerFilterStatus" class="form-select form-select-sm" onchange="renderAllCustomersSummary()" aria-label="Filter by order status">
-                <option value="all">All Status</option>
-                <option value="Pending">Pending</option>
-                <option value="Confirmed">Confirmed</option>
-                <option value="Custom Making">Custom Making</option>
-                <option value="Partial Stock Ready">Partial Stock Ready</option>
-                <option value="Packed">Packed</option>
-                <option value="Shipped">Shipped</option>
-                <option value="Delivered">Delivered</option>
-                <option value="Cancelled">Cancelled</option>
               </select>
             </div>
           </div>
@@ -603,7 +817,7 @@
           <div id="allCustomersListContainer"></div>
         </div>
         <div class="modal-footer border-0">
-          <button type="button" class="btn btn-green btn-sm px-4 rounded-pill" data-bs-dismiss="modal">Close</button>
+          <button type="button" class="btn btn-green btn-sm px-4 rounded-pill" data-bs-dismiss="modal">Close Panel</button>
         </div>
       </div>
     </div>
@@ -643,7 +857,7 @@
         </div>
 
         <div class="col-md-4 text-center">
-          <h6 class="fw-semibold mb-2">Direct Order & Enquiry</h6>
+          <h6 class="fw-semibold mb-2">Direct Order &amp; Enquiry</h6>
           <p class="small mb-2 text-light opacity-75">
             <i class="bi bi-whatsapp text-success me-1"></i> WhatsApp: <strong>+91 84129 81213</strong>
           </p>
@@ -670,7 +884,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
   <script src="js/data.js"></script>
-  <script src="js/extras.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
