@@ -6,19 +6,28 @@ function esc(v) {
 
 function getFullImageUrl(imgPath) {
   if (!imgPath) return "";
-  if (/^https?:\/\//i.test(imgPath)) return imgPath;
+  const cleanPath = String(imgPath).trim();
+  if (/^https?:\/\//i.test(cleanPath)) return cleanPath;
   try {
-    return encodeURI(new URL(imgPath, window.location.href).href);
+    const baseHref = window.location.href.split("#")[0].split("?")[0];
+    return encodeURI(new URL(cleanPath, baseHref).href);
   } catch (e) {
-    return imgPath;
+    return cleanPath;
   }
 }
 
 function toSheetOrder(o) {
-  const mappedItems = (o.items || []).map(it => ({
-    ...it,
-    image: getFullImageUrl(it.image)
-  }));
+  const mappedItems = (o.items || []).map(it => {
+    const prod = PRODUCTS.find(p => p.id === it.id);
+    const preOrderStock = typeof it.preOrderStock === "number"
+      ? it.preOrderStock
+      : (prod ? Math.max(0, parseInt(prod.availableStock, 10) || 0) : 0);
+    return {
+      ...it,
+      image: getFullImageUrl(it.image),
+      currentStock: preOrderStock
+    };
+  });
   return {
     orderId: o.orderId,
     timestamp: o.timestamp,
@@ -161,7 +170,35 @@ function onStockProductSelectChange(prefix) {
   }
 }
 
-function saveSingleProductStockFromUI(prefix) {
+function applyServerStockMap(stockMap) {
+  if (!stockMap || typeof stockMap !== "object") return;
+  let changed = false;
+  PRODUCTS.forEach(p => {
+    if (Object.prototype.hasOwnProperty.call(stockMap, p.id)) {
+      const srvVal = Math.max(0, parseInt(stockMap[p.id], 10) || 0);
+      if (p.availableStock !== srvVal) {
+        p.availableStock = srvVal;
+        changed = true;
+      }
+    }
+  });
+  if (changed) {
+    savePersistedStock();
+    refreshAllProductViews();
+  }
+}
+
+async function syncGlobalStockFromSheet() {
+  if (!APPS_SCRIPT_URL) return;
+  try {
+    const r = await callScript({ action: "getStock" });
+    if (r && r.ok && r.stock) {
+      applyServerStockMap(r.stock);
+    }
+  } catch (e) { /* offline fallback */ }
+}
+
+async function saveSingleProductStockFromUI(prefix) {
   const prodEl = document.getElementById(`${prefix}StockProductSelect`);
   const qtyInp = document.getElementById(`${prefix}StockQtyInput`);
   if (!prodEl || !qtyInp) return;
@@ -172,6 +209,22 @@ function saveSingleProductStockFromUI(prefix) {
   prod.availableStock = newStock;
   savePersistedStock();
   refreshAllProductViews();
+
+  const s = getAdminSession();
+  if (s && s.mode === "sheet" && APPS_SCRIPT_URL) {
+    try {
+      const r = await callScript({
+        action: "setStock",
+        token: s.token,
+        productId: prod.id,
+        productName: prod.name,
+        stock: newStock
+      });
+      if (r && r.ok && r.stock) {
+        applyServerStockMap(r.stock);
+      }
+    } catch (e) { /* saved locally */ }
+  }
   alert(`Stock updated for "${prod.name}" (${prod.id}) → ${newStock} pcs`);
 }
 
@@ -369,6 +422,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   refreshAdminHistory();
   refreshMyOrderStatuses();
+  syncGlobalStockFromSheet();
 });
 
 // ==========================================
@@ -949,32 +1003,6 @@ function getSavedCustomer() {
   }
 }
 
-function getFullImageUrl(imgPath) {
-  if (!imgPath) return "";
-  if (/^https?:\/\//i.test(imgPath)) return imgPath;
-  try {
-    // GitHub Pages ke live URL ke saath full https:// link banayega
-    return encodeURI(new URL(imgPath, window.location.href).href);
-  } catch (e) {
-    return imgPath;
-  }
-}
-
-function toSheetOrder(o) {
-  const mappedItems = (o.items || []).map(it => ({
-    ...it,
-    image: getFullImageUrl(it.image)
-  }));
-  return {
-    orderId: o.orderId,
-    timestamp: o.timestamp,
-    date: o.date,
-    total: o.total,
-    customer: o.customer,
-    items: mappedItems
-  };
-}
-
 function handleOrderSingleClick() {
   if (!currentProduct) return;
   const stock = Math.max(0, parseInt(currentProduct.availableStock, 10) || 0);
@@ -1143,7 +1171,8 @@ function executeOrderSingle(cust) {
 
   const items = [{
     id: currentProduct.id, name: currentProduct.name, size, qty,
-    price: currentProduct.price, note: customNote, image: currentProduct.images[0]
+    price: currentProduct.price, note: customNote, image: currentProduct.images[0],
+    preOrderStock: Math.max(0, parseInt(currentProduct.availableStock, 10) || 0)
   }];
 
   deductStockForItems(items);
@@ -1161,10 +1190,14 @@ function executeOrderCart(cust) {
   let grandTotal = 0;
   let msg = `Hello *Jewellery by Riddhi*! ✨\n*NEW MULTI-ITEM ORDER*\n\n`;
 
-  const items = cart.map(item => ({
-    id: item.id, name: item.name, size: item.size, qty: item.qty,
-    price: item.price, note: item.customNote || "", image: item.images[0]
-  }));
+  const items = cart.map(item => {
+    const pObj = PRODUCTS.find(p => p.id === item.id);
+    return {
+      id: item.id, name: item.name, size: item.size, qty: item.qty,
+      price: item.price, note: item.customNote || "", image: item.images[0],
+      preOrderStock: pObj ? Math.max(0, parseInt(pObj.availableStock, 10) || 0) : 0
+    };
+  });
 
   items.forEach((item, idx) => {
     const sub = item.price * item.qty;
@@ -1463,9 +1496,6 @@ async function refreshMyOrderStatuses() {
   } catch (e) { /* offline fallback */ }
 }
 
-// function safeImgUrl(u) {
-//   return /^https:\/\/[^\s"'<>]+$/.test(String(u || "")) ? u : "";
-// }
 function safeImgUrl(u) {
   const full = getFullImageUrl(u);
   return /^https?:\/\/[^\s"'<>]+$/i.test(full) ? full : "";
@@ -1723,18 +1753,14 @@ function setPendingSync(list) {
   localStorage.setItem("riddhi_pending_sync", JSON.stringify(list));
 }
 
-function toSheetOrder(o) {
-  return {
-    orderId: o.orderId, timestamp: o.timestamp, date: o.date, total: o.total,
-    customer: o.customer, items: o.items || []
-  };
-}
+
 
 async function syncOrderToSheet(order) {
   if (!APPS_SCRIPT_URL || !order) return;
   try {
     const r = await callScript({ action: "newOrder", order: toSheetOrder(order) });
     if (!r.ok) throw new Error(r.error || "sync failed");
+    if (r.stock) applyServerStockMap(r.stock);
   } catch (e) {
     const q = getPendingSync();
     if (!q.some(x => x.orderId === order.orderId)) q.push(toSheetOrder(order));

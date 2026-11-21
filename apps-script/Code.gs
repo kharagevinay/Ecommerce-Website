@@ -1,10 +1,10 @@
 /**
- * Jewellery by Riddhi - Google Sheet order backend (Google Apps Script)
+ * Jewellery by Riddhi - Google Sheet order & live stock backend (Google Apps Script)
  *
  * Kaam:
- *  1) Website se aaya har order Google Sheet me ek row ban jata hai (saare devices ka data ek jagah).
- *  2) Admin ka username/password yahin (server par) check hota hai - website ki JS file me nahi.
- *  3) Sirf sahi login ke baad hi orders website ke admin panel me aate hain.
+ *  1) Website se aaya har order Google Sheet me ek row ban jata hai + product stock automatically deduct hota hai.
+ *  2) Live stock Google Sheet ke "Stock" tab me save rehta hai taaki saare devices par real-time stock dikhe.
+ *  3) Admin ka username/password server par check hota hai.
  *  4) Cancel Reason + Toggleable Auto-Delivered Timer (5 days after Shipped).
  */
 
@@ -14,6 +14,7 @@ const ADMIN_PASSWORD = 'Admin@2026';   // <-- deploy karne se pehle zaroor badal
 // =====================================
 
 const SHEET_NAME = 'Orders';
+const STOCK_SHEET_NAME = 'Stock';
 const HEADERS = ['Timestamp', 'Order ID', 'Date', 'Name', 'Mobile', 'Address', 'City', 'Pincode',
                  'Items', 'Total (INR)', 'Items JSON', 'Image 1', 'Image 2', 'Image 3', 'Image Links',
                  'Status', 'Status Updated', 'Cancel Reason'];
@@ -28,7 +29,7 @@ const MAX_FAILS = 5;
 const LOCK_SEC = 10 * 60;
 
 function doGet() {
-  return json_({ ok: true, service: 'Jewellery by Riddhi orders' });
+  return json_({ ok: true, service: 'Jewellery by Riddhi orders & live stock', stock: readStockMap_() });
 }
 
 function doPost(e) {
@@ -36,6 +37,8 @@ function doPost(e) {
     const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     switch (body.action) {
       case 'newOrder':          return json_(addOrder_(body.order));
+      case 'getStock':          return json_({ ok: true, stock: readStockMap_() });
+      case 'setStock':          return json_(setStock_(body.token, body.productId, body.stock, body.productName));
       case 'adminLogin':        return json_(adminLogin_(body.username, body.password));
       case 'getOrders':         return json_(getOrders_(body.token));
       case 'adminLogout':       return json_(adminLogout_(body.token));
@@ -89,15 +92,93 @@ function sheet_() {
   return sh;
 }
 
+// ---------- LIVE GLOBAL STOCK SHEET ("Stock" tab) ----------
+function stockSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName(STOCK_SHEET_NAME);
+  if (!sh) {
+    sh = ss.insertSheet(STOCK_SHEET_NAME);
+    sh.appendRow(['Product ID', 'Product Name', 'Available Stock', 'Last Updated']);
+    sh.setFrozenRows(1);
+    sh.getRange(1, 1, 1, 4).setFontWeight('bold').setBackground('#15321e').setFontColor('#ffffff');
+  }
+  return sh;
+}
+
+function readStockMap_() {
+  const sh = stockSheet_();
+  const last = sh.getLastRow();
+  const map = {};
+  if (last < 2) return map;
+  const rows = sh.getRange(2, 1, last - 1, 3).getValues();
+  rows.forEach(function (r) {
+    const pid = String(r[0] || '').trim();
+    if (pid) {
+      map[pid] = Math.max(0, parseInt(r[2], 10) || 0);
+    }
+  });
+  return map;
+}
+
+function upsertStockRow_(sh, productId, productName, newStock) {
+  const pid = safe_(productId, 30);
+  const pname = safe_(productName || '', 120);
+  const qty = Math.max(0, parseInt(newStock, 10) || 0);
+  const last = sh.getLastRow();
+  if (last >= 2) {
+    const ids = sh.getRange(2, 1, last - 1, 1).getValues();
+    for (let i = 0; i < ids.length; i++) {
+      if (String(ids[i][0]).trim() === pid) {
+        if (pname) sh.getRange(i + 2, 2).setValue(pname);
+        sh.getRange(i + 2, 3, 1, 2).setValues([[qty, new Date()]]);
+        return qty;
+      }
+    }
+  }
+  sh.appendRow([pid, pname, qty, new Date()]);
+  return qty;
+}
+
+function setStock_(token, productId, stock, productName) {
+  if (!validToken_(token)) return { ok: false, error: 'auth' };
+  const pid = safe_(productId, 30);
+  if (!pid) return { ok: false, error: 'bad_product' };
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const sh = stockSheet_();
+    upsertStockRow_(sh, pid, productName, stock);
+    return { ok: true, stock: readStockMap_() };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function deductStockFromSheet_(items) {
+  const sh = stockSheet_();
+  const currentMap = readStockMap_();
+  items.forEach(function (it) {
+    const pid = String(it.id || '').trim();
+    if (!pid) return;
+    const baseStock = Object.prototype.hasOwnProperty.call(currentMap, pid)
+      ? currentMap[pid]
+      : Math.max(0, parseInt(it.currentStock, 10) || 0);
+    const updated = Math.max(0, baseStock - (Math.max(1, parseInt(it.qty, 10) || 1)));
+    currentMap[pid] = updated;
+    upsertStockRow_(sh, pid, it.name, updated);
+  });
+  return currentMap;
+}
+
 function safe_(v, max) {
-  let t = String(v == null ? '' : v).replace(//g, '').slice(0, max || 300);
+  let t = String(v == null ? '' : v).replace(/\r/g, '').slice(0, max || 300);
   if (/^[=+\-@]/.test(t)) t = "'" + t;
   return t;
 }
 
 function imgUrl_(u) {
-  u = String(u || '');
-  return /^https:\/\/[^\s"'<>]{1,480}$/.test(u) ? u : '';
+  u = String(u || '').trim();
+  return /^https?:\/\/[^\s"'<>]{1,480}$/i.test(u) ? u : '';
 }
 
 function constEq_(a, b) {
@@ -127,7 +208,8 @@ function addOrder_(o) {
       qty: Math.max(1, Math.min(500, Number(i.qty) || 1)),
       price: Math.max(0, Math.min(1000000, Number(i.price) || 0)),
       note: safe_(i.note, 300),
-      image: imgUrl_(i.image)
+      image: imgUrl_(i.image),
+      currentStock: Math.max(0, parseInt(i.currentStock, 10) || 0)
     };
   });
   const total = items.reduce(function (s, i) { return s + i.qty * i.price; }, 0);
@@ -141,13 +223,12 @@ function addOrder_(o) {
     if (last > 1) {
       const ids = sh.getRange(2, 2, last - 1, 1).getValues();
       for (let r = 0; r < ids.length; r++) {
-        if (ids[r][0] === orderId) return { ok: true, duplicate: true };
+        if (ids[r][0] === orderId) return { ok: true, duplicate: true, stock: readStockMap_() };
       }
     }
     const itemsText = items.map(function (i) {
       return i.name + ' (' + i.id + ') x' + i.qty + ' [' + i.size + ']' + (i.note ? ' note: ' + i.note : '');
-    }).join('
-');
+    }).join('\n');
 
     const imgs = items.map(function (i) { return i.image; }).filter(Boolean);
     const imgCells = [];
@@ -155,17 +236,22 @@ function addOrder_(o) {
       imgCells.push(imgs[k] ? '=IMAGE("' + imgs[k] + '")' : '');
     }
 
+    const cleanItemsForJson = items.map(function (i) {
+      return { id: i.id, name: i.name, size: i.size, qty: i.qty, price: i.price, note: i.note, image: i.image };
+    });
+
     sh.appendRow([
       new Date(Number(o.timestamp) || Date.now()), orderId, safe_(o.date, 40),
       safe_(c.name, 100), "'" + mobile, safe_(c.address, 300), safe_(c.city, 80), "'" + pin,
-      itemsText, total, JSON.stringify(items)
-    ].concat(imgCells, [imgs.join('
-'), 'Pending', new Date(), '']));
+      itemsText, total, JSON.stringify(cleanItemsForJson)
+    ].concat(imgCells, [imgs.join('\n'), 'Pending', new Date(), '']));
     if (imgs.length) sh.setRowHeight(sh.getLastRow(), 100);
+
+    const updatedStockMap = deductStockFromSheet_(items);
+    return { ok: true, stock: updatedStockMap };
   } finally {
     lock.releaseLock();
   }
-  return { ok: true };
 }
 
 // ---------- admin ----------
@@ -182,7 +268,7 @@ function adminLogin_(username, password) {
   cache.remove('fails');
   const token = Utilities.getUuid() + Utilities.getUuid();
   cache.put('tok_' + token, '1', TOKEN_TTL_SEC);
-  return { ok: true, token: token, orders: readOrders_(), autoDeliverEnabled: isAutoDeliverEnabled_() };
+  return { ok: true, token: token, orders: readOrders_(), stock: readStockMap_(), autoDeliverEnabled: isAutoDeliverEnabled_() };
 }
 
 function validToken_(token) {
@@ -191,7 +277,7 @@ function validToken_(token) {
 
 function getOrders_(token) {
   if (!validToken_(token)) return { ok: false, error: 'auth' };
-  return { ok: true, orders: readOrders_(), autoDeliverEnabled: isAutoDeliverEnabled_() };
+  return { ok: true, orders: readOrders_(), stock: readStockMap_(), autoDeliverEnabled: isAutoDeliverEnabled_() };
 }
 
 function adminLogout_(token) {
@@ -297,4 +383,5 @@ function readOrders_() {
 
 function setup() {
   sheet_();
+  stockSheet_();
 }

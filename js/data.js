@@ -3,7 +3,8 @@
 // ==========================================
 // 1) Google Apps Script "Web app" URL yahan paste karein (apps-script/Code.gs deploy karne ke baad).
 //    Jab tak ye khaali hai, orders sirf is device ke localStorage me save honge.
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzTQzoFEuRFtQpkQSc-ZxmATTDpAc7GXJAqvCMHyVdxKZ7YblVT6ctM6C_D10S1WMt1/exec";
+const APPS_SCRIPT_URL = 
+"https://script.google.com/macros/s/AKfycbxkeC1iC84DeFyXHFk8HWmvBt5vMAvuvpEcmlyj2YpB8CM5T7XtLhodvifDhxKQ68tW/exec";
 
 // 2) Admin login (sirf tab use hota hai jab APPS_SCRIPT_URL khaali ho -- local testing mode).
 //    URL set hone par username/password Google Apps Script (Code.gs) me check hota hai, is file me nahi.
