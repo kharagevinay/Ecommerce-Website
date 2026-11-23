@@ -90,46 +90,31 @@
     </div>
     <div class="offcanvas-body d-flex flex-column justify-content-between" style="background-color: var(--cream-bg);">
       <div>
-        <!-- ADMIN PERSISTENT SIDEBAR SECTION (Visible whenever admin is logged in, stays logged in even after closing popup) -->
+        <!-- ADMIN PERSISTENT SIDEBAR SECTION (Visible when admin logs in; hidden only when admin logs out) -->
         <div id="sidebarAdminSection" class="d-none mb-3 p-2 rounded-3 border shadow-sm" style="background-color: #fff8eb; border-color: var(--accent-gold) !important;">
           <div class="d-flex justify-content-between align-items-center mb-2">
-            <span class="badge" style="background-color: var(--primary-green);"><i class="bi bi-shield-check me-1"></i>Admin Active</span>
+            <span class="badge" style="background-color: var(--primary-green);"><i class="bi bi-shield-check me-1"></i>Admin Panel</span>
             <button type="button" class="btn btn-outline-danger btn-sm py-0 px-2" style="font-size: 11px;" onclick="adminLogout()">
               <i class="bi bi-box-arrow-right me-1"></i>Logout
             </button>
           </div>
 
-          <button type="button" class="btn btn-green btn-sm w-100 rounded-pill mb-2 fw-semibold" onclick="openAllCustomersModal()" data-bs-dismiss="offcanvas">
-            <i class="bi bi-people me-1"></i> Customers &amp; Orders Panel
-          </button>
-
-          <!-- Individual Product Stock Update with Category Filter in Sidebar -->
-          <div class="p-2 rounded bg-white border mb-2">
-            <div class="small fw-bold mb-1" style="color: var(--primary-green); font-size: 11.5px;">
-              <i class="bi bi-box-seam me-1"></i>Individual Product Stock Update
-            </div>
-            <select id="sidebarStockCategoryFilter" class="form-select form-select-sm mb-1" style="font-size: 11.5px;" onchange="syncStockCategoryFilter('sidebar')">
-              <option value="All">Filter Category: All Categories</option>
-            </select>
-            <select id="sidebarStockProductSelect" class="form-select form-select-sm mb-1" style="font-size: 11.5px;" onchange="onStockProductSelectChange('sidebar')"></select>
-            <div class="input-group input-group-sm">
-              <span class="input-group-text" style="font-size: 11px;">Stock</span>
-              <input type="number" id="sidebarStockQtyInput" class="form-control" min="0" max="999" value="2">
-              <button type="button" class="btn btn-green" onclick="saveSingleProductStockFromUI('sidebar')">Update</button>
-            </div>
-          </div>
-
-          <!-- Auto-Delivered Timer Manual Control in Sidebar -->
-          <div class="p-2 rounded bg-white border">
-            <div class="form-check form-switch m-0 d-flex align-items-center justify-content-between ps-0">
-              <label class="form-check-label small fw-semibold text-dark" for="sidebarAutoDeliverSwitch" style="font-size: 11px;">
-                <i class="bi bi-clock-history me-1 text-warning"></i>Auto-Delivered (5d)
-              </label>
-              <input class="form-check-input ms-2" type="checkbox" role="switch" id="sidebarAutoDeliverSwitch" checked onchange="toggleAutoDeliverSetting(this.checked)">
-            </div>
-            <div id="sidebarAutoDeliverHint" class="text-muted mt-1" style="font-size: 10px;">
-              ON: Shipped orders auto-mark Delivered in 5 days. Turn OFF for manual Delivered status only.
-            </div>
+          <div class="list-group list-group-flush rounded-2 overflow-hidden border bg-white">
+            <a href="admin-orders.html" class="list-group-item list-group-item-action py-2 px-2 small fw-semibold d-flex align-items-center justify-content-between"
+               style="color: var(--primary-green);">
+              <span><i class="bi bi-people-fill me-2 text-success"></i>Customer Order</span>
+              <i class="bi bi-chevron-right small text-muted"></i>
+            </a>
+            <a href="admin-enquiries.html" class="list-group-item list-group-item-action py-2 px-2 small fw-semibold d-flex align-items-center justify-content-between"
+               style="color: var(--primary-green);">
+              <span><i class="bi bi-chat-dots-fill me-2 text-info"></i>Customer Enquiry</span>
+              <i class="bi bi-chevron-right small text-muted"></i>
+            </a>
+            <a href="admin-products.html" class="list-group-item list-group-item-action py-2 px-2 small fw-semibold d-flex align-items-center justify-content-between"
+               style="color: var(--primary-green);">
+              <span><i class="bi bi-plus-square-fill me-2 text-warning"></i>Add/Edit/Delete Product</span>
+              <i class="bi bi-chevron-right small text-muted"></i>
+            </a>
           </div>
         </div>
 
@@ -433,25 +418,18 @@
                 </div>
               </div>
 
-              <!-- BULK / 3-4+ PIECES CUSTOM ENQUIRY -->
+              <!-- BULK / EXTRA QUANTITY STOCK-WISE ENQUIRY TRIGGER -->
               <div class="mt-3 p-2 rounded-3 border" style="background-color: #fff8eb; border-color: #eed6bc !important;">
                 <div class="d-flex justify-content-between align-items-center gap-2">
                   <span class="small text-dark" style="font-size: 12px;">
-                    <strong>Need 3, 4 or more pieces?</strong> Custom bulk making available!
+                    <strong>Need more pieces than ready stock?</strong> Custom bulk making available!
                   </span>
-                  <button class="btn btn-gold btn-sm text-nowrap" style="font-size: 11px;" onclick="toggleBulkEnquiry()">
-                    Enquire 3+ Pcs
+                  <button type="button" class="btn btn-gold btn-sm text-nowrap rounded-pill px-3" style="font-size: 11px;" onclick="openBulkEnquiryFromProductModal()">
+                    <i class="bi bi-plus-circle me-1"></i>Enquire More Qty
                   </button>
                 </div>
-                <div id="bulkEnquiryBox" class="mt-2 pt-2 border-top d-none">
-                  <div class="input-group input-group-sm">
-                    <span class="input-group-text">Qty</span>
-                    <input type="number" id="bulkQtyInput" class="form-control" value="4" min="3" max="50" style="max-width: 70px;">
-                    <input type="text" id="bulkNoteInput" class="form-control" placeholder="Color/Event note...">
-                    <button class="btn btn-green" type="button" onclick="sendBulkEnquiryWhatsApp()">
-                      <i class="bi bi-whatsapp"></i> Send
-                    </button>
-                  </div>
+                <div class="text-muted mt-1" style="font-size: 10.5px;">
+                  Select size &amp; increase/decrease required quantity according to live stock.
                 </div>
               </div>
 
@@ -559,13 +537,107 @@
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body text-center py-3">
-          <p class="small fw-semibold mb-1" id="removeCartItemTitle">Product Name</p>
-          <p class="small text-muted mb-0">Do you want to remove this product from cart?</p>
+          <img id="removeCartItemImg" src="assets/Categories/Comming-Soon.png" alt="Product"
+               class="rounded-3 border mb-2 shadow-sm" style="width: 82px; height: 82px; object-fit: cover;">
+          <p class="small fw-bold mb-1 text-dark" id="removeCartItemTitle">Product Name</p>
+          <div class="small text-muted mb-1" style="font-size: 11.5px;">
+            ID: <strong id="removeCartItemId" class="text-dark"></strong> | Size: <strong id="removeCartItemSize" class="text-dark"></strong>
+          </div>
+          <div class="small fw-bold mb-2" style="color: var(--primary-green);">
+            Price: ₹<span id="removeCartItemPrice">0</span>
+          </div>
+          <p class="small text-muted mb-0" style="font-size: 11.5px;">Do you want to remove this product from cart?</p>
         </div>
         <div class="modal-footer border-0 justify-content-center gap-2 pt-0">
           <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-4" data-bs-dismiss="modal">No</button>
-          <button type="button" class="btn btn-danger btn-sm rounded-pill px-4" onclick="confirmRemoveCartItem()">Yes</button>
+          <button type="button" class="btn btn-danger btn-sm rounded-pill px-4" onclick="confirmRemoveCartItem()">Yes, Remove</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- EMPTY CART POPUP MODAL -->
+  <div class="modal fade" id="emptyCartModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+      <div class="modal-content text-center p-3" style="background-color: var(--cream-bg); border-radius: 16px; border: 2px solid var(--accent-gold);">
+        <div class="modal-header border-0 pb-0">
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body pt-0">
+          <div class="mx-auto mb-2 d-flex align-items-center justify-content-center rounded-circle"
+               style="width: 60px; height: 60px; background-color: #fff3cd; color: #b0881e; font-size: 1.8rem;">
+            <i class="bi bi-bag-x"></i>
+          </div>
+          <h5 class="brand-font fw-bold mb-1" style="color: var(--primary-green);">Your cart is empty!</h5>
+          <p class="small text-muted mb-3">Please add your favourite jewellery pieces to the cart before placing an order.</p>
+          <button type="button" class="btn btn-green btn-sm w-100 rounded-pill py-2 fw-semibold" onclick="exploreJewelleryFromEmptyCart()">
+            <i class="bi bi-gem me-1"></i> Explore Jewellery
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OVER-STOCK / EXTRA QUANTITY ENQUIRY MODAL (With Size & Interactive +/- Quantity Controls) -->
+  <div class="modal fade" id="stockEnquiryModal" tabindex="-1" aria-hidden="true" style="z-index: 1075;">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content" style="background-color: var(--cream-bg); border-radius: 16px; border: 2px solid var(--accent-gold);">
+        <div class="modal-header" style="background-color: var(--primary-green); color: #fff;">
+          <h5 class="modal-title brand-font"><i class="bi bi-bag-plus me-2 text-warning"></i>Extra Quantity &amp; Bulk Enquiry</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <form onsubmit="submitOverStockEnquiry(event)">
+          <div class="modal-body">
+            <div class="d-flex align-items-center gap-2 p-2 rounded-3 bg-white border mb-2">
+              <img id="enqProdImg" src="assets/Categories/Comming-Soon.png" alt="" style="width: 54px; height: 54px; object-fit: cover; border-radius: 8px;">
+              <div>
+                <div class="fw-bold small text-dark" id="enqProdTitleDisplay">Product Name</div>
+                <div class="small text-muted" style="font-size: 11px;">
+                  Product ID: <strong id="enqProdIdDisplay" class="text-dark"></strong> | Price: <strong>₹<span id="enqProdPriceDisplay">0</span>/pc</strong>
+                </div>
+              </div>
+            </div>
+
+            <div class="row g-2 mb-2 align-items-end">
+              <div class="col-6">
+                <label class="form-label small fw-semibold mb-1">Select Size:</label>
+                <select id="enqSizeSelect" class="form-select form-select-sm" onchange="onEnquirySizeChange()"></select>
+              </div>
+              <div class="col-6">
+                <label class="form-label small fw-semibold mb-1">Total Required Qty:</label>
+                <div class="input-group input-group-sm">
+                  <button class="btn btn-outline-dark fw-bold" type="button" onclick="adjustEnquiryQty(-1)">-</button>
+                  <input type="number" id="enqReqQtyInput" class="form-control text-center fw-bold" min="1" max="500" value="6" oninput="refreshEnquiryStockBreakdown()">
+                  <button class="btn btn-outline-dark fw-bold" type="button" onclick="adjustEnquiryQty(1)">+</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="alert alert-warning py-2 px-3 small mb-3" id="overStockAlertSummary" style="border-radius: 10px;"></div>
+            <input type="hidden" id="enqProdId">
+            <input type="hidden" id="enqAvailStock">
+
+            <div class="mb-2">
+              <label class="form-label small fw-semibold">Your Full Name *</label>
+              <input type="text" id="enqCustName" class="form-control form-control-sm" required placeholder="Enter your name">
+            </div>
+            <div class="mb-2">
+              <label class="form-label small fw-semibold">Mobile / WhatsApp Number (10 digits) *</label>
+              <input type="tel" id="enqCustMobile" class="form-control form-control-sm" required pattern="[0-9]{10}" maxlength="10"
+                     oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,10)" placeholder="e.g. 9876543210">
+            </div>
+            <div class="mb-2">
+              <label class="form-label small fw-semibold">Event Date / Customization Note</label>
+              <textarea id="enqCustNote" class="form-control form-control-sm" rows="2" placeholder="Required delivery date, color preference, or custom note..."></textarea>
+            </div>
+          </div>
+          <div class="modal-footer border-0">
+            <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" id="submitOverStockEnqBtn" class="btn btn-green btn-sm rounded-pill px-4 fw-semibold">
+              <i class="bi bi-whatsapp me-1"></i> Update Enquiry &amp; Send on WhatsApp
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   </div>
@@ -628,7 +700,7 @@
     </div>
   </div>
 
-  <!-- MY ORDERS OFFCANVAS (SAVED ORDER HISTORY + FILTERS) -->
+  <!-- MY ORDERS OFFCANVAS (TWO TABS: MY ORDERS & MY ENQUIRIES + FILTERS) -->
   <div class="offcanvas offcanvas-end" tabindex="-1" id="myOrdersOffcanvas">
     <div class="offcanvas-header" style="background-color: var(--primary-green); color: #fff;">
       <h5 class="offcanvas-title brand-font"><i class="bi bi-receipt-cutoff me-2"></i>My Placed Orders</h5>
@@ -636,37 +708,93 @@
     </div>
     <div class="offcanvas-body d-flex flex-column justify-content-between" style="background-color: var(--cream-bg);">
       <div>
-        <!-- PLACED ORDERS FILTERS -->
-        <div class="card border-0 shadow-sm p-2 mb-3 bg-white">
-          <div class="row g-2">
-            <div class="col-6">
-              <label class="form-label mb-1 text-muted" style="font-size: 10px; font-weight: 600;">BY STATUS</label>
-              <select id="myOrdersStatusFilter" class="form-select form-select-sm" onchange="renderMyOrders()">
-                <option value="all">All Orders</option>
-                <option value="Pending">Order Placed</option>
-                <option value="Confirmed">Confirmation</option>
-                <option value="Shipped">Shipped</option>
-                <option value="Delivered">Delivered</option>
-                <option value="Cancelled">Cancelled</option>
-              </select>
-            </div>
-            <div class="col-6">
-              <label class="form-label mb-1 text-muted" style="font-size: 10px; font-weight: 600;">DATE-WISE FILTER</label>
-              <select id="myOrdersDateFilter" class="form-select form-select-sm" onchange="renderMyOrders()">
-                <option value="all">All Dates</option>
-                <option value="30d">Last 30 Days</option>
-                <option value="3m">Last 3 Months</option>
-                <option value="2026">Year 2026</option>
-                <option value="2025">Year 2025</option>
-              </select>
+        <!-- TWO SEPARATE TABS FOR CUSTOMER: MY ORDERS & MY ENQUIRIES -->
+        <ul class="nav nav-pills nav-fill mb-3 bg-white p-1 rounded-pill shadow-sm border" id="customerActivityTabs" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button type="button" class="nav-link active rounded-pill py-1 small fw-semibold" id="tabBtnMyOrders" onclick="switchCustomerActivityTab('orders')">
+              <i class="bi bi-bag-check me-1"></i>My Orders
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button type="button" class="nav-link rounded-pill py-1 small fw-semibold" id="tabBtnMyEnquiries" onclick="switchCustomerActivityTab('enquiries')">
+              <i class="bi bi-chat-dots me-1"></i>My Enquiries
+            </button>
+          </li>
+        </ul>
+
+        <!-- TAB 1: MY ORDERS FILTERS & LIST -->
+        <div id="customerMyOrdersTabPane">
+          <div class="card border-0 shadow-sm p-2 mb-3 bg-white">
+            <div class="row g-2">
+              <div class="col-6">
+                <label class="form-label mb-1 text-muted" style="font-size: 10px; font-weight: 600;">ORDER STATUS</label>
+                <select id="myOrdersStatusFilter" class="form-select form-select-sm" onchange="renderMyOrders()">
+                  <option value="all">All Orders</option>
+                  <option value="Pending">Order Placed</option>
+                  <option value="Confirmed">Confirmation</option>
+                  <option value="Shipped">Shipped</option>
+                  <option value="Delivered">Delivered</option>
+                  <option value="Cancelled">Cancelled</option>
+                </select>
+              </div>
+              <div class="col-6">
+                <label class="form-label mb-1 text-muted" style="font-size: 10px; font-weight: 600;">DATE-WISE FILTER</label>
+                <select id="myOrdersDateFilter" class="form-select form-select-sm" onchange="toggleCustOrderCustomDate(); renderMyOrders()">
+                  <option value="all">All Dates</option>
+                  <option value="today">Today</option>
+                  <option value="7d">Last 7 Days</option>
+                  <option value="30d">Last 30 Days</option>
+                  <option value="3m">Last 3 Months</option>
+                  <option value="custom">Specific Date</option>
+                </select>
+              </div>
+              <div class="col-12 d-none" id="custOrderCustomDateWrap">
+                <input type="date" id="custOrderCustomDateInput" class="form-control form-control-sm" onchange="renderMyOrders()">
+              </div>
             </div>
           </div>
+
+          <div id="myOrdersListContainer"></div>
         </div>
 
-        <div id="myOrdersListContainer"></div>
+        <!-- TAB 2: MY ENQUIRIES FILTERS & LIST -->
+        <div id="customerMyEnquiriesTabPane" class="d-none">
+          <div class="card border-0 shadow-sm p-2 mb-3 bg-white">
+            <div class="row g-2">
+              <div class="col-6">
+                <label class="form-label mb-1 text-muted" style="font-size: 10px; font-weight: 600;">ENQUIRY STATUS</label>
+                <select id="myEnquiriesStatusFilter" class="form-select form-select-sm" onchange="renderCustomerMyEnquiriesTab()">
+                  <option value="all">All Enquiries</option>
+                  <option value="New Enquiry">New Enquiry</option>
+                  <option value="Contacted">Contacted</option>
+                  <option value="Confirmed">Confirmed</option>
+                  <option value="Completed">Completed</option>
+                  <option value="Closed">Closed</option>
+                </select>
+              </div>
+              <div class="col-6">
+                <label class="form-label mb-1 text-muted" style="font-size: 10px; font-weight: 600;">DATE-WISE FILTER</label>
+                <select id="myEnquiriesDateFilter" class="form-select form-select-sm" onchange="toggleCustEnquiryCustomDate(); renderCustomerMyEnquiriesTab()">
+                  <option value="all">All Dates</option>
+                  <option value="today">Today</option>
+                  <option value="7d">Last 7 Days</option>
+                  <option value="30d">Last 30 Days</option>
+                  <option value="3m">Last 3 Months</option>
+                  <option value="custom">Specific Date</option>
+                </select>
+              </div>
+              <div class="col-12 d-none" id="custEnquiryCustomDateWrap">
+                <input type="date" id="custEnquiryCustomDateInput" class="form-control form-control-sm" onchange="renderCustomerMyEnquiriesTab()">
+              </div>
+            </div>
+          </div>
+
+          <div id="myEnquiriesTabListContainer"></div>
+        </div>
       </div>
+
       <div class="border-top pt-2 mt-2 text-center">
-        <small class="text-muted d-block mb-2" style="font-size: 11px;">Orders placed on this device are saved here automatically.</small>
+        <small class="text-muted d-block mb-2" style="font-size: 11px;">Orders &amp; enquiries placed on this device are saved here automatically.</small>
         <button class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="clearOrderHistory()">Clear History</button>
       </div>
     </div>
@@ -755,51 +883,25 @@
     </div>
   </div>
 
-  <!-- ADMIN PANEL: ALL CUSTOMERS, ORDERS & STOCK MANAGER (Closing does NOT logout admin) -->
+  <!-- ADMIN PANEL: CUSTOMER AND ORDER PANEL (Closing does NOT logout admin) -->
   <div class="modal fade" id="allCustomersModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
       <div class="modal-content" style="background-color: var(--cream-bg); border-radius: 16px;">
         <div class="modal-header" style="background-color: var(--primary-green); color: #fff;">
-          <h5 class="modal-title brand-font"><i class="bi bi-people me-2"></i>Admin: Customers, Orders &amp; Stock</h5>
+          <h5 class="modal-title brand-font"><i class="bi bi-people me-2"></i>Customer and Order Panel</h5>
           <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
           <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
             <span id="adminSourceBadge" class="badge bg-secondary">Source</span>
-            <div class="d-flex gap-2">
-              <button type="button" class="btn btn-outline-dark btn-sm" onclick="refreshAdminPanel()"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</button>
-              <button type="button" class="btn btn-outline-success btn-sm" onclick="exportOrdersCsv()"><i class="bi bi-download me-1"></i>CSV</button>
-              <button type="button" class="btn btn-outline-danger btn-sm" onclick="adminLogout()"><i class="bi bi-box-arrow-right me-1"></i>Logout</button>
-            </div>
-          </div>
-
-          <!-- PER-PRODUCT STOCK MANAGER WITH CATEGORY FILTER -->
-          <div class="card border-0 shadow-sm p-2 mb-3 bg-white">
-            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-              <span class="small fw-bold" style="color: var(--primary-green);"><i class="bi bi-box-seam me-1"></i>Individual Product Stock Update</span>
-              <div class="form-check form-switch m-0">
+            <div class="d-flex flex-wrap align-items-center gap-2">
+              <div class="form-check form-switch m-0 me-1">
                 <input class="form-check-input" type="checkbox" role="switch" id="modalAutoDeliverSwitch" checked onchange="toggleAutoDeliverSetting(this.checked)">
                 <label class="form-check-label small fw-semibold" for="modalAutoDeliverSwitch" style="font-size: 11px;">Auto-Delivered (5d)</label>
               </div>
-            </div>
-            <div class="row g-2 align-items-center">
-              <div class="col-12 col-sm-4">
-                <select id="modalStockCategoryFilter" class="form-select form-select-sm" onchange="syncStockCategoryFilter('modal')">
-                  <option value="All">All Categories</option>
-                </select>
-              </div>
-              <div class="col-12 col-sm-4">
-                <select id="modalStockProductSelect" class="form-select form-select-sm" onchange="onStockProductSelectChange('modal')"></select>
-              </div>
-              <div class="col-7 col-sm-2">
-                <div class="input-group input-group-sm">
-                  <span class="input-group-text">Qty</span>
-                  <input type="number" id="modalStockQtyInput" class="form-control" min="0" max="999" value="2">
-                </div>
-              </div>
-              <div class="col-5 col-sm-2 d-grid">
-                <button type="button" class="btn btn-green btn-sm" onclick="saveSingleProductStockFromUI('modal')">Save</button>
-              </div>
+              <button type="button" class="btn btn-outline-dark btn-sm" onclick="refreshAdminPanel()"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</button>
+              <button type="button" class="btn btn-outline-success btn-sm" onclick="exportOrdersCsv()"><i class="bi bi-download me-1"></i>CSV</button>
+              <button type="button" class="btn btn-outline-danger btn-sm" onclick="adminLogout()"><i class="bi bi-box-arrow-right me-1"></i>Logout</button>
             </div>
           </div>
 
@@ -817,6 +919,15 @@
           </div>
           <div id="customerStatsBar" class="small fw-semibold mb-3 text-muted"></div>
           <div id="allCustomersListContainer"></div>
+
+          <hr class="my-4">
+          <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+            <h6 class="brand-font fw-bold m-0" style="color: var(--primary-green);">
+              <i class="bi bi-chat-dots-fill me-1 text-warning"></i>Customer Order Enquiries (<span id="adminEnquiriesCountBadge">0</span>)
+            </h6>
+            <span class="text-muted small" style="font-size: 11px;">Update enquiry status so customer can track progress</span>
+          </div>
+          <div id="adminEnquiriesListContainer"></div>
         </div>
         <div class="modal-footer border-0">
           <button type="button" class="btn btn-green btn-sm px-4 rounded-pill" data-bs-dismiss="modal">Close Panel</button>
@@ -885,7 +996,7 @@
   </footer>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="js/data.js?v=9"></script>
-  <script src="js/app.js?v=9"></script>
+  <script src="js/data.js?v=17"></script>
+  <script src="js/app.js?v=17"></script>
 </body>
 </html>

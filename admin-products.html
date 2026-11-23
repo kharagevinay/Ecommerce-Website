@@ -1,0 +1,1120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin: Products, Sizes &amp; Stock Manager — Jewellery by Riddhi</title>
+  <link rel="icon" type="image/png" href="assets/logo.png">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,500&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .admin-top-bar {
+      background-color: var(--primary-green);
+      color: #fff;
+      border-bottom: 2px solid var(--accent-gold);
+    }
+    .size-pill-badge {
+      background-color: #fff8eb;
+      border: 1px solid #e2be78;
+      color: #4a3509;
+      font-size: 11.5px;
+      padding: 4px 8px;
+      border-radius: 50px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .prod-thumb-admin {
+      width: 56px;
+      height: 56px;
+      object-fit: cover;
+      border-radius: 10px;
+      border: 1px solid #eadbc8;
+      flex-shrink: 0;
+    }
+    .media-preview-mini {
+      width: 44px;
+      height: 44px;
+      object-fit: cover;
+      border-radius: 8px;
+      border: 1px solid #d8c3a5;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- TOP ADMIN NAVBAR -->
+  <nav class="admin-top-bar py-2 px-3 sticky-top shadow-sm">
+    <div class="container d-flex flex-wrap justify-content-between align-items-center gap-2">
+      <div class="d-flex align-items-center gap-2">
+        <img src="assets/logo.png" alt="Logo" style="width: 48px; height: 48px; border-radius: 50%; border: 1.5px solid var(--accent-gold);">
+        <div>
+          <h5 class="brand-font fw-bold m-0" style="color: var(--accent-gold-light);">Product, Size &amp; Stock Manager</h5>
+          <small class="text-light opacity-75" style="font-size: 11px;">Jewellery by Riddhi — Synced with Google Sheet</small>
+        </div>
+      </div>
+      <div class="d-flex flex-wrap align-items-center gap-2">
+        <span id="sheetSyncStatusBadge" class="badge bg-warning text-dark">Checking Sheet...</span>
+        <button type="button" class="btn btn-warning btn-sm rounded-pill px-3 fw-semibold text-dark" onclick="downloadUpdatedCatalogAndMediaBundle()">
+          <i class="bi bi-folder-symlink me-1"></i> Download Folder &amp; Data Bundle
+        </button>
+        <a href="index.html" class="btn btn-outline-warning btn-sm rounded-pill px-3">
+          <i class="bi bi-arrow-left me-1"></i> Back to Storefront
+        </a>
+        <button type="button" id="adminPageLogoutBtn" class="btn btn-outline-light btn-sm rounded-pill px-3 d-none" onclick="logoutFromAdminPage()">
+          <i class="bi bi-box-arrow-right me-1"></i> Logout
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ADMIN LOGIN GATE -->
+  <div id="adminGateContainer" class="container my-5 d-none" style="max-width: 400px;">
+    <div class="card border-0 shadow-sm" style="border-radius: 16px; border: 1.5px solid var(--accent-gold) !important;">
+      <div class="card-header text-white text-center py-3" style="background-color: var(--primary-green); border-radius: 14px 14px 0 0;">
+        <h5 class="brand-font m-0"><i class="bi bi-shield-lock me-2"></i>Admin Verification Required</h5>
+      </div>
+      <div class="card-body p-4">
+        <div id="gateErrorBox" class="alert alert-danger py-2 small d-none"></div>
+        <form onsubmit="submitGateLogin(event)">
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Admin Username</label>
+            <input type="text" id="gateUser" class="form-control form-control-sm" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Admin Password</label>
+            <input type="password" id="gatePass" class="form-control form-control-sm" required>
+          </div>
+          <button type="submit" id="gateSubmitBtn" class="btn btn-green btn-sm w-100 rounded-pill py-2 fw-semibold">
+            Unlock Product Manager
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN PRODUCT ADD / UPDATE / DELETE WORKSPACE -->
+  <div id="adminWorkspace" class="container my-4 d-none">
+    <div class="row g-4">
+
+      <!-- LEFT COLUMN: ADD / UPDATE SINGLE PRODUCT + SIZES FORM -->
+      <div class="col-lg-5">
+        <div class="card border-0 shadow-sm" style="border-radius: 16px; border: 1px solid #eadbc8 !important;">
+          <div class="card-header text-white py-3 d-flex justify-content-between align-items-center" style="background-color: var(--primary-green); border-radius: 15px 15px 0 0;">
+            <h6 class="brand-font m-0 fw-bold" id="editorFormHeader">
+              <i class="bi bi-plus-circle me-1 text-warning"></i> Add New Product
+            </h6>
+            <span class="badge bg-warning text-dark" id="editorModeBadge">NEW</span>
+          </div>
+          <div class="card-body p-3">
+            <form id="productEditorForm" onsubmit="saveProductFromAdminPage(event)">
+              <input type="hidden" id="editingOriginalId" value="">
+
+              <!-- STEP 1: CATEGORY FIRST -> AUTO-GENERATED READ-ONLY PRODUCT ID -->
+              <div class="row g-2 mb-2">
+                <div class="col-7">
+                  <label class="form-label small fw-semibold mb-1">1. Select Category *</label>
+                  <select id="fProdCategory" class="form-select form-select-sm" onchange="onCategorySelectAutoId()" required></select>
+                </div>
+                <div class="col-5">
+                  <label class="form-label small fw-semibold mb-1">2. Product ID (Auto) <i class="bi bi-lock-fill text-muted"></i></label>
+                  <input type="text" id="fProdId" class="form-control form-control-sm bg-light fw-bold" readonly required>
+                </div>
+              </div>
+              <div class="text-muted mb-1" style="font-size: 10.5px;">
+                Category select karte hi next Product ID automatically generate ho jayega (locked/non-editable).
+              </div>
+              <div class="small mb-2" style="font-size: 11px; color: var(--primary-green);">
+                <i class="bi bi-folder2-open me-1 text-warning"></i>Target Asset Path: <code id="targetAssetFolderPath">assets/Categories/Choker/CHK-03/</code>
+              </div>
+
+              <div class="mb-2">
+                <label class="form-label small fw-semibold mb-1">Product Name *</label>
+                <input type="text" id="fProdName" class="form-control form-control-sm" placeholder="e.g. Peshwai Moti Choker" required>
+              </div>
+
+              <div class="row g-2 mb-2">
+                <div class="col-4">
+                  <label class="form-label small fw-semibold mb-1">Offer Price (₹) *</label>
+                  <input type="number" id="fProdPrice" class="form-control form-control-sm" min="1" placeholder="499" required>
+                </div>
+                <div class="col-4">
+                  <label class="form-label small fw-semibold mb-1">Actual Price (₹)</label>
+                  <input type="number" id="fProdActualPrice" class="form-control form-control-sm" min="0" placeholder="699">
+                </div>
+                <div class="col-4 d-flex align-items-end pb-1">
+                  <div class="form-check form-switch m-0">
+                    <input class="form-check-input" type="checkbox" id="fProdNewArrival" checked>
+                    <label class="form-check-label small fw-semibold" for="fProdNewArrival" style="font-size: 11px;">New Arrival</label>
+                  </div>
+                </div>
+              </div>
+
+              <!-- BROWSE IMAGES FROM DEVICE (UP TO 3) -->
+              <div class="p-2 rounded-3 border mb-2 bg-white">
+                <label class="form-label small fw-semibold mb-1">
+                  <i class="bi bi-images me-1 text-success"></i>Product Images (Browse from Device) *
+                </label>
+
+                <div class="d-flex align-items-center gap-2 mb-1">
+                  <input type="file" id="fProdImgFile1" class="form-control form-control-sm" accept="image/*" onchange="handleDeviceImageSelect(this, 1)">
+                  <img id="previewImg1" src="assets/Categories/Comming-Soon.png" class="media-preview-mini" alt="Preview 1">
+                </div>
+                <input type="hidden" id="fProdImg1" value="">
+
+                <div class="d-flex align-items-center gap-2 mb-1">
+                  <input type="file" id="fProdImgFile2" class="form-control form-control-sm" accept="image/*" onchange="handleDeviceImageSelect(this, 2)">
+                  <img id="previewImg2" src="assets/Categories/Comming-Soon.png" class="media-preview-mini d-none" alt="Preview 2">
+                </div>
+                <input type="hidden" id="fProdImg2" value="">
+
+                <div class="d-flex align-items-center gap-2">
+                  <input type="file" id="fProdImgFile3" class="form-control form-control-sm" accept="image/*" onchange="handleDeviceImageSelect(this, 3)">
+                  <img id="previewImg3" src="assets/Categories/Comming-Soon.png" class="media-preview-mini d-none" alt="Preview 3">
+                </div>
+                <input type="hidden" id="fProdImg3" value="">
+              </div>
+
+              <!-- BROWSE VIDEO FROM DEVICE -->
+              <div class="p-2 rounded-3 border mb-2 bg-white">
+                <label class="form-label small fw-semibold mb-1">
+                  <i class="bi bi-camera-video me-1 text-danger"></i>Product Video (Browse from Device - Optional)
+                </label>
+                <input type="file" id="fProdVideoFile" class="form-control form-control-sm" accept="video/mp4,video/*" onchange="handleDeviceVideoSelect(this)">
+                <input type="hidden" id="fProdVideo" value="">
+                <div id="videoFileStatus" class="small text-muted mt-1" style="font-size: 11px;">No video selected</div>
+              </div>
+
+              <div class="mb-2">
+                <label class="form-label small fw-semibold mb-1">Description *</label>
+                <textarea id="fProdDesc" class="form-control form-control-sm" rows="2" placeholder="Handcrafted design details..." required></textarea>
+              </div>
+
+              <!-- DYNAMIC PRODUCT-WISE SIZES & INDIVIDUAL STOCK MANAGER -->
+              <div class="p-2 rounded-3 border mb-3" style="background-color: #fff8eb; border-color: #e2be78 !important;">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <span class="small fw-bold" style="color: var(--primary-green);">
+                    <i class="bi bi-rulers me-1 text-warning"></i>Product Sizes &amp; Size-Wise Stock *
+                  </span>
+                  <button type="button" class="btn btn-gold btn-sm py-0 px-2 rounded-pill" style="font-size: 11px;" onclick="appendSizeStockRow('', 2)">
+                    <i class="bi bi-plus-lg"></i> Add Size
+                  </button>
+                </div>
+                <div id="dynamicSizesContainer"></div>
+                <div class="text-muted mt-1" style="font-size: 10.5px;">
+                  Add, edit or delete sizes specific to this product. Each size tracks its own separate stock in Google Sheet!
+                </div>
+              </div>
+
+              <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-green btn-sm flex-grow-1 rounded-pill py-2 fw-semibold" id="saveProdSubmitBtn">
+                  <i class="bi bi-cloud-check me-1"></i> Save &amp; Sync to Google Sheet
+                </button>
+                <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3 d-none" id="cancelEditModeBtn" onclick="resetProductForm()">
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT COLUMN: ALL PRODUCTS LIST WITH QUICK SIZE/STOCK EDIT & DELETE -->
+      <div class="col-lg-7">
+        <div class="card border-0 shadow-sm" style="border-radius: 16px; border: 1px solid #eadbc8 !important;">
+          <div class="card-header bg-white py-3 d-flex flex-wrap justify-content-between align-items-center gap-2" style="border-radius: 15px 15px 0 0;">
+            <div>
+              <h6 class="brand-font fw-bold m-0" style="color: var(--primary-green);">
+                <i class="bi bi-box-seam me-1"></i> All Store Products (<span id="adminTotalProductsCount">0</span>)
+              </h6>
+              <small class="text-muted" style="font-size: 11px;">All changes sync automatically with Google Sheet ("Products" &amp; "Stock" tabs).</small>
+            </div>
+            <div class="d-flex gap-2 flex-wrap">
+              <select id="adminListCategoryFilter" class="form-select form-select-sm w-auto" onchange="renderAdminProductsTable()">
+                <option value="All">All Categories</option>
+              </select>
+              <input type="text" id="adminListSearch" class="form-control form-control-sm w-auto" placeholder="Search ID or Name..." oninput="renderAdminProductsTable()">
+            </div>
+          </div>
+          <div class="card-body p-0">
+            <div class="table-responsive" style="max-height: 720px;">
+              <table class="table table-hover align-middle mb-0">
+                <thead class="table-light small">
+                  <tr>
+                    <th>Product Details</th>
+                    <th>Price</th>
+                    <th>Sizes &amp; Stock</th>
+                    <th class="text-end">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="adminProductsTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="js/data.js?v=16"></script>
+  <script>
+    const CATEGORY_PREFIX_MAP = {
+      "Choker": "CHK",
+      "Necklaces": "NCK",
+      "Mangalsutra": "MNG",
+      "Combo Set": "CMB",
+      "Nath": "NTH",
+      "Earrings": "EAR",
+      "Bugadi": "BUG",
+      "Sugar-Ball Jewelry": "SGR",
+      "Baby Girl Jewellery Set": "BBY",
+      "Rakhi": "RKH",
+      "Armcuffs": "ARM",
+      "Invisible Necklaces": "INV",
+      "Mundavali": "MND",
+      "Bangles": "BNG",
+      "Ring": "RNG"
+    };
+
+    function escHtml(v) {
+      return String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    }
+
+    function getAdminSessionObj() {
+      try { return JSON.parse((localStorage.getItem("riddhi_admin_session") || sessionStorage.getItem("riddhi_admin_session")) || "null"); } catch (e) { return null; }
+    }
+
+    function generateNextProductIdForCategory(categoryName) {
+      const prefix = CATEGORY_PREFIX_MAP[categoryName] ||
+        categoryName.replace(/[^A-Za-z]/g, "").toUpperCase().slice(0, 3).padEnd(3, "X");
+
+      const list = getCatalogProducts();
+      let maxNum = 0;
+      const re = new RegExp("^" + prefix + "-(\\d+)$", "i");
+
+      list.forEach(p => {
+        const m = String(p.id || "").trim().match(re);
+        if (m) {
+          const num = parseInt(m[1], 10);
+          if (num > maxNum) maxNum = num;
+        }
+      });
+
+      const nextNum = String(maxNum + 1).padStart(2, "0");
+      return `${prefix}-${nextNum}`;
+    }
+
+    function updateTargetFolderHint() {
+      const cat = document.getElementById("fProdCategory")?.value || "Choker";
+      const pid = document.getElementById("fProdId")?.value || "CHK-01";
+      const hintEl = document.getElementById("targetAssetFolderPath");
+      if (hintEl) hintEl.textContent = `assets/Categories/${cat}/${pid}/`;
+    }
+
+    function onCategorySelectAutoId() {
+      const origId = document.getElementById("editingOriginalId").value.trim();
+      if (!origId) {
+        const cat = document.getElementById("fProdCategory").value;
+        document.getElementById("fProdId").value = generateNextProductIdForCategory(cat);
+      }
+      updateTargetFolderHint();
+    }
+
+    // Compress browsed image into clean data URL so it saves smoothly in localStorage & displays across pages
+    function handleDeviceImageSelect(inputEl, slotNum) {
+      const file = inputEl.files && inputEl.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function (ev) {
+        const img = new Image();
+        img.onload = function () {
+          const canvas = document.createElement("canvas");
+          const maxDim = 420;
+          let w = img.width;
+          let h = img.height;
+          if (w > maxDim || h > maxDim) {
+            if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
+            else { w = Math.round((w * maxDim) / h); h = maxDim; }
+          }
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, w, h);
+          let compressedDataUrl = canvas.toDataURL("image/jpeg", 0.68);
+          if (compressedDataUrl.length > 45000) {
+            compressedDataUrl = canvas.toDataURL("image/jpeg", 0.45);
+          }
+
+          document.getElementById(`fProdImg${slotNum}`).value = compressedDataUrl;
+          const prevEl = document.getElementById(`previewImg${slotNum}`);
+          if (prevEl) {
+            prevEl.src = compressedDataUrl;
+            prevEl.classList.remove("d-none");
+          }
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function handleDeviceVideoSelect(inputEl) {
+      const file = inputEl.files && inputEl.files[0];
+      const statusEl = document.getElementById("videoFileStatus");
+      if (!file) return;
+
+      if (file.size > 4 * 1024 * 1024) {
+        // Store relative asset path hint if video is large (>4MB) so browser storage doesn't overflow
+        const cat = document.getElementById("fProdCategory").value;
+        const pid = document.getElementById("fProdId").value;
+        const relPath = `assets/Categories/${cat}/${pid}/${file.name}`;
+        document.getElementById("fProdVideo").value = relPath;
+        if (statusEl) statusEl.innerHTML = `<span class="text-success fw-semibold"><i class="bi bi-film"></i> Selected: ${escHtml(file.name)}</span> (Path: <code>${escHtml(relPath)}</code>)`;
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function (ev) {
+        document.getElementById("fProdVideo").value = ev.target.result;
+        if (statusEl) statusEl.innerHTML = `<span class="text-success fw-semibold"><i class="bi bi-check-circle-fill"></i> Video loaded from device: ${escHtml(file.name)}</span>`;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function getCatalogProducts() {
+      let customList = null;
+      try {
+        const raw = localStorage.getItem("riddhi_custom_products_v1");
+        if (raw) customList = JSON.parse(raw);
+      } catch (e) {}
+
+      let list = Array.isArray(customList) && customList.length > 0
+        ? customList
+        : JSON.parse(JSON.stringify(PRODUCTS));
+
+      let sizeStockMap = {};
+      try {
+        sizeStockMap = JSON.parse(localStorage.getItem("riddhi_product_size_stock") || "{}");
+      } catch (e) {}
+
+      list.forEach(p => {
+        if (!Array.isArray(p.sizes) || p.sizes.length === 0) {
+          p.sizes = ["Free Size (Adjustable Dori)"];
+        }
+        if (!p.sizeStock || typeof p.sizeStock !== "object") {
+          p.sizeStock = {};
+          p.sizes.forEach((sz, i) => {
+            p.sizeStock[sz] = i === 0 ? (Math.max(0, parseInt(p.availableStock, 10) || 0)) : 0;
+          });
+        }
+        if (sizeStockMap[p.id] && typeof sizeStockMap[p.id] === "object") {
+          p.sizeStock = { ...sizeStockMap[p.id] };
+          p.sizes = Object.keys(p.sizeStock);
+        }
+        p.availableStock = Object.values(p.sizeStock).reduce((s, v) => s + (Math.max(0, parseInt(v, 10) || 0)), 0);
+      });
+
+      return list;
+    }
+
+    function saveCatalogLocalOnly(list) {
+      const sizeStockMap = {};
+      const flatStockMap = {};
+
+      list.forEach(p => {
+        if (!p.sizeStock || Object.keys(p.sizeStock).length === 0) {
+          p.sizeStock = { "Free Size (Adjustable Dori)": Math.max(0, parseInt(p.availableStock, 10) || 0) };
+        }
+        p.sizes = Object.keys(p.sizeStock);
+        p.availableStock = Object.values(p.sizeStock).reduce((s, v) => s + (Math.max(0, parseInt(v, 10) || 0)), 0);
+        sizeStockMap[p.id] = p.sizeStock;
+        flatStockMap[p.id] = p.availableStock;
+      });
+
+      localStorage.setItem("riddhi_custom_products_v1", JSON.stringify(list));
+      localStorage.setItem("riddhi_product_size_stock", JSON.stringify(sizeStockMap));
+      localStorage.setItem("riddhi_product_stock", JSON.stringify(flatStockMap));
+    }
+
+    async function syncSingleProductToGoogleSheet(prodObj) {
+      const sess = getAdminSessionObj();
+      const statusBadge = document.getElementById("sheetSyncStatusBadge");
+      if (!sess || sess.mode !== "sheet" || !APPS_SCRIPT_URL) {
+        if (statusBadge) {
+          statusBadge.className = "badge bg-secondary";
+          statusBadge.textContent = "Local Mode";
+        }
+        return;
+      }
+
+      if (statusBadge) {
+        statusBadge.className = "badge bg-info text-dark";
+        statusBadge.textContent = "Syncing to Sheet...";
+      }
+
+      // Send images & video directly to Apps Script (which uploads data: base64 to public Google Drive and returns real https:// URLs)
+      try {
+        const res = await fetch(APPS_SCRIPT_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({
+            action: "saveProduct",
+            token: sess.token,
+            product: prodObj
+          })
+        });
+        const r = await res.json();
+        if (r && r.ok) {
+          // Update local catalog with the returned public Drive https:// image/video URLs so all devices stay identical!
+          if (Array.isArray(r.products)) {
+            const serverSaved = r.products.find(sp => sp.id === prodObj.id);
+            if (serverSaved) {
+              const localList = getCatalogProducts();
+              const idx = localList.findIndex(lp => lp.id === prodObj.id);
+              if (idx > -1) {
+                localList[idx] = { ...localList[idx], ...serverSaved };
+                saveCatalogLocalOnly(localList);
+              }
+            }
+          }
+          if (statusBadge) {
+            statusBadge.className = "badge bg-success";
+            statusBadge.textContent = "Synced with Google Sheet ✓";
+          }
+        } else {
+          if (statusBadge) {
+            statusBadge.className = "badge bg-danger";
+            statusBadge.textContent = "Sheet Sync Error";
+          }
+        }
+      } catch (e) {
+        if (statusBadge) {
+          statusBadge.className = "badge bg-warning text-dark";
+          statusBadge.textContent = "Saved Locally (Offline)";
+        }
+      }
+    }
+
+    async function deleteProductFromGoogleSheet(prodId) {
+      const sess = getAdminSessionObj();
+      if (!sess || sess.mode !== "sheet" || !APPS_SCRIPT_URL) return;
+      try {
+        await fetch(APPS_SCRIPT_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({
+            action: "deleteProduct",
+            token: sess.token,
+            productId: prodId
+          })
+        });
+      } catch (e) {}
+    }
+
+    async function pullProductsFromGoogleSheet() {
+      const sess = getAdminSessionObj();
+      const statusBadge = document.getElementById("sheetSyncStatusBadge");
+      if (!sess || sess.mode !== "sheet" || !APPS_SCRIPT_URL) {
+        if (statusBadge) {
+          statusBadge.className = "badge bg-secondary";
+          statusBadge.textContent = "Local Device Mode";
+        }
+        return;
+      }
+      try {
+        const res = await fetch(APPS_SCRIPT_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({ action: "getProducts" })
+        });
+        const r = await res.json();
+        if (r && r.ok) {
+          // Start fresh from default PRODUCTS + Google Sheet master so every device sees the exact same catalog!
+          const localList = JSON.parse(JSON.stringify(PRODUCTS));
+          const deletedIds = Array.isArray(r.deletedIds) ? r.deletedIds : [];
+          if (deletedIds.length > 0) {
+            for (let i = localList.length - 1; i >= 0; i--) {
+              if (deletedIds.includes(localList[i].id)) localList.splice(i, 1);
+            }
+          }
+          if (Array.isArray(r.products) && r.products.length > 0) {
+            r.products.forEach(sp => {
+              if (!sp || !sp.id || deletedIds.includes(sp.id)) return;
+              const idx = localList.findIndex(lp => lp.id === sp.id);
+              if (idx > -1) {
+                localList[idx] = { ...localList[idx], ...sp };
+              } else {
+                localList.unshift(sp);
+              }
+            });
+          }
+          if (r.sizeStock && typeof r.sizeStock === "object") {
+            localList.forEach(lp => {
+              if (r.sizeStock[lp.id] && Object.keys(r.sizeStock[lp.id]).length > 0) {
+                lp.sizeStock = { ...r.sizeStock[lp.id] };
+                lp.sizes = Object.keys(lp.sizeStock);
+                lp.availableStock = Object.values(lp.sizeStock).reduce((s, v) => s + (Math.max(0, parseInt(v, 10) || 0)), 0);
+              }
+            });
+          }
+          saveCatalogLocalOnly(localList);
+          renderAdminProductsTable();
+          onCategorySelectAutoId();
+          if (statusBadge) {
+            statusBadge.className = "badge bg-success";
+            statusBadge.textContent = "Connected to Google Sheet ✓";
+          }
+        }
+      } catch (e) {
+        if (statusBadge) {
+          statusBadge.className = "badge bg-warning text-dark";
+          statusBadge.textContent = "Offline Mode";
+        }
+      }
+    }
+
+    function checkAdminAuth() {
+      const sess = getAdminSessionObj();
+      if (sess) {
+        document.getElementById("adminGateContainer").classList.add("d-none");
+        document.getElementById("adminWorkspace").classList.remove("d-none");
+        document.getElementById("adminPageLogoutBtn").classList.remove("d-none");
+        initAdminPageUI();
+        pullProductsFromGoogleSheet();
+      } else {
+        document.getElementById("adminGateContainer").classList.remove("d-none");
+        document.getElementById("adminWorkspace").classList.add("d-none");
+        document.getElementById("adminPageLogoutBtn").classList.add("d-none");
+      }
+    }
+
+    async function sha256HexLocal(text) {
+      const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+      return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+    }
+
+    async function submitGateLogin(e) {
+      e.preventDefault();
+      const username = document.getElementById("gateUser").value.trim();
+      const password = document.getElementById("gatePass").value;
+      const errBox = document.getElementById("gateErrorBox");
+      const btn = document.getElementById("gateSubmitBtn");
+      errBox.classList.add("d-none");
+      btn.disabled = true;
+
+      try {
+        if (typeof APPS_SCRIPT_URL !== "undefined" && APPS_SCRIPT_URL) {
+          const res = await fetch(APPS_SCRIPT_URL, {
+            method: "POST",
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify({ action: "adminLogin", username, password })
+          });
+          const r = await res.json();
+          if (!r.ok) {
+            errBox.textContent = "Invalid admin username or password.";
+            errBox.classList.remove("d-none");
+            return;
+          }
+          localStorage.setItem("riddhi_admin_session", JSON.stringify({ mode: "sheet", token: r.token })); sessionStorage.setItem("riddhi_admin_session", JSON.stringify({ mode: "sheet", token: r.token }));
+        } else {
+          const h = await sha256HexLocal(username + ":" + password);
+          if (username !== ADMIN_USERNAME || h !== ADMIN_LOCAL_HASH) {
+            errBox.textContent = "Invalid admin username or password.";
+            errBox.classList.remove("d-none");
+            return;
+          }
+          localStorage.setItem("riddhi_admin_session", JSON.stringify({ mode: "local" })); sessionStorage.setItem("riddhi_admin_session", JSON.stringify({ mode: "local" }));
+        }
+        checkAdminAuth();
+      } catch (err) {
+        errBox.textContent = "Login error. Check connection and try again.";
+        errBox.classList.remove("d-none");
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    function logoutFromAdminPage() {
+      localStorage.removeItem("riddhi_admin_session"); sessionStorage.removeItem("riddhi_admin_session");
+      window.location.href = "index.html";
+    }
+
+    function initAdminPageUI() {
+      const catSel = document.getElementById("fProdCategory");
+      const filterCatSel = document.getElementById("adminListCategoryFilter");
+      if (catSel && catSel.options.length === 0) {
+        CATEGORIES.forEach(c => {
+          catSel.innerHTML += `<option value="${escHtml(c.name)}">${escHtml(c.name)}</option>`;
+          filterCatSel.innerHTML += `<option value="${escHtml(c.name)}">${escHtml(c.name)}</option>`;
+        });
+      }
+      resetProductForm();
+      renderAdminProductsTable();
+    }
+
+    function appendSizeStockRow(sizeLabel = "", stockQty = 2) {
+      const container = document.getElementById("dynamicSizesContainer");
+      const row = document.createElement("div");
+      row.className = "row g-1 mb-1 align-items-center size-stock-row";
+      row.innerHTML = `
+        <div class="col-7">
+          <input type="text" class="form-control form-control-sm sz-name" placeholder="Size (e.g. Free Size, 2.4, Small)" value="${escHtml(sizeLabel)}" required>
+        </div>
+        <div class="col-3">
+          <input type="number" class="form-control form-control-sm sz-qty" placeholder="Stock" min="0" max="999" value="${Math.max(0, parseInt(stockQty, 10) || 0)}" required>
+        </div>
+        <div class="col-2 text-end">
+          <button type="button" class="btn btn-outline-danger btn-sm py-0 px-2" onclick="removeSizeStockRow(this)" title="Delete Size">
+            <i class="bi bi-trash"></i>
+          </button>
+        </div>
+      `;
+      container.appendChild(row);
+    }
+
+    function removeSizeStockRow(btn) {
+      const rows = document.querySelectorAll(".size-stock-row");
+      if (rows.length <= 1) {
+        alert("At least 1 size with stock is required for a product.");
+        return;
+      }
+      btn.closest(".size-stock-row").remove();
+    }
+
+    function resetProductForm() {
+      document.getElementById("productEditorForm").reset();
+      document.getElementById("editingOriginalId").value = "";
+      document.getElementById("fProdId").readOnly = true;
+      document.getElementById("fProdNewArrival").checked = true;
+
+      [1, 2, 3].forEach(n => {
+        document.getElementById(`fProdImg${n}`).value = "";
+        const prev = document.getElementById(`previewImg${n}`);
+        if (prev) {
+          prev.src = "assets/Categories/Comming-Soon.png";
+          if (n > 1) prev.classList.add("d-none");
+        }
+      });
+      document.getElementById("fProdVideo").value = "";
+      document.getElementById("videoFileStatus").textContent = "No video selected";
+
+      document.getElementById("dynamicSizesContainer").innerHTML = "";
+      appendSizeStockRow("Free Size (Adjustable Dori)", 2);
+
+      document.getElementById("editorFormHeader").innerHTML = `<i class="bi bi-plus-circle me-1 text-warning"></i> Add New Product`;
+      document.getElementById("editorModeBadge").textContent = "NEW";
+      document.getElementById("editorModeBadge").className = "badge bg-warning text-dark";
+      document.getElementById("saveProdSubmitBtn").innerHTML = `<i class="bi bi-cloud-check me-1"></i> Save &amp; Sync to Google Sheet`;
+      document.getElementById("cancelEditModeBtn").classList.add("d-none");
+
+      onCategorySelectAutoId();
+      updateTargetFolderHint();
+    }
+
+    async function saveProductFromAdminPage(e) {
+      e.preventDefault();
+      const origId = document.getElementById("editingOriginalId").value.trim();
+      const category = document.getElementById("fProdCategory").value;
+      const id = origId || generateNextProductIdForCategory(category);
+      document.getElementById("fProdId").value = id;
+
+      const name = document.getElementById("fProdName").value.trim();
+      const price = Math.max(1, parseInt(document.getElementById("fProdPrice").value, 10) || 0);
+      const actualPrice = Math.max(0, parseInt(document.getElementById("fProdActualPrice").value, 10) || 0);
+      const isNewArrival = document.getElementById("fProdNewArrival").checked;
+
+      const imgs = [
+        document.getElementById("fProdImg1").value.trim(),
+        document.getElementById("fProdImg2").value.trim(),
+        document.getElementById("fProdImg3").value.trim()
+      ].filter(Boolean);
+
+      if (imgs.length === 0) {
+        alert("Please browse and select at least 1 product image from your device.");
+        return;
+      }
+
+      const video = document.getElementById("fProdVideo").value.trim();
+      const desc = document.getElementById("fProdDesc").value.trim();
+
+      const sizeStock = {};
+      const sizes = [];
+      let totalStock = 0;
+
+      document.querySelectorAll(".size-stock-row").forEach(row => {
+        const sName = row.querySelector(".sz-name").value.trim();
+        const sQty = Math.max(0, parseInt(row.querySelector(".sz-qty").value, 10) || 0);
+        if (sName) {
+          if (!sizes.includes(sName)) sizes.push(sName);
+          sizeStock[sName] = sQty;
+          totalStock += sQty;
+        }
+      });
+
+      if (sizes.length === 0) {
+        alert("Please add at least one size.");
+        return;
+      }
+
+      const list = getCatalogProducts();
+      let savedProductObj = null;
+
+      if (origId) {
+        const idx = list.findIndex(p => p.id === origId);
+        if (idx > -1) {
+          savedProductObj = {
+            ...list[idx],
+            id: origId,
+            category,
+            name,
+            price,
+            actualPrice: actualPrice > price ? actualPrice : 0,
+            isNewArrival,
+            images: imgs,
+            video: video || list[idx].video || "",
+            desc,
+            sizes,
+            sizeStock,
+            availableStock: totalStock
+          };
+          list[idx] = savedProductObj;
+        }
+      } else {
+        savedProductObj = {
+          id,
+          category,
+          name,
+          price,
+          actualPrice: actualPrice > price ? actualPrice : 0,
+          isNewArrival,
+          images: imgs,
+          video,
+          desc,
+          sizes,
+          sizeStock,
+          availableStock: totalStock
+        };
+        list.unshift(savedProductObj);
+      }
+
+      saveCatalogLocalOnly(list);
+      const btn = document.getElementById("saveProdSubmitBtn");
+      btn.disabled = true;
+      btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span>Syncing Google Sheet...`;
+
+      await syncSingleProductToGoogleSheet(savedProductObj);
+
+      btn.disabled = false;
+      resetProductForm();
+      renderAdminProductsTable();
+      alert(origId
+        ? `Product "${name}" (${id}) & sizes updated & synced to Google Sheet!`
+        : `New product "${name}" (${id}) added & synced to Google Sheet!`
+      );
+    }
+
+    function loadProductForEdit(prodId) {
+      const list = getCatalogProducts();
+      const prod = list.find(p => p.id === prodId);
+      if (!prod) return;
+
+      document.getElementById("editingOriginalId").value = prod.id;
+      document.getElementById("fProdCategory").value = prod.category;
+      document.getElementById("fProdId").value = prod.id;
+      document.getElementById("fProdId").readOnly = true;
+      document.getElementById("fProdName").value = prod.name;
+      document.getElementById("fProdPrice").value = prod.price;
+      document.getElementById("fProdActualPrice").value = prod.actualPrice || "";
+      document.getElementById("fProdNewArrival").checked = !!prod.isNewArrival;
+
+      [1, 2, 3].forEach(n => {
+        const val = (prod.images && prod.images[n - 1]) || "";
+        document.getElementById(`fProdImg${n}`).value = val;
+        const prev = document.getElementById(`previewImg${n}`);
+        if (prev) {
+          if (val) {
+            prev.src = val;
+            prev.classList.remove("d-none");
+          } else {
+            prev.src = "assets/Categories/Comming-Soon.png";
+            if (n > 1) prev.classList.add("d-none");
+          }
+        }
+      });
+
+      document.getElementById("fProdVideo").value = prod.video || "";
+      document.getElementById("videoFileStatus").textContent = prod.video
+        ? "Existing video attached (browse new file to replace)"
+        : "No video selected";
+      document.getElementById("fProdDesc").value = prod.desc || "";
+
+      const szContainer = document.getElementById("dynamicSizesContainer");
+      szContainer.innerHTML = "";
+      if (prod.sizeStock && Object.keys(prod.sizeStock).length > 0) {
+        Object.entries(prod.sizeStock).forEach(([sz, st]) => appendSizeStockRow(sz, st));
+      } else {
+        appendSizeStockRow("Free Size (Adjustable Dori)", prod.availableStock || 0);
+      }
+
+      document.getElementById("editorFormHeader").innerHTML = `<i class="bi bi-pencil-square me-1 text-warning"></i> Update Product: ${escHtml(prod.id)}`;
+      document.getElementById("editorModeBadge").textContent = "EDITING";
+      document.getElementById("editorModeBadge").className = "badge bg-info text-dark";
+      document.getElementById("saveProdSubmitBtn").innerHTML = `<i class="bi bi-cloud-check me-1"></i> Update &amp; Sync to Google Sheet`;
+      document.getElementById("cancelEditModeBtn").classList.remove("d-none");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    async function deleteEntireProduct(prodId) {
+      const list = getCatalogProducts();
+      const prod = list.find(p => p.id === prodId);
+      if (!prod) return;
+      if (!confirm(`Delete "${prod.name}" (${prod.id}) completely from your store & Google Sheet?`)) return;
+
+      const updated = list.filter(p => p.id !== prodId);
+      saveCatalogLocalOnly(updated);
+      await deleteProductFromGoogleSheet(prodId);
+
+      if (document.getElementById("editingOriginalId").value === prodId) {
+        resetProductForm();
+      } else {
+        onCategorySelectAutoId();
+      }
+      renderAdminProductsTable();
+    }
+
+    async function deleteSizeFromProduct(prodId, sizeName) {
+      const list = getCatalogProducts();
+      const prod = list.find(p => p.id === prodId);
+      if (!prod || !prod.sizeStock) return;
+
+      if (Object.keys(prod.sizeStock).length <= 1) {
+        alert("Each product must keep at least 1 size. To delete the whole product, use the Delete button on the right.");
+        return;
+      }
+
+      if (!confirm(`Remove size "${sizeName}" from ${prod.name}?`)) return;
+      delete prod.sizeStock[sizeName];
+      prod.sizes = Object.keys(prod.sizeStock);
+      prod.availableStock = Object.values(prod.sizeStock).reduce((s, v) => s + (Math.max(0, parseInt(v, 10) || 0)), 0);
+
+      saveCatalogLocalOnly(list);
+      await syncSingleProductToGoogleSheet(prod);
+      renderAdminProductsTable();
+    }
+
+    function renderAdminProductsTable() {
+      const catFilter = document.getElementById("adminListCategoryFilter")?.value || "All";
+      const q = (document.getElementById("adminListSearch")?.value || "").toLowerCase().trim();
+
+      const list = getCatalogProducts().filter(p => {
+        const matchCat = catFilter === "All" || p.category.toLowerCase() === catFilter.toLowerCase();
+        const matchQ = !q || p.id.toLowerCase().includes(q) || p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q);
+        return matchCat && matchQ;
+      });
+
+      document.getElementById("adminTotalProductsCount").textContent = list.length;
+      const tbody = document.getElementById("adminProductsTableBody");
+      if (!tbody) return;
+
+      if (list.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-4 small">No products found.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = list.map(p => {
+        const thumb = (p.images && p.images[0]) || "assets/Categories/Comming-Soon.png";
+        const sizePills = Object.entries(p.sizeStock || {}).map(([sz, st]) => `
+          <span class="size-pill-badge me-1 mb-1">
+            <span>${escHtml(sz)}:</span>
+            <strong class="${Number(st) === 0 ? "text-danger" : "text-success"}">${st}</strong>
+            <i class="bi bi-x-circle-fill text-danger" style="cursor:pointer;" title="Delete size ${escHtml(sz)}" onclick="deleteSizeFromProduct('${escHtml(p.id)}', '${escHtml(sz)}')"></i>
+          </span>
+        `).join("");
+
+        return `
+          <tr>
+            <td>
+              <div class="d-flex align-items-center gap-2">
+                <img src="${escHtml(thumb)}" class="prod-thumb-admin" alt="">
+                <div>
+                  <div class="fw-bold small text-dark">${escHtml(p.name)}</div>
+                  <div class="text-muted" style="font-size: 11px;">
+                    <span class="badge bg-light text-dark border">${escHtml(p.id)}</span>
+                    <span class="ms-1">${escHtml(p.category)}</span>
+                    ${p.isNewArrival ? `<span class="badge bg-warning text-dark ms-1" style="font-size:9px;">NEW</span>` : ""}
+                  </div>
+                </div>
+              </div>
+            </td>
+            <td class="small">
+              <div class="fw-bold" style="color: var(--primary-green);">₹${p.price}</div>
+              ${p.actualPrice && p.actualPrice > p.price ? `<div class="actual-price" style="font-size: 11px;">₹${p.actualPrice}</div>` : ""}
+            </td>
+            <td>${sizePills}</td>
+            <td class="text-end text-nowrap">
+              <button type="button" class="btn btn-outline-primary btn-sm py-0 px-2 me-1" onclick="loadProductForEdit('${escHtml(p.id)}')" title="Edit Product & Sizes">
+                <i class="bi bi-pencil-square"></i> Edit
+              </button>
+              <button type="button" class="btn btn-outline-danger btn-sm py-0 px-2" onclick="deleteEntireProduct('${escHtml(p.id)}')" title="Delete Product">
+                <i class="bi bi-trash"></i>
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+
+    // Pure JS ZIP creator for downloading assets/Categories/<Cat>/<ID>/ media + updated data.js
+    const CRC_TABLE = (() => {
+      const t = new Uint32Array(256);
+      for (let n = 0; n < 256; n++) {
+        let c = n;
+        for (let k = 0; k < 8; k++) c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
+        t[n] = c >>> 0;
+      }
+      return t;
+    })();
+
+    function crc32Bytes(u8) {
+      let c = 0xffffffff;
+      for (let i = 0; i < u8.length; i++) c = CRC_TABLE[(c ^ u8[i]) & 0xff] ^ (c >>> 8);
+      return (c ^ 0xffffffff) >>> 0;
+    }
+
+    function buildStoreZipBlob(filesMap) {
+      const enc = new TextEncoder();
+      const localParts = [];
+      const centralParts = [];
+      let offset = 0;
+
+      Object.entries(filesMap).forEach(([name, content]) => {
+        const nameBytes = enc.encode(name);
+        const dataBytes = (content instanceof Uint8Array) ? content : enc.encode(String(content));
+        const crc = crc32Bytes(dataBytes);
+        const size = dataBytes.length;
+
+        const lh = new Uint8Array(30 + nameBytes.length);
+        const lv = new DataView(lh.buffer);
+        lv.setUint32(0, 0x04034b50, true);
+        lv.setUint16(4, 20, true);
+        lv.setUint16(6, 0x0800, true);
+        lv.setUint16(8, 0, true); // store
+        lv.setUint32(14, crc, true);
+        lv.setUint32(18, size, true);
+        lv.setUint32(22, size, true);
+        lv.setUint16(26, nameBytes.length, true);
+        lh.set(nameBytes, 30);
+
+        localParts.push(lh, dataBytes);
+
+        const ch = new Uint8Array(46 + nameBytes.length);
+        const cv = new DataView(ch.buffer);
+        cv.setUint32(0, 0x02014b50, true);
+        cv.setUint16(4, 20, true);
+        cv.setUint16(6, 20, true);
+        cv.setUint16(8, 0x0800, true);
+        cv.setUint16(10, 0, true);
+        cv.setUint32(16, crc, true);
+        cv.setUint32(20, size, true);
+        cv.setUint32(24, size, true);
+        cv.setUint16(28, nameBytes.length, true);
+        cv.setUint32(42, offset, true);
+        ch.set(nameBytes, 46);
+        centralParts.push(ch);
+
+        offset += lh.length + dataBytes.length;
+      });
+
+      const centralBytes = centralParts.reduce((a, b) => a + b.length, 0);
+      const eocd = new Uint8Array(22);
+      const ev = new DataView(eocd.buffer);
+      const count = Object.keys(filesMap).length;
+      ev.setUint32(0, 0x06054b50, true);
+      ev.setUint16(8, count, true);
+      ev.setUint16(10, count, true);
+      ev.setUint32(12, centralBytes, true);
+      ev.setUint32(16, offset, true);
+
+      return new Blob([...localParts, ...centralParts, eocd], { type: "application/zip" });
+    }
+
+    function dataUrlToUint8Array(dataUrl) {
+      const parts = String(dataUrl || "").split(",");
+      if (parts.length < 2) return null;
+      const binStr = atob(parts[1]);
+      const arr = new Uint8Array(binStr.length);
+      for (let i = 0; i < binStr.length; i++) arr[i] = binStr.charCodeAt(i);
+      return arr;
+    }
+
+    function downloadUpdatedCatalogAndMediaBundle() {
+      const list = getCatalogProducts();
+      const zipEntries = {};
+
+      // Build folder-mapped products array (assets/Categories/<Category>/<ProductID>/...)
+      const folderMappedList = list.map(p => {
+        const folderBase = `assets/Categories/${p.category}/${p.id}`;
+        const mappedImgs = [];
+        (p.images || []).forEach((imgVal, idx) => {
+          if (String(imgVal).startsWith("data:")) {
+            const ext = String(imgVal).includes("png") ? "png" : "jpg";
+            const filePath = `${folderBase}/image-${idx + 1}.${ext}`;
+            const bytes = dataUrlToUint8Array(imgVal);
+            if (bytes) zipEntries[filePath] = bytes;
+            mappedImgs.push(filePath);
+          } else if (imgVal) {
+            mappedImgs.push(imgVal);
+          }
+        });
+
+        let mappedVideo = p.video || "";
+        if (String(mappedVideo).startsWith("data:")) {
+          const vPath = `${folderBase}/video-1.mp4`;
+          const vBytes = dataUrlToUint8Array(mappedVideo);
+          if (vBytes) zipEntries[vPath] = vBytes;
+          mappedVideo = vPath;
+        }
+
+        return {
+          ...p,
+          images: mappedImgs.length ? mappedImgs : ["assets/Categories/Comming-Soon.png"],
+          video: mappedVideo
+        };
+      });
+
+      const updatedDataJs =
+        `// Auto-generated catalog from Admin Product Manager\n` +
+        `const APPS_SCRIPT_URL = "${typeof APPS_SCRIPT_URL !== "undefined" ? APPS_SCRIPT_URL : ""}";\n` +
+        `const ADMIN_USERNAME = "${typeof ADMIN_USERNAME !== "undefined" ? ADMIN_USERNAME : "riddhi_admin"}";\n` +
+        `const ADMIN_LOCAL_HASH = "${typeof ADMIN_LOCAL_HASH !== "undefined" ? ADMIN_LOCAL_HASH : ""}";\n` +
+        `const WHATSAPP_NUMBER = "${typeof WHATSAPP_NUMBER !== "undefined" ? WHATSAPP_NUMBER : "918412981213"}";\n` +
+        `const BRAND_PHONE_DISPLAY = "${typeof BRAND_PHONE_DISPLAY !== "undefined" ? BRAND_PHONE_DISPLAY : "+91 84129 81213"}";\n` +
+        `const INSTAGRAM_HANDLE = "${typeof INSTAGRAM_HANDLE !== "undefined" ? INSTAGRAM_HANDLE : "@jewellery_by_riddhi"}";\n` +
+        `const INSTAGRAM_URL = "${typeof INSTAGRAM_URL !== "undefined" ? INSTAGRAM_URL : "https://www.instagram.com/jewellery_by_riddhi/"}";\n` +
+        `const INDIAN_CITIES = ${JSON.stringify(INDIAN_CITIES, null, 2)};\n` +
+        `const CATEGORIES = ${JSON.stringify(CATEGORIES, null, 2)};\n` +
+        `const SAMPLE_VIDEO = "${typeof SAMPLE_VIDEO !== "undefined" ? SAMPLE_VIDEO : ""}";\n` +
+        `const PRODUCTS = ${JSON.stringify(folderMappedList, null, 2)};\n`;
+
+      zipEntries["js/data.js"] = updatedDataJs;
+
+      const blob = buildStoreZipBlob(zipEntries);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "riddhi-product-folders-and-data.zip";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    document.addEventListener("DOMContentLoaded", checkAdminAuth);
+  </script>
+</body>
+</html>

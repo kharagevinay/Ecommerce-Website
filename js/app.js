@@ -55,17 +55,46 @@ let removeCartConfirmModalInstance = null;
 let adminCancelModalInstance = null;
 let policyModalInstance = null;
 let orderSuccessModalInstance = null;
+let emptyCartModalInstance = null;
+let stockEnquiryModalInstance = null;
 
 // ==========================================
-// PER-PRODUCT LIVE STOCK PERSISTENCE + CATEGORY FILTERED STOCK UI
+// PER-PRODUCT & PER-SIZE LIVE STOCK PERSISTENCE + ADMIN CATALOG SYNC
 // ==========================================
-function loadPersistedStock() {
+const BASELINE_DEFAULT_PRODUCTS = JSON.parse(JSON.stringify(PRODUCTS));
+
+function syncCustomCatalogFromStorage() {
   try {
+    const customList = JSON.parse(localStorage.getItem("riddhi_custom_products_v1") || "null");
+    if (Array.isArray(customList) && customList.length > 0) {
+      PRODUCTS.splice(0, PRODUCTS.length, ...customList);
+    }
+  } catch (e) {}
+}
+
+function loadPersistedStock() {
+  syncCustomCatalogFromStorage();
+  try {
+    const sizeStockMap = JSON.parse(localStorage.getItem("riddhi_product_size_stock") || "{}");
     const savedMap = JSON.parse(localStorage.getItem("riddhi_product_stock") || "{}");
     PRODUCTS.forEach(p => {
-      if (Object.prototype.hasOwnProperty.call(savedMap, p.id)) {
-        p.availableStock = Math.max(0, parseInt(savedMap[p.id], 10) || 0);
+      if (!Array.isArray(p.sizes) || p.sizes.length === 0) {
+        p.sizes = ["Free Size (Adjustable Dori)"];
       }
+      if (!p.sizeStock || typeof p.sizeStock !== "object") {
+        p.sizeStock = {};
+        p.sizes.forEach((sz, i) => {
+          p.sizeStock[sz] = i === 0 ? (Math.max(0, parseInt(p.availableStock, 10) || 0)) : 0;
+        });
+      }
+      if (sizeStockMap[p.id] && typeof sizeStockMap[p.id] === "object") {
+        p.sizeStock = { ...sizeStockMap[p.id] };
+        p.sizes = Object.keys(p.sizeStock);
+      } else if (Object.prototype.hasOwnProperty.call(savedMap, p.id)) {
+        const firstSz = p.sizes[0] || "Free Size (Adjustable Dori)";
+        p.sizeStock[firstSz] = Math.max(0, parseInt(savedMap[p.id], 10) || 0);
+      }
+      p.availableStock = Object.values(p.sizeStock).reduce((s, v) => s + (Math.max(0, parseInt(v, 10) || 0)), 0);
     });
   } catch (e) {
     console.warn("Could not read persisted stock", e);
@@ -75,13 +104,30 @@ function loadPersistedStock() {
 function savePersistedStock() {
   try {
     const map = {};
+    const sizeMap = {};
     PRODUCTS.forEach(p => {
-      map[p.id] = Math.max(0, parseInt(p.availableStock, 10) || 0);
+      if (!p.sizeStock || Object.keys(p.sizeStock).length === 0) {
+        p.sizeStock = { "Free Size (Adjustable Dori)": Math.max(0, parseInt(p.availableStock, 10) || 0) };
+      }
+      p.sizes = Object.keys(p.sizeStock);
+      p.availableStock = Object.values(p.sizeStock).reduce((s, v) => s + (Math.max(0, parseInt(v, 10) || 0)), 0);
+      map[p.id] = p.availableStock;
+      sizeMap[p.id] = p.sizeStock;
     });
     localStorage.setItem("riddhi_product_stock", JSON.stringify(map));
+    localStorage.setItem("riddhi_product_size_stock", JSON.stringify(sizeMap));
+    localStorage.setItem("riddhi_custom_products_v1", JSON.stringify(PRODUCTS));
   } catch (e) {
     console.warn("Could not save persisted stock", e);
   }
+}
+
+function getStockForProductSize(prod, sizeName) {
+  if (!prod) return 0;
+  if (prod.sizeStock && sizeName && Object.prototype.hasOwnProperty.call(prod.sizeStock, sizeName)) {
+    return Math.max(0, parseInt(prod.sizeStock[sizeName], 10) || 0);
+  }
+  return Math.max(0, parseInt(prod.availableStock, 10) || 0);
 }
 
 function refreshAllProductViews() {
@@ -95,14 +141,18 @@ function refreshAllProductViews() {
   refreshStockManagerDropdowns();
 }
 
-// Deducts stock ONLY for the specific ordered product(s) matching exact ID & Name
+// Deducts stock ONLY for the specific ordered product(s) & selected size
 function deductStockForItems(items) {
   let changed = false;
   (items || []).forEach(it => {
     const prod = PRODUCTS.find(p => p.id === it.id && (!it.name || p.name === it.name)) || PRODUCTS.find(p => p.id === it.id);
     if (prod) {
       const orderedQty = Math.max(1, parseInt(it.qty, 10) || 1);
-      prod.availableStock = Math.max(0, (parseInt(prod.availableStock, 10) || 0) - orderedQty);
+      const sz = it.size || (prod.sizes && prod.sizes[0]) || "Free Size (Adjustable Dori)";
+      if (prod.sizeStock && Object.prototype.hasOwnProperty.call(prod.sizeStock, sz)) {
+        prod.sizeStock[sz] = Math.max(0, (parseInt(prod.sizeStock[sz], 10) || 0) - orderedQty);
+      }
+      prod.availableStock = Object.values(prod.sizeStock || {}).reduce((s, v) => s + (Math.max(0, parseInt(v, 10) || 0)), 0);
       changed = true;
     }
   });
@@ -191,15 +241,79 @@ function applyServerStockMap(stockMap) {
 async function syncGlobalStockFromSheet() {
   if (!APPS_SCRIPT_URL) return;
   try {
-    const catalogPayload = PRODUCTS.map(p => ({
-      id: p.id,
-      name: p.name,
-      image: getFullImageUrl((p.images && p.images[0]) || ""),
-      availableStock: Math.max(0, parseInt(p.availableStock, 10) || 0)
-    }));
+    // 1. Fetch authoritative Products Master + Deleted IDs (including manual row deletions in Google Sheet!) + Per-Size Stock
+    const remoteRes = await callScript({ action: "getProducts" });
+
+    if (remoteRes && remoteRes.ok) {
+      const deletedIds = Array.isArray(remoteRes.deletedIds) ? remoteRes.deletedIds : [];
+      const mergedCatalog = JSON.parse(JSON.stringify(BASELINE_DEFAULT_PRODUCTS))
+        .filter(p => !deletedIds.includes(p.id));
+
+      if (Array.isArray(remoteRes.products) && remoteRes.products.length > 0) {
+        remoteRes.products.forEach(sp => {
+          if (!sp || !sp.id || deletedIds.includes(sp.id)) return;
+          const idx = mergedCatalog.findIndex(lp => lp.id === sp.id);
+          if (idx > -1) {
+            mergedCatalog[idx] = {
+              ...mergedCatalog[idx],
+              ...sp,
+              images: (Array.isArray(sp.images) && sp.images.length > 0) ? sp.images : mergedCatalog[idx].images,
+              video: sp.video || mergedCatalog[idx].video || ""
+            };
+          } else {
+            mergedCatalog.unshift(sp);
+          }
+        });
+      }
+
+      if (remoteRes.sizeStock && typeof remoteRes.sizeStock === "object") {
+        mergedCatalog.forEach(p => {
+          if (remoteRes.sizeStock[p.id] && Object.keys(remoteRes.sizeStock[p.id]).length > 0) {
+            p.sizeStock = { ...remoteRes.sizeStock[p.id] };
+            p.sizes = Object.keys(p.sizeStock);
+            p.availableStock = Object.values(p.sizeStock).reduce((s, v) => s + (Math.max(0, parseInt(v, 10) || 0)), 0);
+          }
+        });
+      }
+
+      PRODUCTS.splice(0, PRODUCTS.length, ...mergedCatalog);
+      savePersistedStock();
+      refreshAllProductViews();
+    }
+
+    // 2. Ensure baseline catalog rows exist in Stock sheet if missing (excluding deleted IDs)
+    const catalogPayload = [];
+    PRODUCTS.forEach(p => {
+      const szObj = (p.sizeStock && Object.keys(p.sizeStock).length > 0)
+        ? p.sizeStock
+        : { "Free Size (Adjustable Dori)": Math.max(0, parseInt(p.availableStock, 10) || 0) };
+      Object.entries(szObj).forEach(([sz, st]) => {
+        catalogPayload.push({
+          id: p.id,
+          category: p.category,
+          name: p.name,
+          size: sz,
+          image: getFullImageUrl((p.images && p.images[0]) || ""),
+          availableStock: Math.max(0, parseInt(st, 10) || 0)
+        });
+      });
+    });
+
     const r = await callScript({ action: "syncCatalog", products: catalogPayload });
-    if (r && r.ok && r.stock) {
-      applyServerStockMap(r.stock);
+    if (r && r.ok && r.sizeStock && typeof r.sizeStock === "object") {
+      let stockChanged = false;
+      PRODUCTS.forEach(p => {
+        if (r.sizeStock[p.id] && Object.keys(r.sizeStock[p.id]).length > 0) {
+          p.sizeStock = { ...r.sizeStock[p.id] };
+          p.sizes = Object.keys(p.sizeStock);
+          p.availableStock = Object.values(p.sizeStock).reduce((s, v) => s + (Math.max(0, parseInt(v, 10) || 0)), 0);
+          stockChanged = true;
+        }
+      });
+      if (stockChanged) {
+        savePersistedStock();
+        refreshAllProductViews();
+      }
     }
   } catch (e) { /* offline fallback */ }
 }
@@ -410,6 +524,12 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   if (document.getElementById("orderSuccessModal")) {
     orderSuccessModalInstance = new bootstrap.Modal(document.getElementById("orderSuccessModal"));
+  }
+  if (document.getElementById("emptyCartModal")) {
+    emptyCartModalInstance = new bootstrap.Modal(document.getElementById("emptyCartModal"));
+  }
+  if (document.getElementById("stockEnquiryModal")) {
+    stockEnquiryModalInstance = new bootstrap.Modal(document.getElementById("stockEnquiryModal"));
   }
 
   initCityAutocomplete();
@@ -667,15 +787,43 @@ function openProductDetail(productId) {
     document.getElementById("maxStockHint").innerText = `(Max ${stock} ready)`;
   }
 
-  document.getElementById("modalSize").selectedIndex = 0;
+  const modalSizeEl = document.getElementById("modalSize");
+  const productSizes = (Array.isArray(currentProduct.sizes) && currentProduct.sizes.length > 0)
+    ? currentProduct.sizes
+    : ["Free Size (Adjustable Dori)"];
+  modalSizeEl.innerHTML = productSizes.map(sz => {
+    const szStock = getStockForProductSize(currentProduct, sz);
+    return `<option value="${esc(sz)}">${esc(sz)} (Stock: ${szStock})</option>`;
+  }).join("");
+  modalSizeEl.onchange = function () {
+    const chosenSize = this.value;
+    const szStock = getStockForProductSize(currentProduct, chosenSize);
+    const badgeEl = document.getElementById("modalStockBadge");
+    const hintEl = document.getElementById("maxStockHint");
+    const qtyEl = document.getElementById("modalQty");
+    if (badgeEl) {
+      badgeEl.className = szStock === 0
+        ? "badge bg-danger px-2 py-1"
+        : "badge bg-success-subtle text-success border border-success-subtle px-2 py-1";
+      badgeEl.innerText = szStock === 0 ? "Stock: 0 • Available Soon" : `Stock: ${szStock} pcs`;
+    }
+    if (hintEl) hintEl.innerText = `(Max ${szStock} ready)`;
+    if (qtyEl && parseInt(qtyEl.value, 10) > szStock) {
+      qtyEl.value = Math.max(1, szStock);
+    }
+  };
+  modalSizeEl.selectedIndex = 0;
+  if (stock > 0) modalSizeEl.onchange();
   document.getElementById("modalQty").value = 1;
   document.getElementById("modalCustom").value = "";
-  document.getElementById("bulkEnquiryBox").classList.add("d-none");
 
   const thumbContainer = document.getElementById("modalThumbnails");
   thumbContainer.innerHTML = "";
 
-  currentProduct.images.slice(0, 3).forEach((imgUrl, idx) => {
+  const prodImgs = (Array.isArray(currentProduct.images) && currentProduct.images.length > 0)
+    ? currentProduct.images
+    : ["assets/Categories/Comming-Soon.png"];
+  prodImgs.slice(0, 3).forEach((imgUrl, idx) => {
     thumbContainer.innerHTML += `
       <div class="thumb-item ${idx === 0 ? "active" : ""}" onclick="setMainMedia('image', '${imgUrl}', this)">
         <img src="${imgUrl}" alt="Photo ${idx + 1}">
@@ -692,8 +840,11 @@ function openProductDetail(productId) {
     `;
   }
 
-  setMainMedia("image", currentProduct.images[0], thumbContainer.firstElementChild);
-  productModalInstance.show();
+  setMainMedia("image", prodImgs[0], thumbContainer.firstElementChild);
+  if (!productModalInstance && document.getElementById("productModal")) {
+    productModalInstance = new bootstrap.Modal(document.getElementById("productModal"));
+  }
+  if (productModalInstance) productModalInstance.show();
 }
 
 function setMainMedia(type, src, thumbEl) {
@@ -748,33 +899,162 @@ function closeProductModal() {
 
 function changeModalQty(delta) {
   const qtyInput = document.getElementById("modalQty");
-  let val = parseInt(qtyInput.value) + delta;
+  const chosenSize = document.getElementById("modalSize")?.value || "";
+  const sizeAvail = getStockForProductSize(currentProduct, chosenSize);
+  let val = parseInt(qtyInput.value, 10) + delta;
   if (val < 1) val = 1;
-  if (val > currentProduct.availableStock) {
-    const bulkBox = document.getElementById("bulkEnquiryBox");
-    const bulkInp = document.getElementById("bulkQtyInput");
-    if (bulkBox) bulkBox.classList.remove("d-none");
-    if (bulkInp) bulkInp.value = val;
-    alert(`Only ${currentProduct.availableStock} pieces are ready in stock. We opened the custom enquiry box below for ${val} pieces—click Send to submit your enquiry!`);
-    val = currentProduct.availableStock;
+  if (val > sizeAvail) {
+    openOverStockEnquiryModal(currentProduct, chosenSize, sizeAvail, val);
+    val = Math.max(1, sizeAvail);
   }
   qtyInput.value = val;
 }
 
-function toggleBulkEnquiry() {
-  document.getElementById("bulkEnquiryBox").classList.toggle("d-none");
+function openBulkEnquiryFromProductModal() {
+  if (!currentProduct) return;
+  const chosenSize = document.getElementById("modalSize")?.value || (currentProduct.sizes && currentProduct.sizes[0]) || "Free Size (Adjustable Dori)";
+  const szStock = getStockForProductSize(currentProduct, chosenSize);
+  const suggestedQty = Math.max(szStock + 1, 3);
+  openOverStockEnquiryModal(currentProduct, chosenSize, szStock, suggestedQty);
 }
 
-function sendBulkEnquiryWhatsApp() {
-  const reqQty = document.getElementById("bulkQtyInput").value;
-  const note = document.getElementById("bulkNoteInput").value.trim();
+function openOverStockEnquiryModal(prod, sizeName, availStock, requestedQty) {
+  if (!prod) return;
+  document.getElementById("enqProdId").value = prod.id;
+  document.getElementById("enqProdImg").src = (prod.images && prod.images[0]) || "assets/Categories/Comming-Soon.png";
+  document.getElementById("enqProdTitleDisplay").textContent = prod.name;
+  document.getElementById("enqProdIdDisplay").textContent = prod.id;
+  document.getElementById("enqProdPriceDisplay").textContent = prod.price;
 
-  let msg = `Hello *Jewellery by Riddhi*! ✨\nI want to enquire for *${reqQty} pieces* of:\n\n`;
-  msg += `🛍️ *Product:* *${currentProduct.name}* (${currentProduct.id})\n`;
-  msg += `💰 *Offer Price per pc:* ₹${currentProduct.price}\n`;
-  if (note) msg += `📝 *Customization:* _${note}_\n`;
-  msg += `\nPlease confirm availability and custom making time.`;
+  const sizeSel = document.getElementById("enqSizeSelect");
+  const sizesList = (Array.isArray(prod.sizes) && prod.sizes.length > 0)
+    ? prod.sizes
+    : [sizeName || "Free Size (Adjustable Dori)"];
 
+  sizeSel.innerHTML = sizesList.map(sz => {
+    const st = getStockForProductSize(prod, sz);
+    return `<option value="${esc(sz)}" ${sz === sizeName ? "selected" : ""}>${esc(sz)} (Stock: ${st})</option>`;
+  }).join("");
+
+  const activeSize = sizeSel.value || sizeName || sizesList[0];
+  const activeStock = getStockForProductSize(prod, activeSize);
+  document.getElementById("enqAvailStock").value = activeStock;
+  document.getElementById("enqReqQtyInput").value = Math.max(1, parseInt(requestedQty, 10) || (activeStock + 1));
+
+  refreshEnquiryStockBreakdown();
+
+  const saved = getSavedCustomer();
+  if (saved) {
+    document.getElementById("enqCustName").value = saved.name || "";
+    document.getElementById("enqCustMobile").value = String(saved.mobile || "").replace(/[^0-9]/g, "").slice(-10);
+  }
+  document.getElementById("enqCustNote").value = "";
+  if (stockEnquiryModalInstance) stockEnquiryModalInstance.show();
+}
+
+function onEnquirySizeChange() {
+  const prodId = document.getElementById("enqProdId").value;
+  const prod = PRODUCTS.find(p => p.id === prodId);
+  if (!prod) return;
+  const chosenSize = document.getElementById("enqSizeSelect").value;
+  const st = getStockForProductSize(prod, chosenSize);
+  document.getElementById("enqAvailStock").value = st;
+  const qtyInp = document.getElementById("enqReqQtyInput");
+  if (parseInt(qtyInp.value, 10) <= st) {
+    qtyInp.value = st + 1;
+  }
+  refreshEnquiryStockBreakdown();
+}
+
+function adjustEnquiryQty(delta) {
+  const qtyInp = document.getElementById("enqReqQtyInput");
+  if (!qtyInp) return;
+  let val = (parseInt(qtyInp.value, 10) || 1) + delta;
+  if (val < 1) val = 1;
+  if (val > 500) val = 500;
+  qtyInp.value = val;
+  refreshEnquiryStockBreakdown();
+}
+
+function refreshEnquiryStockBreakdown() {
+  const prodId = document.getElementById("enqProdId").value;
+  const size = document.getElementById("enqSizeSelect")?.value || "";
+  const availStock = parseInt(document.getElementById("enqAvailStock").value, 10) || 0;
+  const reqQty = Math.max(1, parseInt(document.getElementById("enqReqQtyInput").value, 10) || 1);
+  const extraQty = Math.max(0, reqQty - availStock);
+  const readyAlloc = Math.min(availStock, reqQty);
+
+  const box = document.getElementById("overStockAlertSummary");
+  if (!box) return;
+
+  if (extraQty > 0) {
+    box.innerHTML =
+      `<div class="fw-bold text-dark mb-1">Stock vs. Custom Quantity Summary (${esc(size)}):</div>` +
+      `• Ready Stock Available: <strong>${availStock} pcs</strong><br>` +
+      `• Total Quantity Selected: <strong>${reqQty} pcs</strong><br>` +
+      `• Split: <strong>${readyAlloc} ready stock</strong> + <strong class="text-danger">${extraQty} extra piece(s)</strong> custom making required.`;
+  } else {
+    box.innerHTML =
+      `<div class="fw-bold text-success mb-1">All ${reqQty} piece(s) available in ready stock (${esc(size)})!</div>` +
+      `Ready Stock: <strong>${availStock} pcs</strong>. You can order directly or still send an enquiry below.`;
+  }
+}
+
+async function submitOverStockEnquiry(e) {
+  e.preventDefault();
+  const prodId = document.getElementById("enqProdId").value;
+  const size = document.getElementById("enqSizeSelect").value;
+  const availStock = parseInt(document.getElementById("enqAvailStock").value, 10) || 0;
+  const reqQty = Math.max(1, parseInt(document.getElementById("enqReqQtyInput").value, 10) || 1);
+  const extraQty = Math.max(0, reqQty - availStock);
+  const custName = document.getElementById("enqCustName").value.trim();
+  const mobile = document.getElementById("enqCustMobile").value.replace(/[^0-9]/g, "").slice(0, 10);
+  const note = document.getElementById("enqCustNote").value.trim();
+
+  const prod = PRODUCTS.find(p => p.id === prodId);
+  if (!prod || mobile.length !== 10) return;
+
+  const btn = document.getElementById("submitOverStockEnqBtn");
+  if (btn) btn.disabled = true;
+
+  const enquiryPayload = {
+    enquiryId: "ENQ-" + Date.now().toString().slice(-6),
+    customerName: custName,
+    mobile,
+    productId: prod.id,
+    category: prod.category,
+    productName: prod.name,
+    size,
+    availableStock: availStock,
+    requestedQty: reqQty,
+    extraQty,
+    note: note || `Stock: ${availStock}, Requested: ${reqQty} (Extra ${extraQty} pcs)`,
+    image: getFullImageUrl((prod.images && prod.images[0]) || "")
+  };
+
+  try {
+    const localEnqs = JSON.parse(localStorage.getItem("riddhi_enquiries") || "[]");
+    localEnqs.unshift({ ...enquiryPayload, status: "New Enquiry", date: new Date().toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }), timestamp: Date.now() });
+    localStorage.setItem("riddhi_enquiries", JSON.stringify(localEnqs));
+  } catch (err) {}
+
+  if (APPS_SCRIPT_URL) {
+    try {
+      await callScript({ action: "newEnquiry", enquiry: enquiryPayload });
+    } catch (err) {}
+  }
+
+  let msg = `Hello *Jewellery by Riddhi*! ✨\n*EXTRA QUANTITY / BULK ENQUIRY*\n\n`;
+  msg += `🆔 *Enquiry ID:* ${enquiryPayload.enquiryId}\n`;
+  msg += `🛍️ *Product:* ${prod.name} (${prod.id})\n`;
+  msg += `📏 *Size:* ${size}\n`;
+  msg += `📦 *Ready Stock Available:* ${availStock} pcs\n`;
+  msg += `🛒 *Total Quantity Needed:* ${reqQty} pcs` + (extraQty > 0 ? ` (*${extraQty} extra* custom making)\n` : `\n`);
+  msg += `👤 *Customer:* ${custName} (${mobile})\n`;
+  if (note) msg += `📝 *Note:* _${note}_\n`;
+
+  if (btn) btn.disabled = false;
+  if (stockEnquiryModalInstance) stockEnquiryModalInstance.hide();
   sendWhatsAppUrl(WHATSAPP_NUMBER, msg);
 }
 
@@ -783,24 +1063,23 @@ function sendBulkEnquiryWhatsApp() {
 // ==========================================
 function handleAddToCartClick() {
   if (!currentProduct) return;
-  const stock = Math.max(0, parseInt(currentProduct.availableStock, 10) || 0);
+  const size = document.getElementById("modalSize").value;
+  const stock = getStockForProductSize(currentProduct, size);
   if (stock <= 0) {
-    alert("This product is currently out of stock (Available Soon). Please enquire on WhatsApp!");
+    openOverStockEnquiryModal(currentProduct, size, 0, parseInt(document.getElementById("modalQty").value, 10) || 1);
     return;
   }
 
-  const size = document.getElementById("modalSize").value;
   const qty = parseInt(document.getElementById("modalQty").value, 10) || 1;
   const customNote = document.getElementById("modalCustom").value.trim();
 
   const alreadyInCartQty = cart
-    .filter(item => item.id === currentProduct.id)
+    .filter(item => item.id === currentProduct.id && item.size === size)
     .reduce((sum, item) => sum + item.qty, 0);
 
   if (alreadyInCartQty + qty > stock) {
-    const remainingAllowed = Math.max(0, stock - alreadyInCartQty);
-    alert(`Only ${stock} piece(s) available in stock (you already have ${alreadyInCartQty} in cart).`);
-    if (remainingAllowed <= 0) return;
+    openOverStockEnquiryModal(currentProduct, size, stock, alreadyInCartQty + qty);
+    return;
   }
 
   const existingIndex = cart.findIndex(item =>
@@ -839,9 +1118,9 @@ function updateCartItemQty(index, delta) {
   }
 
   const prod = PRODUCTS.find(p => p.id === item.id);
-  const maxStock = prod ? Math.max(0, parseInt(prod.availableStock, 10) || 0) : item.availableStock;
+  const maxStock = prod ? getStockForProductSize(prod, item.size) : item.availableStock;
   if (newQty > maxStock) {
-    alert(`Only ${maxStock} piece(s) are ready in stock for ${item.name}.`);
+    openOverStockEnquiryModal(prod || item, item.size, maxStock, newQty);
     return;
   }
 
@@ -853,11 +1132,22 @@ function requestRemoveCartItem(index) {
   const item = cart[index];
   if (!item) return;
   pendingRemoveCartIndex = index;
+
+  const imgEl = document.getElementById("removeCartItemImg");
   const titleEl = document.getElementById("removeCartItemTitle");
+  const idEl = document.getElementById("removeCartItemId");
+  const sizeEl = document.getElementById("removeCartItemSize");
+  const priceEl = document.getElementById("removeCartItemPrice");
+
+  if (imgEl) imgEl.src = (item.images && item.images[0]) || "assets/Categories/Comming-Soon.png";
   if (titleEl) titleEl.innerText = item.name;
+  if (idEl) idEl.innerText = item.id;
+  if (sizeEl) sizeEl.innerText = item.size || "Free Size";
+  if (priceEl) priceEl.innerText = (item.price * item.qty);
+
   if (removeCartConfirmModalInstance) {
     removeCartConfirmModalInstance.show();
-  } else if (confirm("Do you want to remove this product from cart?")) {
+  } else if (confirm(`Remove ${item.name} (${item.id}) - Size: ${item.size} - ₹${item.price * item.qty} from cart?`)) {
     confirmRemoveCartItem();
   }
 }
@@ -1038,11 +1328,23 @@ function handleOrderSingleClick() {
 }
 
 function handleCheckoutCartClick() {
-  if (cart.length === 0) {
-    alert("Your cart is empty!");
+  if (!cart || cart.length === 0) {
+    if (emptyCartModalInstance) {
+      emptyCartModalInstance.show();
+    } else {
+      alert("Your cart is empty!");
+    }
     return;
   }
   openCustomerModal("order_cart");
+}
+
+function exploreJewelleryFromEmptyCart() {
+  if (emptyCartModalInstance) emptyCartModalInstance.hide();
+  const cartEl = document.getElementById("cartOffcanvas");
+  const cartInst = cartEl ? bootstrap.Offcanvas.getInstance(cartEl) : null;
+  if (cartInst) cartInst.hide();
+  openProductsView("All");
 }
 
 function openCustomerModal(actionType) {
@@ -1411,6 +1713,7 @@ function closeAdminCancelModal() {
   pendingCancelOrderId = null;
   if (adminCancelModalInstance) adminCancelModalInstance.hide();
   renderAllCustomersSummary();
+  renderAdminEnquiriesList();
   renderMyOrders();
 }
 
@@ -1462,7 +1765,7 @@ async function applyAdminStatusUpdate(orderId, status, cancelReason = "", selEl 
       const r = await callScript({ action: "updateStatus", token: s.token, orderId, status, cancelReason });
       if (!r.ok) {
         if (r.error === "auth") {
-          sessionStorage.removeItem("riddhi_admin_session");
+          localStorage.removeItem("riddhi_admin_session"); sessionStorage.removeItem("riddhi_admin_session");
           updateAdminMenuLabel();
           alert("Session expired. Please login as admin again.");
           return;
@@ -1516,6 +1819,27 @@ async function refreshMyOrderStatuses() {
       }
     });
     if (changed) localStorage.setItem("riddhi_orders", JSON.stringify(fresh));
+
+    try {
+      const localEnqs = JSON.parse(localStorage.getItem("riddhi_enquiries") || "[]");
+      if (localEnqs.length > 0) {
+        const er = await callScript({
+          action: "enquiryStatus",
+          enquiries: localEnqs.slice(0, 30).map(x => ({ enquiryId: x.enquiryId, mobile: x.mobile }))
+        });
+        if (er && er.ok && er.statuses) {
+          let eChanged = false;
+          localEnqs.forEach(x => {
+            if (er.statuses[x.enquiryId] && x.status !== er.statuses[x.enquiryId].status) {
+              x.status = er.statuses[x.enquiryId].status;
+              eChanged = true;
+            }
+          });
+          if (eChanged) localStorage.setItem("riddhi_enquiries", JSON.stringify(localEnqs));
+        }
+      }
+    } catch (ee) {}
+
     renderMyOrders();
   } catch (e) { /* offline fallback */ }
 }
@@ -1642,6 +1966,120 @@ function saveOrderToHistory(orderRecord) {
   return order;
 }
 
+let activeCustomerTab = "orders";
+
+function switchCustomerActivityTab(tabName) {
+  activeCustomerTab = tabName === "enquiries" ? "enquiries" : "orders";
+  const btnOrders = document.getElementById("tabBtnMyOrders");
+  const btnEnq = document.getElementById("tabBtnMyEnquiries");
+  const paneOrders = document.getElementById("customerMyOrdersTabPane");
+  const paneEnq = document.getElementById("customerMyEnquiriesTabPane");
+
+  if (btnOrders) btnOrders.classList.toggle("active", activeCustomerTab === "orders");
+  if (btnEnq) btnEnq.classList.toggle("active", activeCustomerTab === "enquiries");
+  if (paneOrders) paneOrders.classList.toggle("d-none", activeCustomerTab !== "orders");
+  if (paneEnq) paneEnq.classList.toggle("d-none", activeCustomerTab !== "enquiries");
+
+  if (activeCustomerTab === "enquiries") {
+    renderCustomerMyEnquiriesTab();
+  } else {
+    renderMyOrders();
+  }
+}
+
+function toggleCustOrderCustomDate() {
+  const v = document.getElementById("myOrdersDateFilter")?.value;
+  document.getElementById("custOrderCustomDateWrap")?.classList.toggle("d-none", v !== "custom");
+}
+
+function toggleCustEnquiryCustomDate() {
+  const v = document.getElementById("myEnquiriesDateFilter")?.value;
+  document.getElementById("custEnquiryCustomDateWrap")?.classList.toggle("d-none", v !== "custom");
+}
+
+function matchesCustomerDateFilter(ts, dateStr, bucket, customIso) {
+  if (!bucket || bucket === "all") return true;
+  const numTs = Number(ts) || 0;
+  const d = numTs ? new Date(numTs) : null;
+  const now = new Date();
+  if (bucket === "today") {
+    if (!d || isNaN(d.getTime())) return false;
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+  }
+  if (bucket === "7d") return numTs && (Date.now() - numTs <= 7 * 24 * 60 * 60 * 1000);
+  if (bucket === "30d") return numTs && (Date.now() - numTs <= 30 * 24 * 60 * 60 * 1000);
+  if (bucket === "3m") return numTs && (Date.now() - numTs <= 90 * 24 * 60 * 60 * 1000);
+  if (bucket === "custom") {
+    if (!customIso || !d || isNaN(d.getTime())) return true;
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}` === customIso;
+  }
+  return true;
+}
+
+function renderCustomerMyEnquiriesTab() {
+  const container = document.getElementById("myEnquiriesTabListContainer");
+  if (!container) return;
+
+  let enqs = [];
+  try {
+    enqs = JSON.parse(localStorage.getItem("riddhi_enquiries") || "[]");
+  } catch (e) {}
+
+  const stFilter = document.getElementById("myEnquiriesStatusFilter")?.value || "all";
+  const dateFilter = document.getElementById("myEnquiriesDateFilter")?.value || "all";
+  const customIso = document.getElementById("custEnquiryCustomDateInput")?.value || "";
+
+  const filtered = (Array.isArray(enqs) ? enqs : []).filter(eq => {
+    const st = eq.status || "New Enquiry";
+    if (stFilter !== "all" && st !== stFilter) return false;
+    return matchesCustomerDateFilter(eq.timestamp, eq.date, dateFilter, customIso);
+  });
+
+  const refreshBtn = APPS_SCRIPT_URL
+    ? `<button type="button" class="btn btn-outline-dark btn-sm w-100 mb-3 rounded-pill" onclick="refreshMyOrderStatuses()"><i class="bi bi-arrow-clockwise me-1"></i>Refresh Enquiry Status</button>`
+    : "";
+
+  if (filtered.length === 0) {
+    container.innerHTML = refreshBtn + `
+      <div class="text-center text-muted my-4">
+        <i class="bi bi-chat-dots fs-1"></i>
+        <p class="mt-2 small">No enquiries match your selected filter.</p>
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = refreshBtn + filtered.map(eq => {
+    const st = eq.status || "New Enquiry";
+    const badgeCls = (st === "Confirmed" || st === "Completed")
+      ? "bg-success"
+      : (st === "Contacted" ? "bg-info text-dark" : (st === "Closed" ? "bg-danger" : "bg-warning text-dark"));
+
+    return `
+      <div class="card mb-3 border-0 shadow-sm">
+        <div class="card-body p-3 small">
+          <div class="d-flex justify-content-between align-items-center mb-1">
+            <span class="badge bg-dark">${esc(eq.enquiryId)}</span>
+            <span class="badge ${badgeCls}">${esc(st)}</span>
+          </div>
+          ${eq.date ? `<div class="text-muted mb-1" style="font-size: 11px;"><i class="bi bi-clock me-1"></i>${esc(eq.date)}</div>` : ""}
+          <div class="fw-bold text-dark">${esc(eq.productName)} (${esc(eq.productId)})</div>
+          <div class="text-muted mt-1" style="font-size: 11px;">
+            Size: <strong>${esc(eq.size)}</strong> | Ready Stock: <strong>${esc(eq.availableStock)}</strong> | Needed: <strong>${esc(eq.requestedQty)}</strong>
+            ${Number(eq.extraQty) > 0 ? ` | <span class="text-danger fw-bold">Extra: ${esc(eq.extraQty)}</span>` : ""}
+          </div>
+          ${eq.note ? `<div class="text-success mt-1" style="font-size: 11px;"><strong>Note:</strong> ${esc(eq.note)}</div>` : ""}
+          <div class="mt-2 p-2 rounded bg-light text-dark" style="font-size: 11px;">
+            ${esc(ENQUIRY_STATUS_DESC[st] || "")}
+          </div>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
 function renderMyOrders() {
   autoDeliverLocalOrders();
   const container = document.getElementById("myOrdersListContainer");
@@ -1676,7 +2114,7 @@ function renderMyOrders() {
 
   const statusFilter = document.getElementById("myOrdersStatusFilter")?.value || "all";
   const dateFilter = document.getElementById("myOrdersDateFilter")?.value || "all";
-  const now = Date.now();
+  const customIso = document.getElementById("custOrderCustomDateInput")?.value || "";
 
   const orders = allOrders.filter(ord => {
     const st = normStatus(ord.status);
@@ -1688,17 +2126,7 @@ function renderMyOrders() {
       }
     }
 
-    const ts = Number(ord.timestamp) || 0;
-    if (dateFilter === "30d") {
-      if (now - ts > 30 * 24 * 60 * 60 * 1000) return false;
-    } else if (dateFilter === "3m") {
-      if (now - ts > 90 * 24 * 60 * 60 * 1000) return false;
-    } else if (/^\d{4}$/.test(dateFilter)) {
-      const yr = ts ? new Date(ts).getFullYear().toString() : "";
-      if (yr !== dateFilter && !String(ord.date || "").includes(dateFilter)) return false;
-    }
-
-    return true;
+    return matchesCustomerDateFilter(ord.timestamp, ord.date, dateFilter, customIso);
   });
 
   if (orders.length === 0) {
@@ -1749,6 +2177,10 @@ function renderMyOrders() {
         </div>
       </div>`;
   }).join("");
+
+  if (!adminView && activeCustomerTab === "enquiries") {
+    renderCustomerMyEnquiriesTab();
+  }
 }
 
 function clearOrderHistory() {
@@ -1812,9 +2244,126 @@ async function syncPendingOrders() {
 // ADMIN LOGIN & PERSISTENT SIDEBAR STATE (Closing modal NEVER logs out admin!)
 // ==========================================
 let adminOrders = [];
+let adminEnquiries = [];
+const ENQUIRY_STATUS_OPTIONS = ["New Enquiry", "Contacted", "Confirmed", "Completed", "Closed"];
+const ENQUIRY_STATUS_DESC = {
+  "New Enquiry": "Enquiry received; admin will review stock & custom making timeline.",
+  "Contacted": "Admin has contacted you regarding availability and custom making.",
+  "Confirmed": "Custom / extra quantity enquiry confirmed for making.",
+  "Completed": "Your requested pieces are ready / completed.",
+  "Closed": "This enquiry is closed."
+};
+
+function buildCustomerEnquiriesTrackerHtml() {
+  let enqs = [];
+  try {
+    enqs = JSON.parse(localStorage.getItem("riddhi_enquiries") || "[]");
+  } catch (e) {}
+  if (!Array.isArray(enqs) || enqs.length === 0) return "";
+
+  return `
+    <div class="mt-4 pt-3 border-top">
+      <h6 class="brand-font fw-bold mb-2" style="color: var(--primary-green);">
+        <i class="bi bi-chat-dots me-1 text-warning"></i>My Enquiries (${enqs.length})
+      </h6>
+      ${enqs.map(eq => {
+        const st = eq.status || "New Enquiry";
+        const badgeCls = st === "Confirmed" || st === "Completed" ? "bg-success" : (st === "Contacted" ? "bg-info text-dark" : (st === "Closed" ? "bg-danger" : "bg-warning text-dark"));
+        return `
+          <div class="card mb-2 border-0 shadow-sm">
+            <div class="card-body p-2 small">
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="fw-bold text-dark">${esc(eq.enquiryId)}</span>
+                <span class="badge ${badgeCls}">${esc(st)}</span>
+              </div>
+              <div class="fw-semibold">${esc(eq.productName)} (${esc(eq.productId)})</div>
+              <div class="text-muted" style="font-size: 11px;">
+                Size: ${esc(eq.size)} | Stock: ${esc(eq.availableStock)} | Needed: ${esc(eq.requestedQty)}${eq.extraQty > 0 ? ` (Extra: ${esc(eq.extraQty)})` : ""}
+              </div>
+              <div class="text-dark mt-1" style="font-size: 11px;">${esc(ENQUIRY_STATUS_DESC[st] || "")}</div>
+            </div>
+          </div>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
+function renderAdminEnquiriesList() {
+  const container = document.getElementById("adminEnquiriesListContainer");
+  const badge = document.getElementById("adminEnquiriesCountBadge");
+  if (!container || !isAdminLoggedIn()) return;
+
+  if (badge) badge.textContent = adminEnquiries.length;
+
+  if (!adminEnquiries || adminEnquiries.length === 0) {
+    container.innerHTML = `<div class="text-center text-muted py-3 small bg-white rounded-3 border">No customer enquiries received yet.</div>`;
+    return;
+  }
+
+  container.innerHTML = adminEnquiries.map(eq => {
+    const st = eq.status || "New Enquiry";
+    let wa = String(eq.mobile || "").replace(/[^0-9]/g, "").slice(-10);
+    if (wa.length === 10) wa = "91" + wa;
+    const waText = `Hello *Jewellery by Riddhi* Customer ${eq.customerName || ""}! ✨
+🆔 *Enquiry ID:* ${eq.enquiryId}
+🛍️ *Product:* ${eq.productName} (${eq.productId})
+📏 *Size:* ${eq.size} | *Needed Qty:* ${eq.requestedQty}
+📌 *Enquiry Status:* *${st}*
+${ENQUIRY_STATUS_DESC[st] || ""}`;
+
+    return `
+      <div class="card mb-2 border-0 shadow-sm">
+        <div class="card-body p-3 small">
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-1 mb-1">
+            <div>
+              <span class="badge bg-warning text-dark me-1">${esc(eq.enquiryId)}</span>
+              <strong class="text-dark">${esc(eq.customerName)}</strong>
+              <span class="text-muted">(${esc(eq.mobile)})</span>
+            </div>
+            <span class="text-muted" style="font-size: 11px;">${esc(eq.date || "")}</span>
+          </div>
+          <div class="fw-semibold text-dark">${esc(eq.productName)} (${esc(eq.productId)}) — <span class="text-muted">${esc(eq.category || "")}</span></div>
+          <div class="text-muted mb-1" style="font-size: 11px;">
+            Size: <strong>${esc(eq.size)}</strong> | Ready Stock: <strong>${esc(eq.availableStock)}</strong> | Requested: <strong>${esc(eq.requestedQty)}</strong>
+            ${Number(eq.extraQty) > 0 ? ` | <span class="text-danger fw-bold">Extra Needed: ${esc(eq.extraQty)}</span>` : ""}
+          </div>
+          ${eq.note ? `<div class="text-success mb-2" style="font-size: 11px;"><strong>Note:</strong> ${esc(eq.note)}</div>` : ""}
+          <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
+            <select class="form-select form-select-sm w-auto" onchange="adminUpdateEnquiryStatus('${esc(eq.enquiryId)}', this.value, this)">
+              ${ENQUIRY_STATUS_OPTIONS.map(opt => `<option value="${opt}" ${opt === st ? "selected" : ""}>${opt}</option>`).join("")}
+            </select>
+            <a href="https://wa.me/${wa}?text=${encodeURIComponent(waText)}" target="_blank" rel="noopener" class="btn btn-outline-success btn-sm py-0 px-2" style="font-size: 11px;">
+              <i class="bi bi-whatsapp"></i> Update Customer
+            </a>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+async function adminUpdateEnquiryStatus(enquiryId, newStatus, selEl = null) {
+  const s = getAdminSession();
+  if (!s) return;
+  if (selEl) selEl.disabled = true;
+  try {
+    if (s.mode === "sheet" && APPS_SCRIPT_URL) {
+      const r = await callScript({ action: "updateEnquiryStatus", token: s.token, enquiryId, status: newStatus });
+      if (!r.ok) throw new Error(r.error || "failed");
+    }
+    const target = adminEnquiries.find(x => x.enquiryId === enquiryId);
+    if (target) target.status = newStatus;
+    renderAdminEnquiriesList();
+  } catch (e) {
+    alert("Could not update enquiry status. Please check internet.");
+  } finally {
+    if (selEl) selEl.disabled = false;
+  }
+}
 
 function getAdminSession() {
-  try { return JSON.parse(sessionStorage.getItem("riddhi_admin_session") || "null"); } catch (e) { return null; }
+  try { return JSON.parse((localStorage.getItem("riddhi_admin_session") || sessionStorage.getItem("riddhi_admin_session")) || "null"); } catch (e) { return null; }
 }
 function isAdminLoggedIn() {
   return !!getAdminSession();
@@ -1965,6 +2514,7 @@ async function submitAdminLogin(e) {
       }
       session = { mode: "sheet", token: r.token };
       adminOrders = r.orders || [];
+      adminEnquiries = r.enquiries || [];
       if (typeof r.autoDeliverEnabled === "boolean") {
         syncAutoDeliverUI(r.autoDeliverEnabled);
       }
@@ -1983,10 +2533,11 @@ async function submitAdminLogin(e) {
       }
       session = { mode: "local" };
       adminOrders = getLocalOrders();
+      try { adminEnquiries = JSON.parse(localStorage.getItem('riddhi_enquiries') || '[]'); } catch (e) { adminEnquiries = []; }
     }
 
     clearAdminFails();
-    sessionStorage.setItem("riddhi_admin_session", JSON.stringify(session));
+    localStorage.setItem("riddhi_admin_session", JSON.stringify(session)); sessionStorage.setItem("riddhi_admin_session", JSON.stringify(session));
     updateAdminMenuLabel();
     renderMyOrders();
 
@@ -2003,7 +2554,7 @@ async function submitAdminLogin(e) {
 // Admin logs out ONLY when clicking the Logout button
 async function adminLogout() {
   const s = getAdminSession();
-  sessionStorage.removeItem("riddhi_admin_session");
+  localStorage.removeItem("riddhi_admin_session"); sessionStorage.removeItem("riddhi_admin_session");
   adminOrders = [];
   updateAdminMenuLabel();
   renderMyOrders();
@@ -2020,17 +2571,19 @@ async function loadAdminOrders() {
   if (s.mode === "sheet") {
     const r = await callScript({ action: "getOrders", token: s.token });
     if (!r.ok) {
-      sessionStorage.removeItem("riddhi_admin_session");
+      localStorage.removeItem("riddhi_admin_session"); sessionStorage.removeItem("riddhi_admin_session");
       updateAdminMenuLabel();
       return false;
     }
     adminOrders = r.orders || [];
+      adminEnquiries = r.enquiries || [];
     if (typeof r.autoDeliverEnabled === "boolean") {
       syncAutoDeliverUI(r.autoDeliverEnabled);
     }
   } else {
     autoDeliverLocalOrders();
     adminOrders = getLocalOrders();
+      try { adminEnquiries = JSON.parse(localStorage.getItem('riddhi_enquiries') || '[]'); } catch (e) { adminEnquiries = []; }
   }
   return true;
 }
@@ -2078,6 +2631,7 @@ async function refreshAdminPanel() {
     return;
   }
   renderAllCustomersSummary();
+  renderAdminEnquiriesList();
   renderMyOrders();
 }
 
