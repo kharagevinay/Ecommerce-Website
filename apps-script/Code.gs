@@ -3,8 +3,8 @@
  */
 
 // ====== SIRF YE 2 LINES BADLEIN ======
-const ADMIN_USERNAME = 'Admin';
-const ADMIN_PASSWORD = 'Admin@2026';
+const ADMIN_USERNAME = 'Riddhi';
+const ADMIN_PASSWORD = 'Riddhi@2026';
 // =====================================
 
 const SHEET_NAME = 'Orders';
@@ -1111,13 +1111,19 @@ function addOrder_(o) {
       return { id: i.id, category: i.category, name: i.name, size: i.size, qty: i.qty, price: i.price, actualPrice: i.actualPrice, discount: i.discountText, note: i.note, image: i.image };
     });
 
+    const firstImgUrl = (items[0] && items[0].image) ? items[0].image : '';
+    const previewFormula = firstImgUrl ? buildPreviewFormula_(firstImgUrl, o.siteBaseUrl || '') : '';
     sh.appendRow([
       new Date(Number(o.timestamp) || Date.now()), orderId, safe_(o.date, 40),
       safe_(c.name, 100), "'" + mobile, safe_(c.address, 300), safe_(c.city, 80), "'" + pin,
       productIdsCol, categoriesCol, productNamesCol, sizesCol, quantitiesCol, customNotesCol,
       actualPriceCol, offerPriceCol, discountCol,
-      total, JSON.stringify(cleanItemsForJson)
-    ].concat(imgCells, [imgs.join('\n'), 'Pending', new Date(), '']));
+      total, JSON.stringify(cleanItemsForJson),
+      previewFormula || firstImgUrl || ''
+    ].concat(imgCells.slice(0, 3), [imgs.join('\n'), 'Pending', new Date(), '']));
+    if (previewFormula) {
+      sh.getRange(sh.getLastRow(), 20).setFormula(previewFormula);
+    }
     if (imgs.length) sh.setRowHeight(sh.getLastRow(), 100);
 
     const stockRes = deductStockFromSheet_(items, o.siteBaseUrl || '', 0);

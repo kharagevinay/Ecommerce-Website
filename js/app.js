@@ -1489,6 +1489,37 @@ function confirmRemoveCartItem() {
   updateCartUI();
 }
 
+
+function toggleCustomerQuickHub(ev) {
+  if (ev) ev.stopPropagation();
+  const menu = document.getElementById("customerQuickHubMenu");
+  if (!menu) return;
+  menu.classList.toggle("d-none");
+}
+
+function closeCustomerQuickHub() {
+  const menu = document.getElementById("customerQuickHubMenu");
+  if (menu) menu.classList.add("d-none");
+}
+
+document.addEventListener("click", (ev) => {
+  const menu = document.getElementById("customerQuickHubMenu");
+  const btn = document.getElementById("navQuickHubBtn");
+  if (!menu || menu.classList.contains("d-none")) return;
+  if (!menu.contains(ev.target) && (!btn || !btn.contains(ev.target))) {
+    menu.classList.add("d-none");
+  }
+});
+
+function refreshQuickHubBadge() {
+  const hubBadge = document.getElementById("navQuickHubTotalBadge");
+  if (!hubBadge) return;
+  const cartQty = (cart || []).reduce((s, i) => s + (parseInt(i.qty, 10) || 1), 0);
+  const ordCnt = parseInt(document.getElementById("navOrdersCount")?.textContent || "0", 10) || 0;
+  const enqCnt = parseInt(document.getElementById("navEnquiriesCount")?.textContent || "0", 10) || 0;
+  hubBadge.textContent = String(cartQty + ordCnt + enqCnt);
+}
+
 function updateCartUI() {
   const container = document.getElementById("cartItemsContainer");
   if (!container) return;
@@ -1506,6 +1537,7 @@ function updateCartUI() {
     document.getElementById("cartTotal").innerText = "0";
     if (savingsEl) savingsEl.innerText = "0";
     floatBtn.classList.add("d-none");
+    refreshQuickHubBadge();
     return;
   }
 
@@ -1549,6 +1581,7 @@ function updateCartUI() {
   navCount.innerText = totalQty;
   document.getElementById("cartTotal").innerText = totalPrice;
   if (savingsEl) savingsEl.innerText = totalSavings;
+  refreshQuickHubBadge();
   floatBtn.classList.remove("d-none");
   document.getElementById("floatCount").innerText = totalQty;
   document.getElementById("floatTotal").innerText = totalPrice;
@@ -2298,8 +2331,11 @@ async function refreshMyOrderStatuses(forceReplace = false) {
 }
 
 function safeImgUrl(u) {
-  const full = getFullImageUrl(u);
-  return /^https?:\/\/[^\s"'<>]+$/i.test(full) ? full : "";
+  const raw = String(u || "").trim();
+  if (!raw) return "";
+  if (raw.startsWith("data:image/")) return raw;
+  const full = getFullImageUrl(raw);
+  return /^(https?:\/\/|assets\/)/i.test(full) ? full : raw;
 }
 
 
@@ -2593,7 +2629,10 @@ function renderCustomerMyEnquiriesTab() {
             <span class="badge ${badgeCls}">${esc(st)}</span>
           </div>
           ${eq.date ? `<div class="text-muted mb-1" style="font-size: 11px;"><i class="bi bi-clock me-1"></i>${esc(eq.date)}</div>` : ""}
-          <div class="fw-bold text-dark">${esc(eq.productName)} (${esc(eq.productId)})</div>
+          <div class="d-flex gap-2 align-items-center my-1">
+            <img src="${esc(safeImgUrl(eq.image) || 'assets/Categories/Comming-Soon.png')}" alt="" referrerpolicy="no-referrer" style="width:46px;height:46px;object-fit:cover;border-radius:8px;border:1px solid #eadbc8;flex-shrink:0;" onerror="handleSmartImgError(this, 'assets/Categories/Comming-Soon.png');">
+            <div class="fw-bold text-dark">${esc(eq.productName)} (${esc(eq.productId)})</div>
+          </div>
           <div class="text-muted mt-1" style="font-size: 11px;">
             Size: <strong>${esc(eq.size)}</strong> | Ready Stock: <strong>${esc(eq.availableStock)}</strong> | Needed: <strong>${esc(eq.requestedQty)}</strong>
             ${Number(eq.extraQty) > 0 ? ` | <span class="text-danger fw-bold">Extra: ${esc(eq.extraQty)}</span>` : ""}
@@ -2925,7 +2964,10 @@ ${ENQUIRY_STATUS_DESC[st] || ""}`;
             </div>
             <span class="text-muted" style="font-size: 11px;">${esc(eq.date || "")}</span>
           </div>
-          <div class="fw-semibold text-dark">${esc(eq.productName)} (${esc(eq.productId)}) — <span class="text-muted">${esc(eq.category || "")}</span></div>
+          <div class="d-flex gap-2 align-items-center my-1">
+            <img src="${esc(safeImgUrl(eq.image) || 'assets/Categories/Comming-Soon.png')}" alt="" referrerpolicy="no-referrer" style="width:46px;height:46px;object-fit:cover;border-radius:8px;border:1px solid #eadbc8;flex-shrink:0;" onerror="handleSmartImgError(this, 'assets/Categories/Comming-Soon.png');">
+            <div class="fw-semibold text-dark">${esc(eq.productName)} (${esc(eq.productId)}) — <span class="text-muted">${esc(eq.category || "")}</span></div>
+          </div>
           <div class="text-muted mb-1" style="font-size: 11px;">
             Size: <strong>${esc(eq.size)}</strong> | Ready Stock: <strong>${esc(eq.availableStock)}</strong> | Requested: <strong>${esc(eq.requestedQty)}</strong>
             ${Number(eq.extraQty) > 0 ? ` | <span class="text-danger fw-bold">Extra Needed: ${esc(eq.extraQty)}</span>` : ""}
