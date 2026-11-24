@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Offers &amp; Festive Banners Manager — Jewellery by Riddhi Admin</title>
+  <link rel="icon" type="image/png" href="assets/logo.png">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,500&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .admin-top-bar {
+      background-color: var(--primary-green);
+      color: #fff;
+      border-bottom: 2px solid var(--accent-gold);
+    }
+  </style>
+</head>
+<body>
+
+  <nav class="admin-top-bar py-2 px-3 sticky-top shadow-sm">
+    <div class="container d-flex flex-wrap justify-content-between align-items-center gap-2">
+      <div class="d-flex align-items-center gap-2">
+        <img src="assets/logo.png" alt="Logo" style="width: 46px; height: 46px; border-radius: 50%; border: 1.5px solid var(--accent-gold);">
+        <div>
+          <h5 class="brand-font fw-bold m-0" style="color: var(--accent-gold-light);">Offers &amp; Banners Manager</h5>
+          <small class="text-light opacity-75" style="font-size: 11px;">Add, Update &amp; Delete Home Page Offers &amp; Top Marquee — Synced with Google Sheet</small>
+        </div>
+      </div>
+      <div class="d-flex flex-wrap align-items-center gap-2">
+        <span id="offerSheetSyncBadge" class="badge bg-warning text-dark">Checking Sheet...</span>
+        <a href="admin-products.html" class="btn btn-outline-warning btn-sm rounded-pill px-3">
+          <i class="bi bi-box-seam me-1"></i> Products
+        </a>
+        <a href="admin-categories.html" class="btn btn-outline-warning btn-sm rounded-pill px-3">
+          <i class="bi bi-grid-fill me-1"></i> Categories
+        </a>
+        <a href="admin-orders.html" class="btn btn-outline-warning btn-sm rounded-pill px-3">
+          <i class="bi bi-people me-1"></i> Orders
+        </a>
+        <a href="admin-enquiries.html" class="btn btn-outline-warning btn-sm rounded-pill px-3">
+          <i class="bi bi-chat-dots me-1"></i> Enquiries
+        </a>
+        <a href="index.html" class="btn btn-outline-light btn-sm rounded-pill px-3">
+          <i class="bi bi-arrow-left me-1"></i> Storefront
+        </a>
+        <button type="button" id="offerLogoutBtn" class="btn btn-danger btn-sm rounded-pill px-3 d-none" onclick="logoutOfferPage()">
+          <i class="bi bi-box-arrow-right me-1"></i> Logout
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ADMIN LOGIN GATE -->
+  <div id="offerLoginGate" class="container my-5 d-none" style="max-width: 400px;">
+    <div class="card border-0 shadow-sm" style="border-radius: 16px; border: 1.5px solid var(--accent-gold) !important;">
+      <div class="card-header text-white text-center py-3" style="background-color: var(--primary-green); border-radius: 14px 14px 0 0;">
+        <h5 class="brand-font m-0"><i class="bi bi-shield-lock me-2"></i>Admin Login — Offers Manager</h5>
+      </div>
+      <div class="card-body p-4">
+        <div id="offerGateErr" class="alert alert-danger py-2 small d-none"></div>
+        <form onsubmit="submitOfferGateLogin(event)">
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Username</label>
+            <input type="text" id="offerGateUser" class="form-control form-control-sm" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Password</label>
+            <input type="password" id="offerGatePass" class="form-control form-control-sm" required>
+          </div>
+          <button type="submit" id="offerGateBtn" class="btn btn-green btn-sm w-100 rounded-pill py-2 fw-semibold">Unlock Offers Manager</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- OFFERS ADD / UPDATE / DELETE WORKSPACE -->
+  <div id="offerWorkspace" class="container my-4 d-none">
+    <div class="row g-4">
+
+      <!-- LEFT: ADD / UPDATE OFFER FORM -->
+      <div class="col-lg-5">
+        <div class="card border-0 shadow-sm" style="border-radius: 16px; border: 1px solid #eadbc8 !important;">
+          <div class="card-header text-white py-3 d-flex justify-content-between align-items-center" style="background-color: var(--primary-green); border-radius: 15px 15px 0 0;">
+            <h6 class="brand-font m-0 fw-bold" id="offerFormHeader">
+              <i class="bi bi-plus-circle me-1 text-warning"></i> Add New Offer / Banner
+            </h6>
+            <span class="badge bg-warning text-dark" id="offerFormBadge">NEW</span>
+          </div>
+          <div class="card-body p-3">
+            <form id="offerEditorForm" onsubmit="requestConfirmSaveOffer(event)">
+              <input type="hidden" id="editingOfferId" value="">
+
+              <div class="mb-2">
+                <label class="form-label small fw-semibold mb-1">Offer Placement Type *</label>
+                <select id="fOfferType" class="form-select form-select-sm" onchange="toggleOfferTypeFields()" required>
+                  <option value="card">Home Highlighted Offer Card</option>
+                  <option value="marquee">Top Running Marquee Strip</option>
+                </select>
+              </div>
+
+              <div class="row g-2 mb-2">
+                <div class="col-6">
+                  <label class="form-label small fw-semibold mb-1">Badge / Pill 1 *</label>
+                  <input type="text" id="fOfferBadge1" class="form-control form-control-sm" placeholder="e.g. LIMITED TIME DEAL" required>
+                </div>
+                <div class="col-6" id="fOfferBadge2Wrap">
+                  <label class="form-label small fw-semibold mb-1">Badge 2 (Right)</label>
+                  <input type="text" id="fOfferBadge2" class="form-control form-control-sm" placeholder="e.g. FLAT ₹400 OFF">
+                </div>
+              </div>
+
+              <div class="mb-2">
+                <label class="form-label small fw-semibold mb-1">Offer Title / Headline *</label>
+                <input type="text" id="fOfferTitle" class="form-control form-control-sm" placeholder="e.g. Bridal & Festive Combos" required>
+              </div>
+
+              <div class="mb-2" id="fOfferDescWrap">
+                <label class="form-label small fw-semibold mb-1">Offer Description *</label>
+                <textarea id="fOfferDesc" class="form-control form-control-sm" rows="2" placeholder="Complete Choker + Necklace + Earrings sets at festive offer prices..."></textarea>
+              </div>
+
+              <div class="mb-2" id="fOfferCatWrap">
+                <label class="form-label small fw-semibold mb-1">Opens Category on Click</label>
+                <select id="fOfferTargetCategory" class="form-select form-select-sm"></select>
+              </div>
+
+              <div class="d-flex flex-wrap gap-3 my-2 p-2 rounded bg-light border">
+                <div class="form-check form-switch m-0" id="fOfferGreenWrap">
+                  <input class="form-check-input" type="checkbox" id="fOfferFeaturedGreen">
+                  <label class="form-check-label small fw-semibold" for="fOfferFeaturedGreen">Royal Green Card Theme</label>
+                </div>
+                <div class="form-check form-switch m-0">
+                  <input class="form-check-input" type="checkbox" id="fOfferActive" checked>
+                  <label class="form-check-label small fw-semibold" for="fOfferActive">Show on Storefront</label>
+                </div>
+              </div>
+
+              <div class="d-flex gap-2 mt-3">
+                <button type="submit" class="btn btn-green btn-sm flex-grow-1 rounded-pill py-2 fw-semibold" id="saveOfferBtn">
+                  <i class="bi bi-check-circle me-1"></i> Save &amp; Sync Offer
+                </button>
+                <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3 d-none" id="cancelOfferEditBtn" onclick="resetOfferForm()">
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: ALL OFFERS LIST -->
+      <div class="col-lg-7">
+        <div class="card border-0 shadow-sm" style="border-radius: 16px; border: 1px solid #eadbc8 !important;">
+          <div class="card-header bg-white py-3 d-flex flex-wrap justify-content-between align-items-center gap-2" style="border-radius: 15px 15px 0 0;">
+            <div>
+              <h6 class="brand-font fw-bold m-0" style="color: var(--primary-green);">
+                <i class="bi bi-megaphone-fill me-1 text-warning"></i> Active &amp; Saved Offers (<span id="adminTotalOffersCount">0</span>)
+              </h6>
+              <small class="text-muted" style="font-size: 11px;">Changes appear live on Home Page top marquee &amp; offer cards.</small>
+            </div>
+            <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" onclick="restoreDefaultOffers()">
+              <i class="bi bi-arrow-counterclockwise me-1"></i> Reset Default Offers
+            </button>
+          </div>
+          <div class="card-body p-0">
+            <div class="table-responsive" style="max-height: 680px;">
+              <table class="table table-hover align-middle mb-0 admin-mobile-cards">
+                <thead class="table-light small">
+                  <tr>
+                    <th>Type</th>
+                    <th>Offer Details</th>
+                    <th>Status</th>
+                    <th class="text-end">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="adminOffersTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- CONFIRMATION MODAL -->
+  <div class="modal fade" id="offerConfirmModal" tabindex="-1" aria-hidden="true" style="z-index: 1090;">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+      <div class="modal-content" style="background-color: var(--cream-bg); border-radius: 16px; border: 2px solid var(--accent-gold);">
+        <div class="modal-header border-0 pb-1">
+          <h6 class="modal-title brand-font fw-bold" id="offerConfirmTitle" style="color: var(--primary-green);">Confirm Action</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body py-2 small" id="offerConfirmMessage">Are you sure?</div>
+        <div class="modal-footer border-0 pt-1 justify-content-center gap-2">
+          <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" data-bs-dismiss="modal">No, Cancel</button>
+          <button type="button" class="btn btn-green btn-sm rounded-pill px-4 fw-semibold" id="offerConfirmYesBtn">Yes, Confirm</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="js/data.js?v=34"></script>
+  <script>
+    const DEFAULT_STORE_OFFERS = [
+      {
+        id: "OFR-MARQ-1",
+        type: "marquee",
+        badge1: "Festive Offer",
+        badge2: "",
+        title: "Up to 30% OFF on Handcrafted Chokers, Nath & Bridal Combos!",
+        desc: "",
+        targetCategory: "All",
+        featuredGreen: false,
+        active: true
+      },
+      {
+        id: "OFR-MARQ-2",
+        type: "marquee",
+        badge1: "Limited Stock",
+        badge2: "",
+        title: "Only 1–2 Ready Pieces per Design — Book Yours Before It Sells Out!",
+        desc: "",
+        targetCategory: "All",
+        featuredGreen: false,
+        active: true
+      },
+      {
+        id: "OFR-MARQ-3",
+        type: "marquee",
+        badge1: "Custom Bulk",
+        badge2: "",
+        title: "Need 3–4+ Pieces for Weddings or Haldi? Custom Making Available!",
+        desc: "",
+        targetCategory: "All",
+        featuredGreen: false,
+        active: true
+      },
+      {
+        id: "OFR-CARD-1",
+        type: "card",
+        badge1: "LIMITED TIME DEAL",
+        badge2: "FLAT ₹400 OFF",
+        title: "Bridal & Festive Combos",
+        desc: "Complete Choker + Necklace + Earrings + Mangalsutra sets at special festive offer prices.",
+        targetCategory: "Combo Set",
+        featuredGreen: true,
+        active: true
+      },
+      {
+        id: "OFR-CARD-2",
+        type: "card",
+        badge1: "HURRY • 1–2 PCS LEFT",
+        badge2: "READY TO SHIP",
+        title: "Exclusive Handmade Drops",
+        desc: "Each piece is handcrafted in small batches. Grab ready stock before it switches to Available Soon!",
+        targetCategory: "All",
+        featuredGreen: false,
+        active: true
+      },
+      {
+        id: "OFR-CARD-3",
+        type: "card",
+        badge1: "WEDDING & HALDI SPECIAL",
+        badge2: "25%–32% OFF",
+        title: "Peshwai Nath & Haldi Sets",
+        desc: "Traditional Moti Nath, Bugadi & Sugar-Ball sets. Bulk 3+ custom orders welcome!",
+        targetCategory: "Nath",
+        featuredGreen: false,
+        active: true
+      }
+    ];
+
+    let offerConfirmInst = null;
+    let pendingOfferConfirmFn = null;
+
+    function askOfferConfirm(title, html, btnCls, btnTxt, fn) {
+      document.getElementById("offerConfirmTitle").textContent = title;
+      document.getElementById("offerConfirmMessage").innerHTML = html;
+      const yb = document.getElementById("offerConfirmYesBtn");
+      yb.className = `btn ${btnCls} btn-sm rounded-pill px-4 fw-semibold`;
+      yb.textContent = btnTxt;
+      pendingOfferConfirmFn = fn;
+      if (!offerConfirmInst) offerConfirmInst = new bootstrap.Modal(document.getElementById("offerConfirmModal"));
+      offerConfirmInst.show();
+    }
+
+    document.getElementById("offerConfirmYesBtn").addEventListener("click", async () => {
+      if (offerConfirmInst) offerConfirmInst.hide();
+      if (typeof pendingOfferConfirmFn === "function") {
+        const f = pendingOfferConfirmFn;
+        pendingOfferConfirmFn = null;
+        await f();
+      }
+    });
+
+    function escF(v) {
+      return String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    }
+
+    function getAdminSessionObj() {
+      try { return JSON.parse((localStorage.getItem("riddhi_admin_session") || sessionStorage.getItem("riddhi_admin_session")) || "null"); } catch (e) { return null; }
+    }
+
+    function getOffersList() {
+      try {
+        const raw = localStorage.getItem("riddhi_custom_offers_v1");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) return parsed;
+        }
+      } catch (e) {}
+      return JSON.parse(JSON.stringify(DEFAULT_STORE_OFFERS));
+    }
+
+    function saveOffersLocal(list) {
+      localStorage.setItem("riddhi_custom_offers_v1", JSON.stringify(list));
+    }
+
+    function populateOfferCategoryDropdown() {
+      const sel = document.getElementById("fOfferTargetCategory");
+      if (!sel) return;
+      let cats = CATEGORIES;
+      try {
+        const raw = localStorage.getItem("riddhi_custom_categories_v1");
+        if (raw) {
+          const p = JSON.parse(raw);
+          if (Array.isArray(p) && p.length) cats = p;
+        }
+      } catch (e) {}
+      sel.innerHTML = `<option value="All">All Products</option>` +
+        cats.map(c => `<option value="${escF(c.name)}">${escF(c.name)}</option>`).join("");
+    }
+
+    function toggleOfferTypeFields() {
+      const type = document.getElementById("fOfferType").value;
+      const isCard = type === "card";
+      document.getElementById("fOfferBadge2Wrap").classList.toggle("d-none", !isCard);
+      document.getElementById("fOfferDescWrap").classList.toggle("d-none", !isCard);
+      document.getElementById("fOfferCatWrap").classList.toggle("d-none", !isCard);
+      document.getElementById("fOfferGreenWrap").classList.toggle("d-none", !isCard);
+    }
+
+    async function syncOfferToSheet(offerObj) {
+      const sess = getAdminSessionObj();
+      const badge = document.getElementById("offerSheetSyncBadge");
+      if (!sess || sess.mode !== "sheet" || !APPS_SCRIPT_URL) {
+        if (badge) { badge.className = "badge bg-secondary"; badge.textContent = "Local Mode"; }
+        return;
+      }
+      if (badge) { badge.className = "badge bg-info text-dark"; badge.textContent = "Syncing Sheet..."; }
+      try {
+        const res = await fetch(APPS_SCRIPT_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({ action: "saveOffer", token: sess.token, offer: offerObj })
+        });
+        const r = await res.json();
+        if (r && r.ok) {
+          if (badge) { badge.className = "badge bg-success"; badge.textContent = "Synced with Google Sheet ✓"; }
+        }
+      } catch (e) {
+        if (badge) { badge.className = "badge bg-warning text-dark"; badge.textContent = "Saved Locally"; }
+      }
+    }
+
+    async function deleteOfferFromSheet(offerId) {
+      const sess = getAdminSessionObj();
+      if (!sess || sess.mode !== "sheet" || !APPS_SCRIPT_URL) return;
+      try {
+        await fetch(APPS_SCRIPT_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({ action: "deleteOffer", token: sess.token, offerId })
+        });
+      } catch (e) {}
+    }
+
+    async function pullOffersFromSheet() {
+      const sess = getAdminSessionObj();
+      const badge = document.getElementById("offerSheetSyncBadge");
+      if (!sess || sess.mode !== "sheet" || !APPS_SCRIPT_URL) {
+        if (badge) { badge.className = "badge bg-secondary"; badge.textContent = "Local Mode"; }
+        return;
+      }
+      try {
+        const res = await fetch(APPS_SCRIPT_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({ action: "getOffers" })
+        });
+        const r = await res.json();
+        if (r && r.ok && Array.isArray(r.offers) && r.offers.length > 0) {
+          saveOffersLocal(r.offers);
+          renderOffersTable();
+        }
+        if (badge) { badge.className = "badge bg-success"; badge.textContent = "Connected to Google Sheet ✓"; }
+      } catch (e) {}
+    }
+
+    function requestConfirmSaveOffer(e) {
+      e.preventDefault();
+      const editId = document.getElementById("editingOfferId").value.trim();
+      const type = document.getElementById("fOfferType").value;
+      const badge1 = document.getElementById("fOfferBadge1").value.trim();
+      const badge2 = document.getElementById("fOfferBadge2").value.trim();
+      const title = document.getElementById("fOfferTitle").value.trim();
+      const desc = document.getElementById("fOfferDesc").value.trim();
+      const targetCategory = document.getElementById("fOfferTargetCategory").value || "All";
+      const featuredGreen = document.getElementById("fOfferFeaturedGreen").checked;
+      const active = document.getElementById("fOfferActive").checked;
+
+      if (!badge1 || !title) {
+        alert("Please fill Badge 1 and Offer Title.");
+        return;
+      }
+
+      const isEdit = !!editId;
+      askOfferConfirm(
+        isEdit ? "Confirm Update Offer?" : "Confirm Add New Offer?",
+        isEdit
+          ? `Update offer <strong>"${escF(title)}"</strong>?`
+          : `Add new offer <strong>"${escF(title)}"</strong> to Home Page?`,
+        "btn-green",
+        isEdit ? "Yes, Update" : "Yes, Add Offer",
+        async () => {
+          const list = getOffersList();
+          const offerObj = {
+            id: editId || ("OFR-" + Date.now().toString().slice(-6)),
+            type,
+            badge1,
+            badge2: type === "card" ? badge2 : "",
+            title,
+            desc: type === "card" ? desc : "",
+            targetCategory: type === "card" ? targetCategory : "All",
+            featuredGreen: type === "card" ? featuredGreen : false,
+            active
+          };
+
+          if (editId) {
+            const idx = list.findIndex(x => x.id === editId);
+            if (idx > -1) list[idx] = offerObj;
+            else list.unshift(offerObj);
+          } else {
+            list.unshift(offerObj);
+          }
+
+          saveOffersLocal(list);
+          await syncOfferToSheet(offerObj);
+          resetOfferForm();
+          renderOffersTable();
+        }
+      );
+    }
+
+    function loadOfferForEdit(offerId) {
+      const item = getOffersList().find(x => x.id === offerId);
+      if (!item) return;
+
+      document.getElementById("editingOfferId").value = item.id;
+      document.getElementById("fOfferType").value = item.type || "card";
+      toggleOfferTypeFields();
+      document.getElementById("fOfferBadge1").value = item.badge1 || "";
+      document.getElementById("fOfferBadge2").value = item.badge2 || "";
+      document.getElementById("fOfferTitle").value = item.title || "";
+      document.getElementById("fOfferDesc").value = item.desc || "";
+      document.getElementById("fOfferTargetCategory").value = item.targetCategory || "All";
+      document.getElementById("fOfferFeaturedGreen").checked = !!item.featuredGreen;
+      document.getElementById("fOfferActive").checked = item.active !== false;
+
+      document.getElementById("offerFormHeader").innerHTML = `<i class="bi bi-pencil-square me-1 text-warning"></i> Update Offer: ${escF(item.id)}`;
+      document.getElementById("offerFormBadge").textContent = "EDITING";
+      document.getElementById("offerFormBadge").className = "badge bg-info text-dark";
+      document.getElementById("saveOfferBtn").innerHTML = `<i class="bi bi-check2-all me-1"></i> Update Offer`;
+      document.getElementById("cancelOfferEditBtn").classList.remove("d-none");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function requestConfirmDeleteOffer(offerId) {
+      const item = getOffersList().find(x => x.id === offerId);
+      if (!item) return;
+      askOfferConfirm(
+        "Confirm Delete Offer?",
+        `Delete offer <strong>"${escF(item.title)}"</strong> from Home Page?`,
+        "btn-danger",
+        "Yes, Delete",
+        async () => {
+          const updated = getOffersList().filter(x => x.id !== offerId);
+          saveOffersLocal(updated);
+          await deleteOfferFromSheet(offerId);
+          if (document.getElementById("editingOfferId").value === offerId) resetOfferForm();
+          renderOffersTable();
+        }
+      );
+    }
+
+    function restoreDefaultOffers() {
+      askOfferConfirm(
+        "Reset Default Offers?",
+        "Restore the original 3 marquee banners and 3 festive offer cards?",
+        "btn-warning",
+        "Yes, Reset",
+        async () => {
+          const defaults = JSON.parse(JSON.stringify(DEFAULT_STORE_OFFERS));
+          saveOffersLocal(defaults);
+          for (const ofr of defaults) {
+            await syncOfferToSheet(ofr);
+          }
+          renderOffersTable();
+        }
+      );
+    }
+
+    function resetOfferForm() {
+      document.getElementById("offerEditorForm").reset();
+      document.getElementById("editingOfferId").value = "";
+      document.getElementById("fOfferType").value = "card";
+      document.getElementById("fOfferActive").checked = true;
+      toggleOfferTypeFields();
+      document.getElementById("offerFormHeader").innerHTML = `<i class="bi bi-plus-circle me-1 text-warning"></i> Add New Offer / Banner`;
+      document.getElementById("offerFormBadge").textContent = "NEW";
+      document.getElementById("offerFormBadge").className = "badge bg-warning text-dark";
+      document.getElementById("saveOfferBtn").innerHTML = `<i class="bi bi-check-circle me-1"></i> Save &amp; Sync Offer`;
+      document.getElementById("cancelOfferEditBtn").classList.add("d-none");
+    }
+
+    function renderOffersTable() {
+      const list = getOffersList();
+      document.getElementById("adminTotalOffersCount").textContent = list.length;
+      const tbody = document.getElementById("adminOffersTableBody");
+      if (!tbody) return;
+
+      if (list.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-4 small">No offers configured yet.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = list.map(o => `
+        <tr>
+          <td>
+            <span class="badge ${o.type === "marquee" ? "bg-dark" : "bg-warning text-dark"}">
+              ${o.type === "marquee" ? "Marquee Strip" : "Offer Card"}
+            </span>
+          </td>
+          <td class="small">
+            <div class="fw-bold text-dark">${escF(o.title)}</div>
+            <div class="text-muted" style="font-size: 11px;">
+              <span class="badge bg-light text-dark border">${escF(o.badge1)}</span>
+              ${o.badge2 ? `<span class="badge bg-light text-dark border ms-1">${escF(o.badge2)}</span>` : ""}
+              ${o.type === "card" ? `<span class="ms-1">→ ${escF(o.targetCategory)}</span>` : ""}
+            </div>
+            ${o.desc ? `<div class="text-muted mt-1" style="font-size: 11px;">${escF(o.desc)}</div>` : ""}
+          </td>
+          <td>
+            <span class="badge ${o.active !== false ? "bg-success" : "bg-secondary"}">
+              ${o.active !== false ? "Active" : "Hidden"}
+            </span>
+          </td>
+          <td class="text-end text-nowrap">
+            <button type="button" class="btn btn-outline-primary btn-sm py-0 px-2 me-1" onclick="loadOfferForEdit('${escF(o.id)}')">
+              <i class="bi bi-pencil-square"></i> Edit
+            </button>
+            <button type="button" class="btn btn-outline-danger btn-sm py-0 px-2" onclick="requestConfirmDeleteOffer('${escF(o.id)}')">
+              <i class="bi bi-trash"></i>
+            </button>
+          </td>
+        </tr>
+      `).join("");
+    }
+
+    async function sha256HexLocal(text) {
+      const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+      return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+    }
+
+    async function submitOfferGateLogin(e) {
+      e.preventDefault();
+      const u = document.getElementById("offerGateUser").value.trim();
+      const p = document.getElementById("offerGatePass").value;
+      const err = document.getElementById("offerGateErr");
+      const btn = document.getElementById("offerGateBtn");
+      err.classList.add("d-none");
+      btn.disabled = true;
+      try {
+        if (typeof APPS_SCRIPT_URL !== "undefined" && APPS_SCRIPT_URL) {
+          const res = await fetch(APPS_SCRIPT_URL, {
+            method: "POST",
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify({ action: "adminLogin", username: u, password: p })
+          });
+          const r = await res.json();
+          if (!r.ok) {
+            err.textContent = "Invalid username or password.";
+            err.classList.remove("d-none");
+            return;
+          }
+          const sess = { mode: "sheet", token: r.token };
+          localStorage.setItem("riddhi_admin_session", JSON.stringify(sess));
+          sessionStorage.setItem("riddhi_admin_session", JSON.stringify(sess));
+        } else {
+          const h = await sha256HexLocal(u + ":" + p);
+          if (u !== ADMIN_USERNAME || h !== ADMIN_LOCAL_HASH) {
+            err.textContent = "Invalid username or password.";
+            err.classList.remove("d-none");
+            return;
+          }
+          const sess = { mode: "local" };
+          localStorage.setItem("riddhi_admin_session", JSON.stringify(sess));
+          sessionStorage.setItem("riddhi_admin_session", JSON.stringify(sess));
+        }
+        initOfferPage();
+      } catch (ex) {
+        err.textContent = "Login error.";
+        err.classList.remove("d-none");
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    function logoutOfferPage() {
+      localStorage.removeItem("riddhi_admin_session");
+      sessionStorage.removeItem("riddhi_admin_session");
+      window.location.reload();
+    }
+
+    function initOfferPage() {
+      const s = getAdminSessionObj();
+      if (!s) {
+        document.getElementById("offerLoginGate").classList.remove("d-none");
+        document.getElementById("offerWorkspace").classList.add("d-none");
+        document.getElementById("offerLogoutBtn").classList.add("d-none");
+        return;
+      }
+      document.getElementById("offerLoginGate").classList.add("d-none");
+      document.getElementById("offerWorkspace").classList.remove("d-none");
+      document.getElementById("offerLogoutBtn").classList.remove("d-none");
+      populateOfferCategoryDropdown();
+      toggleOfferTypeFields();
+      renderOffersTable();
+      pullOffersFromSheet();
+    }
+
+    document.addEventListener("DOMContentLoaded", initOfferPage);
+  </script>
+</body>
+</html>

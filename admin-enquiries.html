@@ -32,6 +32,8 @@
         <a href="admin-orders.html" class="btn btn-outline-warning btn-sm rounded-pill px-3">
           <i class="bi bi-people me-1"></i> Customer Order
         </a>
+        <a href="admin-offers.html" class="btn btn-outline-warning btn-sm rounded-pill px-3"><i class="bi bi-megaphone me-1"></i> Offers</a>
+        <a href="admin-categories.html" class="btn btn-outline-warning btn-sm rounded-pill px-3"><i class="bi bi-grid-fill me-1"></i> Shop by Category</a>
         <a href="admin-products.html" class="btn btn-outline-warning btn-sm rounded-pill px-3">
           <i class="bi bi-box-seam me-1"></i> Add/Edit/Delete Product
         </a>
@@ -112,13 +114,19 @@
       </div>
     </div>
 
+    <div id="adminLiveNotifBanner" class="alert alert-warning d-none d-flex flex-wrap justify-content-between align-items-center gap-2 py-2 px-3 mb-3 shadow-sm" style="border-radius: 12px; border: 1.5px solid var(--accent-gold);">
+      <div class="small fw-semibold text-dark" id="adminLiveNotifText">
+        <i class="bi bi-bell-fill text-danger me-1"></i> New updates received!
+      </div>
+      <button type="button" class="btn btn-dark btn-sm rounded-pill px-3 py-0" style="font-size: 11px;" onclick="dismissAdminLiveNotif()">Mark Seen</button>
+    </div>
     <div id="enqStatsSummaryBar" class="small fw-semibold mb-3 text-muted"></div>
     <div id="enqPageListContainer"></div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="js/data.js?v=18"></script>
-  <script src="js/app.js?v=18"></script>
+  <script src="js/data.js?v=34"></script>
+  <script src="js/app.js?v=34"></script>
   <script>
     function escE(v) {
       return String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -179,7 +187,7 @@
     function logoutEnqPage() {
       localStorage.removeItem("riddhi_admin_session");
       sessionStorage.removeItem("riddhi_admin_session");
-      window.location.href = "index.html";
+      window.location.reload();
     }
 
     function matchEnqDate(ts, bucket, customIso) {
@@ -217,6 +225,7 @@
       } else {
         try { adminEnquiries = JSON.parse(localStorage.getItem("riddhi_enquiries") || "[]"); } catch (e) { adminEnquiries = []; }
       }
+      updateAdminNotifBanner((adminOrders || []).length, (adminEnquiries || []).length);
       renderEnquiriesWorkspace();
     }
 
@@ -306,6 +315,31 @@
       }
 
       await loadEnquiriesPageData();
+    }
+
+    
+    function updateAdminNotifBanner(ordCnt, enqCnt) {
+      const seenOrd = Number(localStorage.getItem("riddhi_seen_orders_cnt") || 0);
+      const seenEnq = Number(localStorage.getItem("riddhi_seen_enquiries_cnt") || 0);
+      const newO = Math.max(0, (ordCnt || 0) - seenOrd);
+      const newE = Math.max(0, (enqCnt || 0) - seenEnq);
+      const banner = document.getElementById("adminLiveNotifBanner");
+      const txt = document.getElementById("adminLiveNotifText");
+      if (!banner || !txt) return;
+      if (newO > 0 || newE > 0) {
+        const parts = [];
+        if (newO > 0) parts.push(`${newO} New Order(s)`);
+        if (newE > 0) parts.push(`${newE} New Enquiry(ies)`);
+        txt.innerHTML = `<i class="bi bi-bell-fill text-danger me-1"></i> <strong>New Notification:</strong> ${parts.join(" & ")}!`;
+        banner.classList.remove("d-none");
+      } else {
+        banner.classList.add("d-none");
+      }
+    }
+    function dismissAdminLiveNotif() {
+      localStorage.setItem("riddhi_seen_orders_cnt", String((adminOrders || []).length));
+      localStorage.setItem("riddhi_seen_enquiries_cnt", String((adminEnquiries || []).length));
+      document.getElementById("adminLiveNotifBanner")?.classList.add("d-none");
     }
 
     document.addEventListener("DOMContentLoaded", initEnquiriesPage);

@@ -572,3 +572,159 @@ footer {
   background: #fff0f3;
   border-color: #f5c2c7;
 }
+
+
+/* ==========================================
+   MOBILE RESPONSIVE POLISH (PREVENT LAYOUT BREAKING)
+   ========================================== */
+html, body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+img, video, iframe {
+  max-width: 100%;
+}
+
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 576px) {
+  .offer-marquee-bar {
+    font-size: 11px;
+    padding: 5px 0;
+  }
+  .offer-marquee-item {
+    padding: 0 14px;
+    gap: 6px;
+  }
+  .navbar .container {
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+  .nav-right-slot {
+    gap: 5px !important;
+  }
+  .nav-right-slot .btn {
+    padding: 4px 7px !important;
+  }
+  .hero-section {
+    padding: 28px 10px 24px;
+  }
+  .hero-section h1.display-5 {
+    font-size: 1.55rem !important;
+    line-height: 1.25;
+  }
+  .offer-highlight-card {
+    padding: 13px 14px;
+  }
+  .offer-highlight-card h5 {
+    font-size: 1rem;
+  }
+  .product-card img {
+    height: 175px;
+  }
+  .media-main-box {
+    height: 255px;
+  }
+  .thumb-item {
+    width: 54px;
+    height: 54px;
+  }
+  .floating-cart {
+    bottom: 12px;
+    right: 12px;
+    padding: 8px 13px;
+    font-size: 12px;
+  }
+  .offcanvas {
+    max-width: 92vw !important;
+  }
+  .admin-top-bar .container {
+    flex-direction: column;
+    align-items: flex-start !important;
+  }
+  .admin-top-bar .btn {
+    font-size: 11px;
+    padding: 4px 10px;
+  }
+  .size-pill-badge {
+    font-size: 10.5px;
+    padding: 3px 6px;
+  }
+}
+
+
+/* ==========================================
+   MOBILE CARD VIEW FOR ADMIN TABLES (< 768px)
+   ========================================== */
+@media (max-width: 767.98px) {
+  .navbar-grid {
+    gap: 4px;
+  }
+  .section-title {
+    font-size: 1.25rem;
+  }
+  .card-footer-title {
+    font-size: 0.85rem;
+    padding: 8px 6px;
+  }
+  .product-card .p-2 {
+    padding: 8px !important;
+  }
+  .product-card h6.small {
+    font-size: 0.8rem;
+    line-height: 1.3;
+  }
+  .price-tag {
+    font-size: 0.92rem;
+  }
+
+  /* Transform Admin Tables into Full-Detail Stacked Cards on Mobile */
+  table.admin-mobile-cards thead {
+    display: none;
+  }
+  table.admin-mobile-cards,
+  table.admin-mobile-cards tbody,
+  table.admin-mobile-cards tr,
+  table.admin-mobile-cards td {
+    display: block;
+    width: 100%;
+  }
+  table.admin-mobile-cards tbody {
+    padding: 10px;
+    background-color: #fdfaf5;
+  }
+  table.admin-mobile-cards tr {
+    background: #ffffff;
+    border: 1.5px solid #eadbc8;
+    border-radius: 14px;
+    padding: 12px;
+    margin-bottom: 12px;
+    box-shadow: 0 3px 10px rgba(21, 50, 30, 0.06);
+  }
+  table.admin-mobile-cards td {
+    border: none !important;
+    padding: 5px 0 !important;
+    text-align: left !important;
+    white-space: normal !important;
+  }
+  table.admin-mobile-cards td:last-child {
+    border-top: 1px dashed #eadbc8 !important;
+    margin-top: 8px;
+    padding-top: 10px !important;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  table.admin-mobile-cards td:last-child .btn {
+    padding: 5px 14px !important;
+    font-size: 12px !important;
+  }
+  .table-responsive {
+    max-height: none !important;
+    overflow-x: visible !important;
+  }
+}

@@ -57,11 +57,26 @@
       </div>
       <div class="d-flex flex-wrap align-items-center gap-2">
         <span id="sheetSyncStatusBadge" class="badge bg-warning text-dark">Checking Sheet...</span>
-        <button type="button" class="btn btn-warning btn-sm rounded-pill px-3 fw-semibold text-dark" onclick="downloadUpdatedCatalogAndMediaBundle()">
-          <i class="bi bi-folder-symlink me-1"></i> Download Folder &amp; Data Bundle
+        <button type="button" class="btn btn-danger btn-sm rounded-pill px-3 fw-semibold" onclick="requestClearAllGoogleSheetData('sheetSyncStatusBadge')">
+          <i class="bi bi-trash3 me-1"></i> Clear Sheet Data
         </button>
-        <a href="index.html" class="btn btn-outline-warning btn-sm rounded-pill px-3">
-          <i class="bi bi-arrow-left me-1"></i> Back to Storefront
+        <button type="button" class="btn btn-warning btn-sm rounded-pill px-3 fw-semibold text-dark" onclick="downloadUpdatedCatalogAndMediaBundle()">
+          <i class="bi bi-folder-symlink me-1"></i> Download Bundle
+        </button>
+        <a href="admin-offers.html" class="btn btn-outline-warning btn-sm rounded-pill px-3">
+          <i class="bi bi-megaphone me-1"></i> Offers
+        </a>
+        <a href="admin-categories.html" class="btn btn-outline-warning btn-sm rounded-pill px-3">
+          <i class="bi bi-grid-fill me-1"></i> Categories
+        </a>
+        <a href="admin-orders.html" class="btn btn-outline-warning btn-sm rounded-pill px-3">
+          <i class="bi bi-people me-1"></i> Customer Order
+        </a>
+        <a href="admin-enquiries.html" class="btn btn-outline-warning btn-sm rounded-pill px-3">
+          <i class="bi bi-chat-dots me-1"></i> Customer Enquiry
+        </a>
+        <a href="index.html" class="btn btn-outline-light btn-sm rounded-pill px-3">
+          <i class="bi bi-arrow-left me-1"></i> Storefront
         </a>
         <button type="button" id="adminPageLogoutBtn" class="btn btn-outline-light btn-sm rounded-pill px-3 d-none" onclick="logoutFromAdminPage()">
           <i class="bi bi-box-arrow-right me-1"></i> Logout
@@ -111,6 +126,7 @@
           <div class="card-body p-3">
             <form id="productEditorForm" onsubmit="saveProductFromAdminPage(event)">
               <input type="hidden" id="editingOriginalId" value="">
+              <input type="hidden" id="editingOriginalCategory" value="">
 
               <!-- STEP 1: CATEGORY FIRST -> AUTO-GENERATED READ-ONLY PRODUCT ID -->
               <div class="row g-2 mb-2">
@@ -177,7 +193,7 @@
                 <input type="hidden" id="fProdImg3" value="">
               </div>
 
-              <!-- BROWSE VIDEO FROM DEVICE -->
+              <!-- BROWSE VIDEO FROM DEVICE + LIVE VIDEO PREVIEW -->
               <div class="p-2 rounded-3 border mb-2 bg-white">
                 <label class="form-label small fw-semibold mb-1">
                   <i class="bi bi-camera-video me-1 text-danger"></i>Product Video (Browse from Device - Optional)
@@ -185,6 +201,12 @@
                 <input type="file" id="fProdVideoFile" class="form-control form-control-sm" accept="video/mp4,video/*" onchange="handleDeviceVideoSelect(this)">
                 <input type="hidden" id="fProdVideo" value="">
                 <div id="videoFileStatus" class="small text-muted mt-1" style="font-size: 11px;">No video selected</div>
+                <div id="adminVideoPreviewWrap" class="mt-2 d-none position-relative rounded-3 overflow-hidden border" style="background:#000; height:170px;">
+                  <div id="adminVideoPreviewContainer" style="width:100%; height:100%;"></div>
+                  <button type="button" class="btn btn-danger btn-sm py-0 px-2 position-absolute top-0 end-0 m-1 rounded-pill" style="font-size:10px; z-index:5;" onclick="clearSelectedProductVideo()">
+                    <i class="bi bi-x-lg"></i> Remove Video
+                  </button>
+                </div>
               </div>
 
               <div class="mb-2">
@@ -219,6 +241,49 @@
             </form>
           </div>
         </div>
+
+        <!-- MANUAL CATEGORY-WISE STOCK ADD / UPDATE / DELETE CARD -->
+        <div class="card border-0 shadow-sm mt-3" style="border-radius: 16px; border: 1px solid #eadbc8 !important;">
+          <div class="card-header text-white py-2 px-3 d-flex justify-content-between align-items-center" style="background-color: var(--primary-green); border-radius: 15px 15px 0 0;">
+            <h6 class="brand-font m-0 fw-bold small">
+              <i class="bi bi-boxes me-1 text-warning"></i> Manual Category-Wise Stock Manager
+            </h6>
+            <button type="button" class="btn btn-danger btn-sm py-0 px-2 rounded-pill" style="font-size: 10.5px;" onclick="requestClearStockSheetOnly()">
+              <i class="bi bi-trash3 me-1"></i> Delete All Sheet Stock
+            </button>
+          </div>
+          <div class="card-body p-3">
+            <div class="row g-2 mb-2">
+              <div class="col-6">
+                <label class="form-label small fw-semibold mb-1">1. Category</label>
+                <select id="manualStockCatSel" class="form-select form-select-sm" onchange="onManualStockCategoryChange()"></select>
+              </div>
+              <div class="col-6">
+                <label class="form-label small fw-semibold mb-1">2. Product</label>
+                <select id="manualStockProdSel" class="form-select form-select-sm" onchange="onManualStockProductChange()"></select>
+              </div>
+            </div>
+            <div class="row g-2 mb-2 align-items-end">
+              <div class="col-6">
+                <label class="form-label small fw-semibold mb-1">3. Size</label>
+                <input type="text" id="manualStockSizeInput" class="form-control form-control-sm" list="manualStockSizesDatalist" placeholder="Free Size (Adjustable Dori)" value="Free Size (Adjustable Dori)">
+                <datalist id="manualStockSizesDatalist"></datalist>
+              </div>
+              <div class="col-6">
+                <label class="form-label small fw-semibold mb-1">4. Available Qty</label>
+                <input type="number" id="manualStockQtyInput" class="form-control form-control-sm" min="0" max="999" value="2">
+              </div>
+            </div>
+            <div class="d-flex gap-2 mt-2">
+              <button type="button" class="btn btn-green btn-sm flex-grow-1 rounded-pill fw-semibold" onclick="manualSaveCategoryStockRow()">
+                <i class="bi bi-plus-circle me-1"></i> Add / Update Stock
+              </button>
+              <button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3 fw-semibold" onclick="manualDeleteCategoryStockRow()">
+                <i class="bi bi-trash me-1"></i> Delete Stock
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- RIGHT COLUMN: ALL PRODUCTS LIST WITH QUICK SIZE/STOCK EDIT & DELETE -->
@@ -240,7 +305,7 @@
           </div>
           <div class="card-body p-0">
             <div class="table-responsive" style="max-height: 720px;">
-              <table class="table table-hover align-middle mb-0">
+              <table class="table table-hover align-middle mb-0 admin-mobile-cards">
                 <thead class="table-light small">
                   <tr>
                     <th>Product Details</th>
@@ -259,8 +324,27 @@
     </div>
   </div>
 
+  <!-- UNIVERSAL CONFIRMATION POPUP MODAL (FOR ADD / UPDATE / DELETE) -->
+  <div class="modal fade" id="prodActionConfirmModal" tabindex="-1" aria-hidden="true" style="z-index: 1090;">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+      <div class="modal-content" style="background-color: var(--cream-bg); border-radius: 16px; border: 2px solid var(--accent-gold);">
+        <div class="modal-header border-0 pb-1">
+          <h6 class="modal-title brand-font fw-bold" id="prodConfirmTitle" style="color: var(--primary-green);">Confirm Action</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body py-2 small" id="prodConfirmMessage">
+          Are you sure you want to proceed?
+        </div>
+        <div class="modal-footer border-0 pt-1 justify-content-center gap-2">
+          <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" data-bs-dismiss="modal">No, Cancel</button>
+          <button type="button" class="btn btn-green btn-sm rounded-pill px-4 fw-semibold" id="prodConfirmYesBtn">Yes, Confirm</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="js/data.js?v=18"></script>
+  <script src="js/data.js?v=34"></script>
   <script>
     const CATEGORY_PREFIX_MAP = {
       "Choker": "CHK",
@@ -280,6 +364,31 @@
       "Ring": "RNG"
     };
 
+    let prodConfirmModalInst = null;
+    let pendingProdConfirmFn = null;
+
+    function askProdConfirmation(title, msgHtml, btnClass, btnLabel, callbackFn) {
+      document.getElementById("prodConfirmTitle").textContent = title;
+      document.getElementById("prodConfirmMessage").innerHTML = msgHtml;
+      const yesBtn = document.getElementById("prodConfirmYesBtn");
+      yesBtn.className = `btn ${btnClass} btn-sm rounded-pill px-4 fw-semibold`;
+      yesBtn.textContent = btnLabel;
+      pendingProdConfirmFn = callbackFn;
+      if (!prodConfirmModalInst) {
+        prodConfirmModalInst = new bootstrap.Modal(document.getElementById("prodActionConfirmModal"));
+      }
+      prodConfirmModalInst.show();
+    }
+
+    document.getElementById("prodConfirmYesBtn").addEventListener("click", async function () {
+      if (prodConfirmModalInst) prodConfirmModalInst.hide();
+      if (typeof pendingProdConfirmFn === "function") {
+        const fn = pendingProdConfirmFn;
+        pendingProdConfirmFn = null;
+        await fn();
+      }
+    });
+
     function escHtml(v) {
       return String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
     }
@@ -288,8 +397,41 @@
       try { return JSON.parse((localStorage.getItem("riddhi_admin_session") || sessionStorage.getItem("riddhi_admin_session")) || "null"); } catch (e) { return null; }
     }
 
+    function getEffectiveCategories() {
+      let customCats = null;
+      try {
+        const raw = localStorage.getItem("riddhi_custom_categories_v1");
+        if (raw) customCats = JSON.parse(raw);
+      } catch (e) {}
+      const list = Array.isArray(customCats) && customCats.length > 0
+        ? customCats
+        : JSON.parse(JSON.stringify(CATEGORIES));
+      return list;
+    }
+
+    function refreshCategoryDropdownsInAdminProducts() {
+      const catSel = document.getElementById("fProdCategory");
+      const filterCatSel = document.getElementById("adminListCategoryFilter");
+      const list = getEffectiveCategories();
+
+      if (catSel) {
+        const prev = catSel.value;
+        catSel.innerHTML = list.map(c => `<option value="${escHtml(c.name)}">${escHtml(c.name)}</option>`).join("");
+        if (prev && list.some(c => c.name === prev)) catSel.value = prev;
+      }
+      if (filterCatSel) {
+        const prevF = filterCatSel.value || "All";
+        filterCatSel.innerHTML = `<option value="All">All Categories</option>` +
+          list.map(c => `<option value="${escHtml(c.name)}">${escHtml(c.name)}</option>`).join("");
+        filterCatSel.value = prevF;
+      }
+    }
+
     function generateNextProductIdForCategory(categoryName) {
-      const prefix = CATEGORY_PREFIX_MAP[categoryName] ||
+      const cats = getEffectiveCategories();
+      const matchedCat = cats.find(c => String(c.name).toLowerCase() === String(categoryName).toLowerCase());
+      const prefix = (matchedCat && matchedCat.prefix) ||
+        CATEGORY_PREFIX_MAP[categoryName] ||
         categoryName.replace(/[^A-Za-z]/g, "").toUpperCase().slice(0, 3).padEnd(3, "X");
 
       const list = getCatalogProducts();
@@ -324,7 +466,6 @@
       updateTargetFolderHint();
     }
 
-    // Compress browsed image into clean data URL so it saves smoothly in localStorage & displays across pages
     function handleDeviceImageSelect(inputEl, slotNum) {
       const file = inputEl.files && inputEl.files[0];
       if (!file) return;
@@ -362,13 +503,42 @@
       reader.readAsDataURL(file);
     }
 
+    function renderAdminVideoPreview(videoSrc) {
+      const wrap = document.getElementById("adminVideoPreviewWrap");
+      const box = document.getElementById("adminVideoPreviewContainer");
+      if (!wrap || !box) return;
+      const src = String(videoSrc || "").trim();
+      if (!src) {
+        box.innerHTML = "";
+        wrap.classList.add("d-none");
+        return;
+      }
+      wrap.classList.remove("d-none");
+      const driveMatch = src.match(/drive\.google\.com\/(?:file\/d\/|uc\?[^#]*id=)([A-Za-z0-9_-]+)/i);
+      if (driveMatch && driveMatch[1]) {
+        box.innerHTML = `<iframe src="https://drive.google.com/file/d/${driveMatch[1]}/preview" allow="autoplay; fullscreen" style="width:100%;height:100%;border:0;"></iframe>`;
+      } else {
+        box.innerHTML = `<video src="${escHtml(src)}" controls muted loop playsinline preload="metadata" style="width:100%;height:100%;object-fit:cover;"><source src="${escHtml(src)}" type="video/mp4"></video>`;
+      }
+    }
+
+    function clearSelectedProductVideo() {
+      document.getElementById("fProdVideo").value = "";
+      const fInp = document.getElementById("fProdVideoFile");
+      if (fInp) fInp.value = "";
+      document.getElementById("videoFileStatus").textContent = "No video selected";
+      renderAdminVideoPreview("");
+    }
+
     function handleDeviceVideoSelect(inputEl) {
       const file = inputEl.files && inputEl.files[0];
       const statusEl = document.getElementById("videoFileStatus");
       if (!file) return;
 
+      const blobUrl = URL.createObjectURL(file);
+      renderAdminVideoPreview(blobUrl);
+
       if (file.size > 4 * 1024 * 1024) {
-        // Store relative asset path hint if video is large (>4MB) so browser storage doesn't overflow
         const cat = document.getElementById("fProdCategory").value;
         const pid = document.getElementById("fProdId").value;
         const relPath = `assets/Categories/${cat}/${pid}/${file.name}`;
@@ -440,6 +610,14 @@
       localStorage.setItem("riddhi_product_stock", JSON.stringify(flatStockMap));
     }
 
+    function getLocalSaveEndpointBase() {
+      if (location.port === "5501") return "";
+      if (location.hostname === "localhost" || location.hostname === "127.0.0.1" || location.protocol === "file:") {
+        return "http://localhost:5501";
+      }
+      return null;
+    }
+
     async function syncSingleProductToGoogleSheet(prodObj) {
       const sess = getAdminSessionObj();
       const statusBadge = document.getElementById("sheetSyncStatusBadge");
@@ -456,20 +634,38 @@
         statusBadge.textContent = "Syncing to Sheet...";
       }
 
-      // Send images & video directly to Apps Script (which uploads data: base64 to public Google Drive and returns real https:// URLs)
+      const relToDataUrl = async (u) => {
+        const s = String(u || "").trim();
+        if (!s || s.startsWith("data:") || /^https?:\/\//i.test(s)) return s;
+        try {
+          const r = await fetch(s);
+          const b = await r.blob();
+          return await new Promise(res => {
+            const fr = new FileReader();
+            fr.onload = () => res(fr.result);
+            fr.onerror = () => res(s);
+            fr.readAsDataURL(b);
+          });
+        } catch (e) { return s; }
+      };
+
       try {
+        const resolvedImgs = await Promise.all((prodObj.images || []).map(relToDataUrl));
+        const resolvedVid = prodObj.video ? await relToDataUrl(prodObj.video) : "";
+        const payloadProd = { ...prodObj, images: resolvedImgs, video: resolvedVid };
+
         const res = await fetch(APPS_SCRIPT_URL, {
           method: "POST",
           headers: { "Content-Type": "text/plain;charset=utf-8" },
           body: JSON.stringify({
             action: "saveProduct",
             token: sess.token,
-            product: prodObj
+            product: payloadProd,
+            siteBaseUrl: window.location.href.split("#")[0].split("?")[0].replace(/\/[^\/]*$/, "")
           })
         });
         const r = await res.json();
         if (r && r.ok) {
-          // Update local catalog with the returned public Drive https:// image/video URLs so all devices stay identical!
           if (Array.isArray(r.products)) {
             const serverSaved = r.products.find(sp => sp.id === prodObj.id);
             if (serverSaved) {
@@ -533,7 +729,24 @@
         });
         const r = await res.json();
         if (r && r.ok) {
-          // Start fresh from default PRODUCTS + Google Sheet master so every device sees the exact same catalog!
+          // Sync Categories if returned
+          if (Array.isArray(r.categories) && r.categories.length > 0) {
+            const delCats = (Array.isArray(r.deletedCategoryNames) ? r.deletedCategoryNames : []).map(x => x.toLowerCase());
+            const mergedCats = getEffectiveCategories().filter(c => !delCats.includes(c.name.toLowerCase()));
+            r.categories.forEach(sc => {
+              if (!sc || !sc.name || delCats.includes(sc.name.toLowerCase())) return;
+              const ci = mergedCats.findIndex(m => m.name.toLowerCase() === sc.name.toLowerCase());
+              if (ci > -1) {
+                const keepCatImg = (mergedCats[ci].image && !mergedCats[ci].image.includes("Comming-Soon.png")) ? mergedCats[ci].image : sc.image;
+                mergedCats[ci] = { ...mergedCats[ci], ...sc, image: keepCatImg };
+              } else {
+                mergedCats.push(sc);
+              }
+            });
+            localStorage.setItem("riddhi_custom_categories_v1", JSON.stringify(mergedCats));
+            refreshCategoryDropdownsInAdminProducts();
+          }
+
           const localList = JSON.parse(JSON.stringify(PRODUCTS));
           const deletedIds = Array.isArray(r.deletedIds) ? r.deletedIds : [];
           if (deletedIds.length > 0) {
@@ -546,7 +759,8 @@
               if (!sp || !sp.id || deletedIds.includes(sp.id)) return;
               const idx = localList.findIndex(lp => lp.id === sp.id);
               if (idx > -1) {
-                localList[idx] = { ...localList[idx], ...sp };
+                const keepImgs = (localList[idx].images && localList[idx].images.length && !localList[idx].images.every(u => String(u).includes("Comming-Soon.png"))) ? localList[idx].images : sp.images;
+                localList[idx] = { ...localList[idx], ...sp, images: keepImgs };
               } else {
                 localList.unshift(sp);
               }
@@ -619,7 +833,8 @@
             errBox.classList.remove("d-none");
             return;
           }
-          localStorage.setItem("riddhi_admin_session", JSON.stringify({ mode: "sheet", token: r.token })); sessionStorage.setItem("riddhi_admin_session", JSON.stringify({ mode: "sheet", token: r.token }));
+          localStorage.setItem("riddhi_admin_session", JSON.stringify({ mode: "sheet", token: r.token }));
+          sessionStorage.setItem("riddhi_admin_session", JSON.stringify({ mode: "sheet", token: r.token }));
         } else {
           const h = await sha256HexLocal(username + ":" + password);
           if (username !== ADMIN_USERNAME || h !== ADMIN_LOCAL_HASH) {
@@ -627,7 +842,8 @@
             errBox.classList.remove("d-none");
             return;
           }
-          localStorage.setItem("riddhi_admin_session", JSON.stringify({ mode: "local" })); sessionStorage.setItem("riddhi_admin_session", JSON.stringify({ mode: "local" }));
+          localStorage.setItem("riddhi_admin_session", JSON.stringify({ mode: "local" }));
+          sessionStorage.setItem("riddhi_admin_session", JSON.stringify({ mode: "local" }));
         }
         checkAdminAuth();
       } catch (err) {
@@ -639,19 +855,170 @@
     }
 
     function logoutFromAdminPage() {
-      localStorage.removeItem("riddhi_admin_session"); sessionStorage.removeItem("riddhi_admin_session");
-      window.location.href = "index.html";
+      localStorage.removeItem("riddhi_admin_session");
+      sessionStorage.removeItem("riddhi_admin_session");
+      window.location.reload();
+    }
+
+
+    function initManualStockManagerUI() {
+      const catSel = document.getElementById("manualStockCatSel");
+      if (!catSel) return;
+      const cats = getEffectiveCategories();
+      catSel.innerHTML = cats.map(c => `<option value="${escHtml(c.name)}">${escHtml(c.name)}</option>`).join("");
+      onManualStockCategoryChange();
+    }
+
+    function onManualStockCategoryChange() {
+      const catSel = document.getElementById("manualStockCatSel");
+      const prodSel = document.getElementById("manualStockProdSel");
+      if (!catSel || !prodSel) return;
+      const cat = catSel.value;
+      const prods = getCatalogProducts().filter(p => String(p.category || "").toLowerCase() === String(cat).toLowerCase());
+      if (prods.length === 0) {
+        prodSel.innerHTML = `<option value="">No products in ${escHtml(cat)}</option>`;
+        return;
+      }
+      prodSel.innerHTML = prods.map(p => `<option value="${escHtml(p.id)}">${escHtml(p.name)} (${escHtml(p.id)})</option>`).join("");
+      onManualStockProductChange();
+    }
+
+    function onManualStockProductChange() {
+      const prodSel = document.getElementById("manualStockProdSel");
+      const szInp = document.getElementById("manualStockSizeInput");
+      const dl = document.getElementById("manualStockSizesDatalist");
+      const qtyInp = document.getElementById("manualStockQtyInput");
+      if (!prodSel || !szInp) return;
+      const prod = getCatalogProducts().find(p => p.id === prodSel.value);
+      if (!prod) return;
+      const entries = Object.entries(prod.sizeStock || {});
+      if (dl) {
+        dl.innerHTML = entries.map(([sz]) => `<option value="${escHtml(sz)}">`).join("");
+      }
+      if (entries.length > 0) {
+        szInp.value = entries[0][0];
+        if (qtyInp) qtyInp.value = entries[0][1];
+      } else {
+        szInp.value = "Free Size (Adjustable Dori)";
+        if (qtyInp) qtyInp.value = prod.availableStock || 0;
+      }
+    }
+
+    async function manualSaveCategoryStockRow() {
+      const prodId = document.getElementById("manualStockProdSel")?.value;
+      const size = (document.getElementById("manualStockSizeInput")?.value || "Free Size (Adjustable Dori)").trim();
+      const qty = Math.max(0, parseInt(document.getElementById("manualStockQtyInput")?.value, 10) || 0);
+      if (!prodId || !size) {
+        alert("Please select a product and enter size.");
+        return;
+      }
+      const list = getCatalogProducts();
+      const prod = list.find(p => p.id === prodId);
+      if (!prod) return;
+      if (!prod.sizeStock || typeof prod.sizeStock !== "object") prod.sizeStock = {};
+      prod.sizeStock[size] = qty;
+      prod.sizes = Object.keys(prod.sizeStock);
+      prod.availableStock = Object.values(prod.sizeStock).reduce((s, v) => s + (Math.max(0, parseInt(v, 10) || 0)), 0);
+      saveCatalogLocalOnly(list);
+      renderAdminProductsTable();
+
+      const sess = getAdminSessionObj();
+      if (sess && sess.mode === "sheet" && APPS_SCRIPT_URL) {
+        try {
+          await fetch(APPS_SCRIPT_URL, {
+            method: "POST",
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify({
+              action: "setStock",
+              token: sess.token,
+              productId: prod.id,
+              productName: prod.name,
+              category: prod.category,
+              size,
+              image: (prod.images && prod.images[0]) || "",
+              stock: qty,
+              siteBaseUrl: window.location.href.split("#")[0].split("?")[0].replace(/\/[^\/]*$/, "")
+            })
+          });
+        } catch (e) {}
+      }
+      alert(`Stock updated: ${prod.name} [${size}] = ${qty} pcs`);
+    }
+
+    async function manualDeleteCategoryStockRow() {
+      const prodId = document.getElementById("manualStockProdSel")?.value;
+      const size = (document.getElementById("manualStockSizeInput")?.value || "").trim();
+      if (!prodId || !size) {
+        alert("Please select a product and size to delete.");
+        return;
+      }
+      const list = getCatalogProducts();
+      const prod = list.find(p => p.id === prodId);
+      if (!prod) return;
+
+      askProdConfirmation(
+        "Delete Stock Entry?",
+        `Delete stock for <strong>${escHtml(prod.name)}</strong> (Size: <strong>${escHtml(size)}</strong>) from Stock tab?`,
+        "btn-danger",
+        "Yes, Delete Stock",
+        async () => {
+          if (prod.sizeStock && Object.prototype.hasOwnProperty.call(prod.sizeStock, size)) {
+            delete prod.sizeStock[size];
+            if (Object.keys(prod.sizeStock).length === 0) {
+              prod.sizeStock["Free Size (Adjustable Dori)"] = 0;
+            }
+            prod.sizes = Object.keys(prod.sizeStock);
+            prod.availableStock = Object.values(prod.sizeStock).reduce((s, v) => s + (Math.max(0, parseInt(v, 10) || 0)), 0);
+            saveCatalogLocalOnly(list);
+            renderAdminProductsTable();
+          }
+          const sess = getAdminSessionObj();
+          if (sess && sess.mode === "sheet" && APPS_SCRIPT_URL) {
+            try {
+              await fetch(APPS_SCRIPT_URL, {
+                method: "POST",
+                headers: { "Content-Type": "text/plain;charset=utf-8" },
+                body: JSON.stringify({ action: "deleteStockRow", token: sess.token, productId: prodId, size })
+              });
+            } catch (e) {}
+          }
+        }
+      );
+    }
+
+    function requestClearStockSheetOnly() {
+      askProdConfirmation(
+        "Delete All Google Sheet Stock Data?",
+        "This will delete all rows in the <strong>Stock</strong> tab of Google Sheet (keeping headers intact) so you can add stock manually category-wise. Continue?",
+        "btn-danger",
+        "Yes, Delete Stock Data",
+        async () => {
+          const sess = getAdminSessionObj();
+          const badge = document.getElementById("sheetSyncStatusBadge");
+          if (!sess || sess.mode !== "sheet" || !APPS_SCRIPT_URL) {
+            alert("Not connected to Google Sheet.");
+            return;
+          }
+          if (badge) { badge.className = "badge bg-info text-dark"; badge.textContent = "Clearing Stock Tab..."; }
+          try {
+            const res = await fetch(APPS_SCRIPT_URL, {
+              method: "POST",
+              headers: { "Content-Type": "text/plain;charset=utf-8" },
+              body: JSON.stringify({ action: "clearStockData", token: sess.token })
+            });
+            const r = await res.json();
+            if (r && r.ok) {
+              if (badge) { badge.className = "badge bg-success"; badge.textContent = "Stock Tab Cleared ✓"; }
+              alert("Google Sheet ke Stock tab ka saara data delete ho gaya hai! Ab aap niche Manual Category-Wise Stock Manager se stock add/update/delete kar sakte hain.");
+            }
+          } catch (e) {}
+        }
+      );
     }
 
     function initAdminPageUI() {
-      const catSel = document.getElementById("fProdCategory");
-      const filterCatSel = document.getElementById("adminListCategoryFilter");
-      if (catSel && catSel.options.length === 0) {
-        CATEGORIES.forEach(c => {
-          catSel.innerHTML += `<option value="${escHtml(c.name)}">${escHtml(c.name)}</option>`;
-          filterCatSel.innerHTML += `<option value="${escHtml(c.name)}">${escHtml(c.name)}</option>`;
-        });
-      }
+      refreshCategoryDropdownsInAdminProducts();
+      initManualStockManagerUI();
       resetProductForm();
       renderAdminProductsTable();
     }
@@ -688,6 +1055,7 @@
     function resetProductForm() {
       document.getElementById("productEditorForm").reset();
       document.getElementById("editingOriginalId").value = "";
+      document.getElementById("editingOriginalCategory").value = "";
       document.getElementById("fProdId").readOnly = true;
       document.getElementById("fProdNewArrival").checked = true;
 
@@ -701,6 +1069,7 @@
       });
       document.getElementById("fProdVideo").value = "";
       document.getElementById("videoFileStatus").textContent = "No video selected";
+      renderAdminVideoPreview("");
 
       document.getElementById("dynamicSizesContainer").innerHTML = "";
       appendSizeStockRow("Free Size (Adjustable Dori)", 2);
@@ -709,13 +1078,14 @@
       document.getElementById("editorModeBadge").textContent = "NEW";
       document.getElementById("editorModeBadge").className = "badge bg-warning text-dark";
       document.getElementById("saveProdSubmitBtn").innerHTML = `<i class="bi bi-cloud-check me-1"></i> Save &amp; Sync to Google Sheet`;
+      document.getElementById("cancelCatEditBtn")?.classList.add("d-none");
       document.getElementById("cancelEditModeBtn").classList.add("d-none");
 
       onCategorySelectAutoId();
       updateTargetFolderHint();
     }
 
-    async function saveProductFromAdminPage(e) {
+    function saveProductFromAdminPage(e) {
       e.preventDefault();
       const origId = document.getElementById("editingOriginalId").value.trim();
       const category = document.getElementById("fProdCategory").value;
@@ -760,6 +1130,21 @@
         return;
       }
 
+      const isEdit = !!origId;
+      askProdConfirmation(
+        isEdit ? "Confirm Update Product?" : "Confirm Add New Product?",
+        isEdit
+          ? `Are you sure you want to update <strong>"${escHtml(name)}" (${escHtml(id)})</strong> in category <strong>${escHtml(category)}</strong>?`
+          : `Are you sure you want to add new product <strong>"${escHtml(name)}" (${escHtml(id)})</strong> in category <strong>${escHtml(category)}</strong>?`,
+        "btn-green",
+        isEdit ? "Yes, Update Product" : "Yes, Add Product",
+        async () => {
+          await executeSaveProductFromAdminPage(origId, id, category, name, price, actualPrice, isNewArrival, imgs, video, desc, sizes, sizeStock, totalStock);
+        }
+      );
+    }
+
+    async function executeSaveProductFromAdminPage(origId, id, category, name, price, actualPrice, isNewArrival, imgs, video, desc, sizes, sizeStock, totalStock) {
       const list = getCatalogProducts();
       let savedProductObj = null;
 
@@ -804,52 +1189,113 @@
       saveCatalogLocalOnly(list);
       const btn = document.getElementById("saveProdSubmitBtn");
       btn.disabled = true;
-      btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span>Syncing Google Sheet...`;
+      btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span>Saving Folder &amp; Syncing Sheet...`;
 
-      if (location.hostname === "localhost" || location.hostname === "127.0.0.1") {
+      // Keep original base64/URL payload for Google Drive & Google Sheet upload!
+      const sheetPayloadProd = JSON.parse(JSON.stringify(savedProductObj));
+
+      // 1. Write real folder assets/Categories/<Category>/<ProductID>/ & image files if local server is running
+      const localBase = getLocalSaveEndpointBase();
+      let localFolderSaved = false;
+      if (localBase !== null) {
         try {
-          const localRes = await fetch("/api/save-product-assets", {
+          const localRes = await fetch(`${localBase}/api/save-product-assets`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               category: savedProductObj.category,
+              oldCategory: document.getElementById("editingOriginalCategory")?.value || "",
               productId: savedProductObj.id,
               images: savedProductObj.images,
-              video: savedProductObj.video
+              video: savedProductObj.video,
+              allProducts: list,
+              allCategories: getEffectiveCategories()
             })
           });
           const localJson = await localRes.json();
           if (localJson && localJson.ok) {
+            localFolderSaved = true;
             savedProductObj.images = localJson.images.length ? localJson.images : savedProductObj.images;
             savedProductObj.video = localJson.video || savedProductObj.video;
             saveCatalogLocalOnly(list);
           }
         } catch (err) {}
       }
-      await syncSingleProductToGoogleSheet(savedProductObj);
+
+      // 2. Sync to Google Sheet + Google Drive using original image/video data so =IMAGE() & URLs always populate!
+      await syncSingleProductToGoogleSheet(sheetPayloadProd);
 
       btn.disabled = false;
       resetProductForm();
       renderAdminProductsTable();
-      alert(origId
-        ? `Product "${name}" (${id}) & sizes updated & synced to Google Sheet!`
-        : `New product "${name}" (${id}) added & synced to Google Sheet!`
-      );
+
+      if (localBase !== null && !localFolderSaved) {
+        alert(
+          `Product "${name}" (${id}) Google Sheet mein save ho gaya hai!\n\n` +
+          `Note: Local hard drive par folder (assets/Categories/${category}/${id}/) banane ke liye pehle project folder mein "START-LOCAL-SERVER.bat" (ya "node local-save-server.js") double-click karke chalu karein.`
+        );
+      } else {
+        alert(origId
+          ? `Product "${name}" (${id}) & folder assets updated & synced!`
+          : `New product "${name}" (${id}) & folder assets created & synced!`
+        );
+      }
     }
 
-    function loadProductForEdit(prodId) {
+    async function loadProductForEdit(prodId) {
+      refreshCategoryDropdownsInAdminProducts();
+      const sess = getAdminSessionObj();
+      if (sess && sess.mode === "sheet" && APPS_SCRIPT_URL) {
+        try {
+          const r = await fetch(APPS_SCRIPT_URL, {
+            method: "POST",
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify({ action: "getProducts" })
+          });
+          const data = await r.json();
+          if (data && data.ok && Array.isArray(data.products)) {
+            const srvProd = data.products.find(x => x.id === prodId);
+            if (srvProd) {
+              const curList = getCatalogProducts();
+              const idx = curList.findIndex(x => x.id === prodId);
+              if (idx > -1) {
+                curList[idx] = { ...curList[idx], ...srvProd };
+                saveCatalogLocalOnly(curList);
+              }
+            }
+          }
+        } catch (e) {}
+      }
       const list = getCatalogProducts();
       const prod = list.find(p => p.id === prodId);
       if (!prod) return;
 
       document.getElementById("editingOriginalId").value = prod.id;
-      document.getElementById("fProdCategory").value = prod.category;
+      document.getElementById("editingOriginalCategory").value = prod.category || "";
+
+      const catSel = document.getElementById("fProdCategory");
+      const targetCat = String(prod.category || "").trim();
+      let matchedOpt = Array.from(catSel.options).find(
+        opt => opt.value.trim().toLowerCase() === targetCat.toLowerCase()
+      );
+      if (!matchedOpt && targetCat) {
+        const extraOpt = document.createElement("option");
+        extraOpt.value = targetCat;
+        extraOpt.textContent = targetCat;
+        catSel.appendChild(extraOpt);
+        matchedOpt = extraOpt;
+      }
+      if (matchedOpt) {
+        catSel.value = matchedOpt.value;
+      }
+
       document.getElementById("fProdId").value = prod.id;
       document.getElementById("fProdId").readOnly = true;
       document.getElementById("fProdName").value = prod.name;
       document.getElementById("fProdPrice").value = prod.price;
       document.getElementById("fProdActualPrice").value = prod.actualPrice || "";
       document.getElementById("fProdNewArrival").checked = !!prod.isNewArrival;
+      updateTargetFolderHint();
 
       [1, 2, 3].forEach(n => {
         const val = (prod.images && prod.images[n - 1]) || "";
@@ -867,9 +1313,10 @@
       });
 
       document.getElementById("fProdVideo").value = prod.video || "";
-      document.getElementById("videoFileStatus").textContent = prod.video
-        ? "Existing video attached (browse new file to replace)"
+      document.getElementById("videoFileStatus").innerHTML = prod.video
+        ? `<span class="text-success fw-semibold"><i class="bi bi-camera-video-fill me-1"></i>Existing video loaded</span> (browse new file to replace)`
         : "No video selected";
+      renderAdminVideoPreview(prod.video || "");
       document.getElementById("fProdDesc").value = prod.desc || "";
 
       const szContainer = document.getElementById("dynamicSizesContainer");
@@ -888,34 +1335,42 @@
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
 
-    async function deleteEntireProduct(prodId) {
+    function deleteEntireProduct(prodId) {
       const list = getCatalogProducts();
       const prod = list.find(p => p.id === prodId);
       if (!prod) return;
-      if (!confirm(`Delete "${prod.name}" (${prod.id}) completely from your store & Google Sheet?`)) return;
 
-      const updated = list.filter(p => p.id !== prodId);
-      saveCatalogLocalOnly(updated);
-      if ((location.hostname === "localhost" || location.hostname === "127.0.0.1") && prod) {
-        try {
-          await fetch("/api/delete-product-assets", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ category: prod.category, productId: prodId })
-          });
-        } catch (err) {}
-      }
-      await deleteProductFromGoogleSheet(prodId);
+      askProdConfirmation(
+        "Confirm Delete Product?",
+        `Are you sure you want to permanently delete <strong>"${escHtml(prod.name)}" (${escHtml(prod.id)})</strong> from your store, local folder &amp; Google Sheet?`,
+        "btn-danger",
+        "Yes, Delete Product",
+        async () => {
+          const updated = getCatalogProducts().filter(p => p.id !== prodId);
+          saveCatalogLocalOnly(updated);
+          const localBase = getLocalSaveEndpointBase();
+          if (localBase !== null && prod) {
+            try {
+              await fetch(`${localBase}/api/delete-product-assets`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ category: prod.category, productId: prodId, allProducts: updated, allCategories: getEffectiveCategories() })
+              });
+            } catch (err) {}
+          }
+          await deleteProductFromGoogleSheet(prodId);
 
-      if (document.getElementById("editingOriginalId").value === prodId) {
-        resetProductForm();
-      } else {
-        onCategorySelectAutoId();
-      }
-      renderAdminProductsTable();
+          if (document.getElementById("editingOriginalId").value === prodId) {
+            resetProductForm();
+          } else {
+            onCategorySelectAutoId();
+          }
+          renderAdminProductsTable();
+        }
+      );
     }
 
-    async function deleteSizeFromProduct(prodId, sizeName) {
+    function deleteSizeFromProduct(prodId, sizeName) {
       const list = getCatalogProducts();
       const prod = list.find(p => p.id === prodId);
       if (!prod || !prod.sizeStock) return;
@@ -925,14 +1380,24 @@
         return;
       }
 
-      if (!confirm(`Remove size "${sizeName}" from ${prod.name}?`)) return;
-      delete prod.sizeStock[sizeName];
-      prod.sizes = Object.keys(prod.sizeStock);
-      prod.availableStock = Object.values(prod.sizeStock).reduce((s, v) => s + (Math.max(0, parseInt(v, 10) || 0)), 0);
+      askProdConfirmation(
+        "Confirm Delete Size?",
+        `Are you sure you want to remove size <strong>"${escHtml(sizeName)}"</strong> from <strong>${escHtml(prod.name)}</strong>?`,
+        "btn-danger",
+        "Yes, Remove Size",
+        async () => {
+          const freshList = getCatalogProducts();
+          const target = freshList.find(p => p.id === prodId);
+          if (!target || !target.sizeStock) return;
+          delete target.sizeStock[sizeName];
+          target.sizes = Object.keys(target.sizeStock);
+          target.availableStock = Object.values(target.sizeStock).reduce((s, v) => s + (Math.max(0, parseInt(v, 10) || 0)), 0);
 
-      saveCatalogLocalOnly(list);
-      await syncSingleProductToGoogleSheet(prod);
-      renderAdminProductsTable();
+          saveCatalogLocalOnly(freshList);
+          await syncSingleProductToGoogleSheet(target);
+          renderAdminProductsTable();
+        }
+      );
     }
 
     function renderAdminProductsTable() {
@@ -974,7 +1439,10 @@
                   <div class="text-muted" style="font-size: 11px;">
                     <span class="badge bg-light text-dark border">${escHtml(p.id)}</span>
                     <span class="ms-1">${escHtml(p.category)}</span>
-                    ${p.isNewArrival ? `<span class="badge bg-warning text-dark ms-1" style="font-size:9px;">NEW</span>` : ""}
+                    <label class="form-check form-switch d-inline-flex align-items-center gap-1 ms-2 mb-0" style="vertical-align: middle; cursor: pointer;" title="Toggle New Arrival on Home Page">
+                      <input class="form-check-input m-0" type="checkbox" ${p.isNewArrival ? "checked" : ""} onchange="quickToggleNewArrival('${escHtml(p.id)}', this.checked)">
+                      <span class="badge ${p.isNewArrival ? "bg-warning text-dark" : "bg-light text-muted border"}" style="font-size:9px;">NEW ARRIVAL</span>
+                    </label>
                   </div>
                 </div>
               </div>
@@ -996,7 +1464,6 @@
         `;
       }).join("");
     }
-
 
     // Pure JS ZIP creator for downloading assets/Categories/<Cat>/<ID>/ media + updated data.js
     const CRC_TABLE = (() => {
@@ -1141,6 +1608,137 @@
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
+    }
+
+    async function pushAllCodeDataToGoogleSheet() {
+      const badge = document.getElementById("sheetSyncStatusBadge");
+      if (!APPS_SCRIPT_URL) {
+        alert("APPS_SCRIPT_URL is not configured in js/data.js");
+        return;
+      }
+      if (badge) { badge.className = "badge bg-info text-dark"; badge.textContent = "Syncing Code to Sheet..."; }
+      try {
+        const catsList = getEffectiveCategories();
+        const prodsList = getCatalogProducts();
+        const baseHref = window.location.href.split("#")[0].split("?")[0];
+        const toFull = u => (!u || /^https?:\/\//i.test(u) || u.startsWith("data:")) ? u : encodeURI(new URL(u, baseHref).href);
+
+        const masterCategories = catsList.map(c => ({
+          name: c.name,
+          prefix: c.prefix || c.name.replace(/[^A-Za-z]/g, "").toUpperCase().slice(0, 3).padEnd(3, "X"),
+          image: toFull(c.image || "assets/Categories/Comming-Soon.png")
+        }));
+
+        const masterProducts = prodsList.map(p => ({
+          id: p.id,
+          category: p.category,
+          name: p.name,
+          price: p.price,
+          actualPrice: p.actualPrice || 0,
+          isNewArrival: !!p.isNewArrival,
+          images: (p.images || []).map(toFull),
+          video: p.video ? toFull(p.video) : "",
+          desc: p.desc || "",
+          sizes: p.sizes || ["Free Size (Adjustable Dori)"],
+          sizeStock: p.sizeStock || { "Free Size (Adjustable Dori)": Math.max(0, parseInt(p.availableStock, 10) || 0) },
+          availableStock: Math.max(0, parseInt(p.availableStock, 10) || 0)
+        }));
+
+        const stockRows = [];
+        masterProducts.forEach(p => {
+          Object.entries(p.sizeStock || {}).forEach(([sz, st]) => {
+            stockRows.push({
+              id: p.id,
+              category: p.category,
+              name: p.name,
+              size: sz,
+              image: (p.images && p.images[0]) || "",
+              availableStock: Math.max(0, parseInt(st, 10) || 0)
+            });
+          });
+        });
+
+        const res = await fetch(APPS_SCRIPT_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({
+            action: "syncCatalog",
+            products: stockRows,
+            masterProducts,
+            masterCategories
+          })
+        });
+        const r = await res.json();
+        if (r && r.ok) {
+          if (badge) { badge.className = "badge bg-success"; badge.textContent = "All Code Data Synced ✓"; }
+          alert("All Categories, Products & Stock from your code have been synced to Google Sheet!");
+        } else {
+          if (badge) { badge.className = "badge bg-danger"; badge.textContent = "Sync Failed"; }
+        }
+      } catch (err) {
+        if (badge) { badge.className = "badge bg-danger"; badge.textContent = "Sync Error"; }
+      }
+    }
+
+    async function quickToggleNewArrival(prodId, isChecked) {
+      const list = getCatalogProducts();
+      const target = list.find(p => p.id === prodId);
+      if (!target) return;
+      target.isNewArrival = !!isChecked;
+      saveCatalogLocalOnly(list);
+      renderAdminProductsTable();
+
+      const sess = getAdminSessionObj();
+      const statusBadge = document.getElementById("sheetSyncStatusBadge");
+      if (sess && sess.mode === "sheet" && APPS_SCRIPT_URL) {
+        if (statusBadge) { statusBadge.className = "badge bg-info text-dark"; statusBadge.textContent = "Updating New Arrival..."; }
+        try {
+          const res = await fetch(APPS_SCRIPT_URL, {
+            method: "POST",
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify({ action: "toggleNewArrival", token: sess.token, productId: prodId, isNewArrival: !!isChecked })
+          });
+          const r = await res.json();
+          if (r && r.ok && statusBadge) {
+            statusBadge.className = "badge bg-success";
+            statusBadge.textContent = "New Arrival Synced ✓";
+          }
+        } catch (e) {}
+      }
+    }
+
+    function requestClearAllGoogleSheetData(badgeId) {
+      askProdConfirmation(
+        "Clear ALL Google Sheet Data?",
+        "This will permanently delete all rows in <strong>Products, Categories, Stock, Orders, Enquiry &amp; Offers</strong> tabs in Google Sheet (keeping headers intact). Continue?",
+        "btn-danger",
+        "Yes, Clear Sheet Data",
+        async () => {
+          const sess = getAdminSessionObj();
+          const badge = document.getElementById(badgeId);
+          if (!sess || sess.mode !== "sheet" || !APPS_SCRIPT_URL) {
+            alert("Not connected to Google Sheet.");
+            return;
+          }
+          if (badge) { badge.className = "badge bg-info text-dark"; badge.textContent = "Clearing Sheet..."; }
+          try {
+            const res = await fetch(APPS_SCRIPT_URL, {
+              method: "POST",
+              headers: { "Content-Type": "text/plain;charset=utf-8" },
+              body: JSON.stringify({ action: "clearAllSheetData", token: sess.token })
+            });
+            const r = await res.json();
+            if (r && r.ok) {
+              if (badge) { badge.className = "badge bg-success"; badge.textContent = "Sheet Cleared ✓"; }
+              alert("Google Sheet ka saara data clear ho gaya hai! Ab aap admin panel se manually categories aur products add kar sakte hain.");
+            } else {
+              if (badge) { badge.className = "badge bg-danger"; badge.textContent = "Clear Failed"; }
+            }
+          } catch (err) {
+            if (badge) { badge.className = "badge bg-danger"; badge.textContent = "Error"; }
+          }
+        }
+      );
     }
 
     document.addEventListener("DOMContentLoaded", checkAdminAuth);

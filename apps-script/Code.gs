@@ -1,28 +1,33 @@
 /**
- * Jewellery by Riddhi - Google Sheet Orders, Stock, Products Master, Drive Media & Enquiry Backend
- *
- * Tabs managed automatically:
- *  1) "Orders"   -> Timestamp, Order ID, Date, Name, Mobile, Address, City, Pincode, Product ID, Category, Product Name, Size, Quantity, Customization Note, Total (INR), Items JSON, Image 1, Image 2, Image 3, Image Links, Status, Status Updated, Cancel Reason
- *  2) "Stock"    -> Date, Product ID, Category, Product Name, Size, Image, Total Quantity, Available Quantity, Sale Hui Quantity, Last Updated
- *  3) "Enquiry"  -> Timestamp, Enquiry ID, Date, Customer Name, Mobile, Product ID, Category, Product Name, Size, Available Stock, Requested Quantity, Extra Needed Qty, Customization Note, Image, Status
- *  4) "Products" -> Product ID, Category, Product Name, Offer Price (INR), Actual Price (INR), New Arrival, Sizes & Stock JSON, Total Available Stock, Description, Image Preview, Image 1 URL, Image 2 URL, Image 3 URL, Video URL, Last Updated
+ * Jewellery by Riddhi - Google Sheet Orders, Stock, Products Master, Categories, Offers, Drive Media & Enquiry Backend
  */
 
 // ====== SIRF YE 2 LINES BADLEIN ======
-const ADMIN_USERNAME = 'Riddhi';
-const ADMIN_PASSWORD = 'Riddhi@2026';   // <-- deploy karne se pehle zaroor badal dein
+const ADMIN_USERNAME = 'Admin';
+const ADMIN_PASSWORD = 'Admin@2026';
 // =====================================
 
 const SHEET_NAME = 'Orders';
 const STOCK_SHEET_NAME = 'Stock';
 const ENQUIRY_SHEET_NAME = 'Enquiry';
 const PRODUCTS_SHEET_NAME = 'Products';
+const CATEGORIES_SHEET_NAME = 'Categories';
+const OFFERS_SHEET_NAME = 'Offers';
 const DRIVE_MEDIA_FOLDER_NAME = 'Jewellery_by_Riddhi_Media';
+
+const CATEGORIES_HEADERS = [
+  'Category Name', 'Prefix', 'Image Preview', 'Image URL', 'Last Updated'
+];
+
+const OFFERS_HEADERS = [
+  'Offer ID', 'Type', 'Badge 1', 'Badge 2', 'Title', 'Description', 'Target Category', 'Featured Green', 'Active', 'Last Updated'
+];
 
 const HEADERS = [
   'Timestamp', 'Order ID', 'Date', 'Name', 'Mobile', 'Address', 'City', 'Pincode',
   'Product ID', 'Category', 'Product Name', 'Size', 'Quantity', 'Customization Note',
-  'Total (INR)', 'Items JSON', 'Image 1', 'Image 2', 'Image 3', 'Image Links',
+  'Actual Price (INR)', 'Offer Price (INR)', 'Discount',
+  'Total (INR)', 'Items JSON', 'Image Preview', 'Image 1', 'Image 2', 'Image 3', 'Image Links',
   'Status', 'Status Updated', 'Cancel Reason'
 ];
 
@@ -44,13 +49,13 @@ const PRODUCTS_HEADERS = [
   'Image Preview', 'Image 1 URL', 'Image 2 URL', 'Image 3 URL', 'Video URL', 'Last Updated'
 ];
 
-const READ_COLS = 23;
-const STATUS_COL = 21;
-const CANCEL_REASON_COL = 23;
+const READ_COLS = 27;
+const STATUS_COL = 25;
+const CANCEL_REASON_COL = 27;
 const STATUSES = ['Pending', 'Confirmed', 'Custom Making / Partial Stock Ready', 'Packed', 'Shipped', 'Delivered', 'Cancelled'];
 const ENQUIRY_STATUSES = ['New Enquiry', 'Contacted', 'Confirmed', 'Completed', 'Closed'];
 const AUTO_DELIVER_DAYS = 5;
-const MAX_IMG_COLS = 3;
+const MAX_IMG_COLS = 4;
 const TOKEN_TTL_SEC = 2 * 60 * 60;
 const MAX_FAILS = 5;
 const LOCK_SEC = 10 * 60;
@@ -58,10 +63,13 @@ const LOCK_SEC = 10 * 60;
 function doGet() {
   return json_({
     ok: true,
-    service: 'Jewellery by Riddhi orders, stock, products & enquiry',
+    service: 'Jewellery by Riddhi orders, stock, products, categories, offers & enquiry',
     stock: readStockMap_(),
     sizeStock: readSizeStockMap_(),
     products: readProductsMaster_(),
+    categories: readCategoriesMaster_(),
+    offers: readOffersMaster_(),
+    deletedCategoryNames: getDeletedCategoryNames_(),
     deletedIds: getAllDeletedIds_()
   });
 }
@@ -76,11 +84,23 @@ function doPost(e) {
       case 'updateEnquiryStatus': return json_(updateEnquiryStatus_(body.token, body.enquiryId, body.status));
       case 'enquiryStatus':       return json_(enquiryStatus_(body.enquiries));
       case 'getStock':          return json_({ ok: true, stock: readStockMap_(), sizeStock: readSizeStockMap_() });
-      case 'getProducts':       return json_({ ok: true, products: readProductsMaster_(), deletedIds: getAllDeletedIds_(), sizeStock: readSizeStockMap_() });
-      case 'syncCatalog':       return json_(syncCatalog_(body.products));
-      case 'saveProduct':       return json_(saveProductMaster_(body.token, body.product));
+      case 'getProducts':       return json_({ ok: true, products: readProductsMaster_(), deletedIds: getAllDeletedIds_(), sizeStock: readSizeStockMap_(), categories: readCategoriesMaster_(), deletedCategoryNames: getDeletedCategoryNames_(), offers: readOffersMaster_() });
+      case 'getCategories':     return json_({ ok: true, categories: readCategoriesMaster_(), deletedCategoryNames: getDeletedCategoryNames_() });
+      case 'saveCategory':      return json_(saveCategoryMaster_(body.token, body.category, body.oldName, body.siteBaseUrl));
+      case 'deleteCategory':    return json_(deleteCategoryMaster_(body.token, body.categoryName));
+      case 'getOffers':         return json_({ ok: true, offers: readOffersMaster_() });
+      case 'saveOffer':         return json_(saveOfferMaster_(body.token, body.offer));
+      case 'deleteOffer':       return json_(deleteOfferMaster_(body.token, body.offerId));
+      case 'getOrdersByMobile': return json_(getOrdersByMobile_(body.mobile));
+      case 'syncCatalog':       return json_(syncCatalog_(body.products, body.masterProducts, body.masterCategories, body.siteBaseUrl));
+      case 'saveProduct':       return json_(saveProductMaster_(body.token, body.product, body.siteBaseUrl));
+      case 'toggleNewArrival':  return json_(toggleNewArrival_(body.token, body.productId, body.isNewArrival));
       case 'deleteProduct':     return json_(deleteProductMaster_(body.token, body.productId));
-      case 'setStock':          return json_(setStock_(body.token, body.productId, body.stock, body.productName, body.image, body.category, body.size));
+      case 'clearAllSheetData': return json_(clearAllSheetData_(body.token));
+      case 'clearStockData':    return json_(clearStockData_(body.token));
+      case 'deleteStockRow':    return json_(deleteStockRow_(body.token, body.productId, body.size));
+      case 'allocateOrderQty':  return json_(allocateOrderQty_(body.token, body.orderId, body.itemIndex, body.newQty));
+      case 'setStock':          return json_(setStock_(body.token, body.productId, body.stock, body.productName, body.image, body.category, body.size, body.siteBaseUrl));
       case 'adminLogin':        return json_(adminLogin_(body.username, body.password));
       case 'getOrders':         return json_(getOrders_(body.token));
       case 'adminLogout':       return json_(adminLogout_(body.token));
@@ -94,7 +114,6 @@ function doPost(e) {
   }
 }
 
-// ---------- helpers ----------
 function json_(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }
@@ -127,33 +146,198 @@ function getOrCreateMediaFolder_() {
   return folder;
 }
 
-function resolveMediaUrl_(rawVal, filenamePrefix) {
+function isPublicHttpUrl_(u) {
+  const s = String(u || '').trim();
+  if (!/^https?:\/\//i.test(s)) return false;
+  if (/^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0)/i.test(s)) return false;
+  return true;
+}
+
+function resolveMediaUrl_(rawVal, filenamePrefix, siteBaseUrl) {
   const val = String(rawVal || '').trim();
   if (!val) return '';
-  // If already a normal http/https URL or relative asset path, return as-is
-  if (!val.startsWith('data:')) {
+
+  // 1) Public https:// URL (not localhost) -> return directly
+  if (isPublicHttpUrl_(val)) {
     return val;
   }
-  // Convert data:<mime>;base64,<data> into a real public Drive file URL so =IMAGE() works in Google Sheet & across all devices!
-  try {
-    const match = val.match(/^data:([^;]+);base64,(.+)$/);
-    if (!match) return '';
-    const mimeType = match[1];
-    const base64Data = match[2];
-    const ext = mimeType.indexOf('png') > -1 ? 'png' : (mimeType.indexOf('mp4') > -1 ? 'mp4' : 'jpg');
-    const bytes = Utilities.base64Decode(base64Data);
-    const blob = Utilities.newBlob(bytes, mimeType, (filenamePrefix || 'media') + '_' + Date.now() + '.' + ext);
-    const folder = getOrCreateMediaFolder_();
-    const file = folder.createFile(blob);
-    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-    const fileId = file.getId();
-    if (ext === 'mp4') {
-      return 'https://drive.google.com/uc?export=download&id=' + fileId;
+
+  // 2) Base64 data URI -> upload to public Google Drive folder so =IMAGE() & cross-device <img> work everywhere!
+  if (val.startsWith('data:')) {
+    try {
+      const match = val.match(/^data:([^;]+);base64,(.+)$/);
+      if (!match) return '';
+      const mimeType = match[1];
+      const base64Data = match[2];
+      const ext = mimeType.indexOf('png') > -1 ? 'png' : (mimeType.indexOf('mp4') > -1 ? 'mp4' : 'jpg');
+      const bytes = Utilities.base64Decode(base64Data);
+      const blob = Utilities.newBlob(bytes, mimeType, (filenamePrefix || 'media') + '_' + Date.now() + '.' + ext);
+      const folder = getOrCreateMediaFolder_();
+      const file = folder.createFile(blob);
+      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      const fileId = file.getId();
+      if (ext === 'mp4') {
+        return 'https://drive.google.com/uc?export=download&id=' + fileId;
+      }
+      return 'https://lh3.googleusercontent.com/d/' + fileId + '=w800';
+    } catch (err) {
+      return '';
     }
-    // lh3.googleusercontent.com direct image URL works reliably in both Google Sheets =IMAGE() and mobile/desktop <img> tags!
-    return 'https://lh3.googleusercontent.com/d/' + fileId + '=w800';
-  } catch (err) {
-    return '';
+  }
+
+  // 3) Relative path (e.g., assets/Categories/...): if siteBaseUrl is a public https:// URL (not localhost), convert to full URL
+  const base = String(siteBaseUrl || '').trim();
+  if (isPublicHttpUrl_(base)) {
+    const cleanBase = base.replace(/\/+$/, '');
+    const cleanRel = val.replace(/^\/+/, '');
+    return encodeURI(cleanBase + '/' + cleanRel);
+  }
+
+  return val;
+}
+
+function buildPreviewFormula_(urlStr, siteBaseUrl) {
+  const raw = String(urlStr || '').trim();
+  if (!raw) return '';
+  let http = imgUrl_(raw);
+  if (!http && siteBaseUrl && isPublicHttpUrl_(siteBaseUrl)) {
+    const cleanBase = String(siteBaseUrl).replace(/\/+$/, '');
+    const cleanRel = raw.replace(/^\/+/, '');
+    http = imgUrl_(encodeURI(cleanBase + '/' + cleanRel));
+  }
+  return http ? '=IMAGE("' + http + '")' : '';
+}
+
+function clearAllSheetData_(token) {
+  if (token && !validToken_(token)) return { ok: false, error: 'auth' };
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const sheets = [
+      productsSheet_(),
+      categoriesSheet_(),
+      stockSheet_(),
+      sheet_(),
+      enquirySheet_(),
+      offersSheet_()
+    ];
+    sheets.forEach(function (sh) {
+      const last = sh.getLastRow();
+      if (last >= 2) {
+        sh.deleteRows(2, last - 1);
+      }
+    });
+    const props = PropertiesService.getScriptProperties();
+    props.deleteProperty('DELETED_PRODUCT_IDS');
+    props.deleteProperty('KNOWN_PRODUCT_IDS');
+    props.deleteProperty('DELETED_CATEGORY_NAMES');
+    return { ok: true, message: 'All Google Sheet tabs cleared (headers preserved).' };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function clearAllDataFromEditor() {
+  return clearAllSheetData_(null);
+}
+
+function clearStockData_(token) {
+  if (token && !validToken_(token)) return { ok: false, error: 'auth' };
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const sh = stockSheet_();
+    const last = sh.getLastRow();
+    if (last >= 2) {
+      sh.deleteRows(2, last - 1);
+    }
+    return { ok: true, stock: {}, sizeStock: {} };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function clearStockSheetFromEditor() {
+  return clearStockData_(null);
+}
+
+function deleteStockRow_(token, productId, size) {
+  if (!validToken_(token)) return { ok: false, error: 'auth' };
+  const pid = safe_(productId, 30);
+  const psize = safe_(size || '', 60);
+  if (!pid) return { ok: false, error: 'bad_product' };
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const sh = stockSheet_();
+    const last = sh.getLastRow();
+    if (last >= 2) {
+      const rows = sh.getRange(2, 2, last - 1, 4).getValues();
+      for (let i = rows.length - 1; i >= 0; i--) {
+        const rPid = String(rows[i][0] || '').trim();
+        const rSz = String(rows[i][3] || '').trim();
+        if (rPid === pid && (!psize || rSz === psize)) {
+          sh.deleteRow(i + 2);
+        }
+      }
+    }
+    return { ok: true, stock: readStockMap_(), sizeStock: readSizeStockMap_() };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function allocateOrderQty_(token, orderId, itemIndex, newQty) {
+  if (!validToken_(token)) return { ok: false, error: 'auth' };
+  const oid = safe_(orderId, 30);
+  const idx = Math.max(0, parseInt(itemIndex, 10) || 0);
+  const targetQty = Math.max(0, Math.min(500, parseInt(newQty, 10) || 0));
+  if (!oid) return { ok: false, error: 'bad_order' };
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const sh = sheet_();
+    const last = sh.getLastRow();
+    if (last < 2) return { ok: false, error: 'not_found' };
+    const rows = sh.getRange(2, 1, last - 1, Math.min(READ_COLS, sh.getLastColumn())).getValues();
+    for (let r = 0; r < rows.length; r++) {
+      if (String(rows[r][1] || '').trim() === oid) {
+        let items = [];
+        try { items = JSON.parse(rows[r][18] || '[]'); } catch (e) { items = []; }
+        if (!Array.isArray(items) || !items[idx]) return { ok: false, error: 'item_not_found' };
+        const oldQty = Math.max(1, parseInt(items[idx].qty, 10) || 1);
+        const diffQty = oldQty - targetQty; // positive if reducing qty given to customer (e.g., 4 -> 2 => diffQty = 2 restored to stock)
+        items[idx].qty = targetQty;
+        const newTotal = items.reduce(function (s, it) { return s + (Math.max(0, parseInt(it.qty, 10) || 0)) * (Number(it.price) || 0); }, 0);
+        const qtyCol = items.map(function (it) { return it.qty; }).join('\n');
+        sh.getRange(r + 2, 13).setValue(qtyCol);
+        sh.getRange(r + 2, 18).setValue(newTotal);
+        sh.getRange(r + 2, 19).setValue(JSON.stringify(items));
+
+        // Adjust Stock sheet available quantity by diffQty
+        const sSh = stockSheet_();
+        const sLast = sSh.getLastRow();
+        const pid = String(items[idx].id || '').trim();
+        const sz = String(items[idx].size || 'Free Size (Adjustable Dori)').trim();
+        if (sLast >= 2 && pid && diffQty !== 0) {
+          const sRows = sSh.getRange(2, 2, sLast - 1, 4).getValues();
+          for (let k = 0; k < sRows.length; k++) {
+            if (String(sRows[k][0] || '').trim() === pid && (!String(sRows[k][3] || '').trim() || String(sRows[k][3] || '').trim() === sz)) {
+              const rowNum = k + 2;
+              const curAvail = Math.max(0, parseInt(sSh.getRange(rowNum, 8).getValue(), 10) || 0);
+              const nextAvail = Math.max(0, curAvail + diffQty);
+              sSh.getRange(rowNum, 8).setValue(nextAvail);
+              sSh.getRange(rowNum, 10).setValue(new Date());
+              break;
+            }
+          }
+        }
+        return { ok: true, orderId: oid, total: newTotal, items: items };
+      }
+    }
+    return { ok: false, error: 'not_found' };
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -172,29 +356,10 @@ function productsSheet_() {
     sh.setColumnWidth(7, 220);
     sh.setColumnWidth(9, 250);
     sh.setColumnWidth(10, 110);
-  } else {
-    // Migrate old 14-col Products sheet (without Image Preview column) to 15-col format
-    const col10 = String(sh.getRange(1, 10).getValue() || '').trim();
-    if (col10 !== 'Image Preview' || sh.getLastColumn() < PRODUCTS_HEADERS.length) {
-      const last = sh.getLastRow();
-      const oldRows = last >= 2 ? sh.getRange(2, 1, last - 1, sh.getLastColumn()).getValues() : [];
-      sh.clear();
-      sh.appendRow(PRODUCTS_HEADERS);
-      sh.setFrozenRows(1);
-      sh.getRange(1, 1, 1, PRODUCTS_HEADERS.length).setFontWeight('bold').setBackground('#15321e').setFontColor('#ffffff');
-      sh.setColumnWidth(10, 110);
-      oldRows.forEach(function (r) {
-        if (!r[0]) return;
-        const img1 = String(r[9] || '').trim();
-        const cleanHttp = imgUrl_(img1);
-        sh.appendRow([
-          r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8],
-          cleanHttp ? '=IMAGE("' + cleanHttp + '")' : '',
-          img1, r[10] || '', r[11] || '', r[12] || '', r[13] || new Date()
-        ]);
-        if (cleanHttp) sh.setRowHeight(sh.getLastRow(), 90);
-      });
-    }
+    sh.setColumnWidth(11, 260);
+    sh.setColumnWidth(12, 260);
+    sh.setColumnWidth(13, 260);
+    sh.setColumnWidth(14, 260);
   }
   return sh;
 }
@@ -215,7 +380,6 @@ function setDeletedProductIds_(arr) {
   return unique;
 }
 
-// If admin manually deleted a row directly inside Google Sheet ("Products" tab), detect that missing ID so all devices also remove it!
 function getKnownSyncedIds_() {
   try {
     const raw = PropertiesService.getScriptProperties().getProperty('KNOWN_PRODUCT_IDS');
@@ -248,7 +412,6 @@ function getAllDeletedIds_() {
     });
   }
 
-  // Any ID that was previously in Products sheet (knownIds) but is now missing from Products sheet was manually deleted by admin in Google Sheet!
   const newlyDeleted = [];
   knownIds.forEach(function (kid) {
     if (!presentMap[kid]) {
@@ -258,10 +421,9 @@ function getAllDeletedIds_() {
 
   if (newlyDeleted.length > 0) {
     const mergedDeleted = setDeletedProductIds_(storedDeleted.concat(newlyDeleted));
-    const remainingKnown = knownIds.filter(function (k) { return !presentMap[k] ? false : true; });
+    const remainingKnown = knownIds.filter(function (k) { return !!presentMap[k]; });
     setKnownSyncedIds_(remainingKnown);
 
-    // Also remove those manually deleted products from Stock tab so Stock tab stays clean
     const stockSh = stockSheet_();
     const sLast = stockSh.getLastRow();
     if (sLast >= 2) {
@@ -314,14 +476,38 @@ function readProductsMaster_() {
     });
   });
 
-  // Update known synced IDs whenever Products sheet has rows
   if (presentIds.length > 0) {
     setKnownSyncedIds_(getKnownSyncedIds_().concat(presentIds));
   }
   return out;
 }
 
-function saveProductMaster_(token, prod) {
+function toggleNewArrival_(token, productId, isNewArrival) {
+  if (!validToken_(token)) return { ok: false, error: 'auth' };
+  const pid = safe_(productId, 30);
+  if (!pid) return { ok: false, error: 'bad_product' };
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const sh = productsSheet_();
+    const last = sh.getLastRow();
+    if (last >= 2) {
+      const ids = sh.getRange(2, 1, last - 1, 1).getValues();
+      for (let i = 0; i < ids.length; i++) {
+        if (String(ids[i][0] || '').trim() === pid) {
+          sh.getRange(i + 2, 6).setValue(isNewArrival ? 'YES' : 'NO');
+          sh.getRange(i + 2, 15).setValue(new Date());
+          break;
+        }
+      }
+    }
+    return { ok: true, products: readProductsMaster_() };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function saveProductMaster_(token, prod, siteBaseUrl) {
   if (!validToken_(token)) return { ok: false, error: 'auth' };
   if (!prod || !prod.id || !prod.name || !prod.category) {
     return { ok: false, error: 'invalid_product' };
@@ -333,7 +519,6 @@ function saveProductMaster_(token, prod) {
     const stockSh = stockSheet_();
     const pid = safe_(prod.id, 30);
 
-    // Ensure pid is removed from deleted list & added to known list
     setDeletedProductIds_(getDeletedProductIds_().filter(function (x) { return x !== pid; }));
     setKnownSyncedIds_(getKnownSyncedIds_().concat([pid]));
 
@@ -349,14 +534,13 @@ function saveProductMaster_(token, prod) {
     const totalAvail = sizes.reduce(function (s, k) { return s + (Math.max(0, parseInt(sizeStock[k], 10) || 0)); }, 0);
 
     const rawImgs = Array.isArray(prod.images) ? prod.images : [];
-    const img1 = resolveMediaUrl_(rawImgs[0], pid + '_img1');
-    const img2 = resolveMediaUrl_(rawImgs[1], pid + '_img2');
-    const img3 = resolveMediaUrl_(rawImgs[2], pid + '_img3');
-    const videoUrl = resolveMediaUrl_(prod.video, pid + '_vid');
+    const img1 = resolveMediaUrl_(rawImgs[0], pid + '_img1', siteBaseUrl);
+    const img2 = resolveMediaUrl_(rawImgs[1], pid + '_img2', siteBaseUrl);
+    const img3 = resolveMediaUrl_(rawImgs[2], pid + '_img3', siteBaseUrl);
+    const videoUrl = resolveMediaUrl_(prod.video, pid + '_vid', siteBaseUrl);
     const now = new Date();
 
-    const cleanHttpPreview = imgUrl_(img1);
-    const previewFormula = cleanHttpPreview ? '=IMAGE("' + cleanHttpPreview + '")' : '';
+    const previewFormula = buildPreviewFormula_(img1, siteBaseUrl);
 
     const rowData = [
       pid, pcat, pname, price, actualPrice, isNew,
@@ -378,13 +562,12 @@ function saveProductMaster_(token, prod) {
 
     if (updatedRow > 0) {
       sh.getRange(updatedRow, 1, 1, PRODUCTS_HEADERS.length).setValues([rowData]);
-      if (previewFormula) sh.setRowHeight(updatedRow, 90);
+      if (previewFormula) sh.setRowHeight(updatedRow, 95);
     } else {
       sh.appendRow(rowData);
-      if (previewFormula) sh.setRowHeight(sh.getLastRow(), 90);
+      if (previewFormula) sh.setRowHeight(sh.getLastRow(), 95);
     }
 
-    // Sync each size into Stock sheet and remove deleted sizes for this product from Stock sheet
     const stockLast = stockSh.getLastRow();
     if (stockLast >= 2) {
       const stockRows = stockSh.getRange(2, 2, stockLast - 1, 4).getValues();
@@ -398,7 +581,7 @@ function saveProductMaster_(token, prod) {
     }
 
     sizes.forEach(function (sz) {
-      upsertStockRow_(stockSh, pid, pname, sizeStock[sz], img1, false, pcat, sz, 0);
+      upsertStockRow_(stockSh, pid, pname, sizeStock[sz], img1, false, pcat, sz, 0, siteBaseUrl);
     });
 
     return {
@@ -467,7 +650,18 @@ function sheet_() {
     sh.setFrozenRows(1);
     sh.getRange(1, 1, 1, HEADERS.length).setFontWeight('bold').setBackground('#15321e').setFontColor('#ffffff');
     sh.setColumnWidth(11, 220);
-    for (let c = 17; c <= 19; c++) sh.setColumnWidth(c, 110);
+    for (let c = 20; c <= 22; c++) sh.setColumnWidth(c, 110);
+    statusValidation_(sh);
+  } else {
+    const col15 = String(sh.getRange(1, 15).getValue() || '').trim();
+    if (col15 !== 'Actual Price (INR)') {
+      sh.insertColumnsBefore(15, 3);
+    }
+    const col20 = String(sh.getRange(1, 20).getValue() || '').trim();
+    if (col20 !== 'Image Preview') {
+      sh.insertColumnsBefore(20, 1);
+    }
+    sh.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]).setFontWeight('bold').setBackground('#15321e').setFontColor('#ffffff');
     statusValidation_(sh);
   }
   return sh;
@@ -487,7 +681,7 @@ function stockSheet_() {
     sh.setColumnWidth(3, 150);
     sh.setColumnWidth(4, 230);
     sh.setColumnWidth(5, 170);
-    sh.setColumnWidth(6, 105);
+    sh.setColumnWidth(6, 110);
     sh.setColumnWidth(7, 130);
     sh.setColumnWidth(8, 150);
     sh.setColumnWidth(9, 145);
@@ -528,7 +722,8 @@ function addEnquiry_(enq) {
     const avail = Math.max(0, parseInt(enq.availableStock, 10) || 0);
     const reqQty = Math.max(1, parseInt(enq.requestedQty, 10) || 1);
     const extraQty = Math.max(0, reqQty - avail);
-    const cleanImg = imgUrl_(enq.image);
+    const resolvedImg = resolveMediaUrl_(enq.image, enqId + '_img', enq.siteBaseUrl || '');
+    const previewFormula = buildPreviewFormula_(resolvedImg, enq.siteBaseUrl || '');
     const mobile = String(enq.mobile || '').replace(/[^0-9]/g, '');
 
     sh.appendRow([
@@ -545,12 +740,12 @@ function addEnquiry_(enq) {
       reqQty,
       extraQty,
       safe_(enq.note || '', 300),
-      '',
+      previewFormula || resolvedImg || '',
       'New Enquiry'
     ]);
     const rowNum = sh.getLastRow();
-    if (cleanImg) {
-      sh.getRange(rowNum, 14).setFormula('=IMAGE("' + cleanImg + '")');
+    if (previewFormula) {
+      sh.getRange(rowNum, 14).setFormula(previewFormula);
       sh.setRowHeight(rowNum, 95);
     }
     return { ok: true, enquiryId: enqId };
@@ -591,15 +786,15 @@ function readSizeStockMap_() {
   return map;
 }
 
-function upsertStockRow_(sh, productId, productName, newAvailStock, imageUrl, onlyIfMissing, category, size, soldDelta) {
+function upsertStockRow_(sh, productId, productName, newAvailStock, imageUrl, onlyIfMissing, category, size, soldDelta, siteBaseUrl) {
   const pid = safe_(productId, 30);
   const pname = safe_(productName || '', 120);
   const pcat = safe_(category || '', 80);
   const psize = safe_(size || 'Free Size (Adjustable Dori)', 60);
   const availQty = Math.max(0, parseInt(newAvailStock, 10) || 0);
   const deltaSold = Math.max(0, parseInt(soldDelta, 10) || 0);
-  const cleanImg = imgUrl_(imageUrl);
-  const imgFormula = cleanImg ? '=IMAGE("' + cleanImg + '")' : '';
+  const resolvedImg = resolveMediaUrl_(imageUrl, pid + '_stk', siteBaseUrl);
+  const imgFormula = buildPreviewFormula_(resolvedImg, siteBaseUrl);
   const now = new Date();
   const dateStr = Utilities.formatDate(now, Session.getScriptTimeZone() || 'Asia/Kolkata', 'dd MMM yyyy');
 
@@ -623,6 +818,8 @@ function upsertStockRow_(sh, productId, productName, newAvailStock, imageUrl, on
           if (imgFormula) {
             sh.getRange(rowNum, 6).setFormula(imgFormula);
             sh.setRowHeight(rowNum, 90);
+          } else if (resolvedImg && !rowVals[5]) {
+            sh.getRange(rowNum, 6).setValue(resolvedImg);
           }
           const fixedTotal = Math.max(prevTotal, prevAvail + prevSold);
           if (fixedTotal !== prevTotal) {
@@ -637,6 +834,8 @@ function upsertStockRow_(sh, productId, productName, newAvailStock, imageUrl, on
         if (imgFormula) {
           sh.getRange(rowNum, 6).setFormula(imgFormula);
           sh.setRowHeight(rowNum, 90);
+        } else {
+          sh.getRange(rowNum, 6).setValue('');
         }
 
         const updatedSold = prevSold + deltaSold;
@@ -652,7 +851,7 @@ function upsertStockRow_(sh, productId, productName, newAvailStock, imageUrl, on
 
   const initSold = deltaSold;
   const initTotal = availQty + initSold;
-  sh.appendRow([dateStr, pid, pcat, pname, psize, '', initTotal, availQty, initSold, now]);
+  sh.appendRow([dateStr, pid, pcat, pname, psize, imgFormula || '', initTotal, availQty, initSold, now]);
   const newRowNum = sh.getLastRow();
   if (imgFormula) {
     sh.getRange(newRowNum, 6).setFormula(imgFormula);
@@ -661,37 +860,117 @@ function upsertStockRow_(sh, productId, productName, newAvailStock, imageUrl, on
   return availQty;
 }
 
-function syncCatalog_(productsList) {
-  if (!Array.isArray(productsList) || productsList.length === 0) {
-    return { ok: true, stock: readStockMap_(), sizeStock: readSizeStockMap_(), products: readProductsMaster_(), deletedIds: getAllDeletedIds_() };
-  }
+function syncCatalog_(productsList, masterProductsList, masterCategoriesList, siteBaseUrl) {
   const lock = LockService.getScriptLock();
   lock.waitLock(15000);
   try {
-    const sh = stockSheet_();
+    if (Array.isArray(masterCategoriesList) && masterCategoriesList.length > 0) {
+      const cSh = categoriesSheet_();
+      const delCats = {};
+      getDeletedCategoryNames_().forEach(function (n) { delCats[String(n).trim().toLowerCase()] = true; });
+      const existingCats = {};
+      const cLast = cSh.getLastRow();
+      if (cLast >= 2) {
+        cSh.getRange(2, 1, cLast - 1, 1).getValues().forEach(function (r) {
+          const nm = String(r[0] || '').trim().toLowerCase();
+          if (nm) existingCats[nm] = true;
+        });
+      }
+      masterCategoriesList.slice(0, 100).forEach(function (cat) {
+        const cname = safe_(cat && cat.name, 80);
+        if (!cname) return;
+        const key = cname.toLowerCase();
+        if (delCats[key] || existingCats[key]) return;
+        const prefix = safe_(cat.prefix || cname.replace(/[^A-Za-z]/g, '').toUpperCase().slice(0, 3), 10);
+        const imgPath = resolveMediaUrl_(cat.image || 'assets/Categories/Comming-Soon.png', 'CAT_' + cname.replace(/[^A-Za-z0-9]/g, '_'), siteBaseUrl);
+        const formula = buildPreviewFormula_(imgPath, siteBaseUrl);
+        cSh.appendRow([cname, prefix, formula, imgPath, new Date()]);
+        if (formula) cSh.setRowHeight(cSh.getLastRow(), 90);
+        existingCats[key] = true;
+      });
+    }
+
     const delSet = {};
-    getAllDeletedIds_().forEach(function (id) { delSet[id] = true; });
-    productsList.slice(0, 300).forEach(function (p) {
-      if (!p || !p.id || delSet[String(p.id).trim()]) return;
-      upsertStockRow_(
-        sh,
-        p.id,
-        p.name || '',
-        p.availableStock,
-        p.image || '',
-        true,
-        p.category || '',
-        p.size || 'Free Size (Adjustable Dori)',
-        0
-      );
-    });
-    return { ok: true, stock: readStockMap_(), sizeStock: readSizeStockMap_(), products: readProductsMaster_(), deletedIds: getAllDeletedIds_() };
+    getAllDeletedIds_().forEach(function (id) { delSet[String(id).trim()] = true; });
+
+    if (Array.isArray(masterProductsList) && masterProductsList.length > 0) {
+      const pSh = productsSheet_();
+      const existingPids = {};
+      const pLast = pSh.getLastRow();
+      if (pLast >= 2) {
+        pSh.getRange(2, 1, pLast - 1, 1).getValues().forEach(function (r) {
+          const pid = String(r[0] || '').trim();
+          if (pid) existingPids[pid] = true;
+        });
+      }
+      masterProductsList.slice(0, 300).forEach(function (mp) {
+        const pid = safe_(mp && mp.id, 30);
+        if (!pid || delSet[pid] || existingPids[pid]) return;
+        const imgs = Array.isArray(mp.images) ? mp.images : [];
+        const img1 = resolveMediaUrl_(imgs[0] || '', pid + '_img1', siteBaseUrl);
+        const img2 = resolveMediaUrl_(imgs[1] || '', pid + '_img2', siteBaseUrl);
+        const img3 = resolveMediaUrl_(imgs[2] || '', pid + '_img3', siteBaseUrl);
+        const vidUrl = resolveMediaUrl_(mp.video || '', pid + '_vid', siteBaseUrl);
+        const formula = buildPreviewFormula_(img1, siteBaseUrl);
+        const sizeStock = (mp.sizeStock && typeof mp.sizeStock === 'object') ? mp.sizeStock : { 'Free Size (Adjustable Dori)': Math.max(0, parseInt(mp.availableStock, 10) || 0) };
+        const totalAvail = Object.values(sizeStock).reduce(function (s, v) { return s + (Math.max(0, parseInt(v, 10) || 0)); }, 0);
+        pSh.appendRow([
+          pid,
+          safe_(mp.category, 80),
+          safe_(mp.name, 140),
+          Math.max(0, Number(mp.price) || 0),
+          Math.max(0, Number(mp.actualPrice) || 0),
+          mp.isNewArrival ? 'YES' : 'NO',
+          JSON.stringify(sizeStock),
+          totalAvail,
+          safe_(mp.desc || '', 500),
+          formula,
+          img1,
+          img2,
+          img3,
+          vidUrl,
+          new Date()
+        ]);
+        if (formula) pSh.setRowHeight(pSh.getLastRow(), 90);
+        existingPids[pid] = true;
+      });
+    }
+
+    if (Array.isArray(productsList) && productsList.length > 0) {
+      const sh = stockSheet_();
+      productsList.slice(0, 300).forEach(function (p) {
+        if (!p || !p.id || delSet[String(p.id).trim()]) return;
+        upsertStockRow_(
+          sh,
+          p.id,
+          p.name || '',
+          p.availableStock,
+          p.image || '',
+          true,
+          p.category || '',
+          p.size || 'Free Size (Adjustable Dori)',
+          0,
+          siteBaseUrl
+        );
+      });
+    }
+
+    return {
+      ok: true,
+      stock: readStockMap_(),
+      sizeStock: readSizeStockMap_(),
+      products: readProductsMaster_(),
+      deletedIds: getAllDeletedIds_(),
+      categories: readCategoriesMaster_(),
+      deletedCategoryNames: getDeletedCategoryNames_(),
+      offers: readOffersMaster_()
+    };
   } finally {
     lock.releaseLock();
   }
 }
 
-function setStock_(token, productId, stock, productName, imageUrl, category, size) {
+function setStock_(token, productId, stock, productName, imageUrl, category, size, siteBaseUrl) {
   if (!validToken_(token)) return { ok: false, error: 'auth' };
   const pid = safe_(productId, 30);
   if (!pid) return { ok: false, error: 'bad_product' };
@@ -699,14 +978,14 @@ function setStock_(token, productId, stock, productName, imageUrl, category, siz
   lock.waitLock(15000);
   try {
     const sh = stockSheet_();
-    upsertStockRow_(sh, pid, productName, stock, imageUrl, false, category || '', size || 'Free Size (Adjustable Dori)', 0);
+    upsertStockRow_(sh, pid, productName, stock, imageUrl, false, category || '', size || 'Free Size (Adjustable Dori)', 0, siteBaseUrl);
     return { ok: true, stock: readStockMap_(), sizeStock: readSizeStockMap_() };
   } finally {
     lock.releaseLock();
   }
 }
 
-function deductStockFromSheet_(items) {
+function deductStockFromSheet_(items, siteBaseUrl, soldDeltaOverride) {
   const sh = stockSheet_();
   const sizeMap = readSizeStockMap_();
   items.forEach(function (it) {
@@ -730,7 +1009,8 @@ function deductStockFromSheet_(items) {
       false,
       it.category || '',
       sz,
-      soldQty
+      soldQty,
+      ''
     );
   });
   return { stock: readStockMap_(), sizeStock: readSizeStockMap_() };
@@ -744,7 +1024,9 @@ function safe_(v, max) {
 
 function imgUrl_(u) {
   u = String(u || '').trim();
-  return /^https?:\/\/[^\s"'<>]{1,480}$/i.test(u) ? u : '';
+  if (!/^https?:\/\/[^\s"'<>]{1,480}$/i.test(u)) return '';
+  if (/^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0)/i.test(u)) return '';
+  return u;
 }
 
 function constEq_(a, b) {
@@ -768,16 +1050,28 @@ function addOrder_(o) {
     return { ok: false, error: 'invalid_customer' };
   }
 
+  const masterById = {};
+  readProductsMaster_().forEach(function (mp) { masterById[mp.id] = mp; });
+
   const items = o.items.map(function (i) {
+    const pid = safe_(i.id, 20);
+    const mp = masterById[pid] || {};
+    const resolvedImg = resolveMediaUrl_(i.image, pid + '_ord', o.siteBaseUrl || '');
+    const offerPrice = Math.max(0, Math.min(1000000, Number(i.price) || Number(mp.price) || 0));
+    const actualPrice = Math.max(0, Math.min(1000000, Number(i.actualPrice) || Number(mp.actualPrice) || offerPrice));
+    const discAmt = actualPrice > offerPrice ? (actualPrice - offerPrice) : 0;
+    const discPct = actualPrice > offerPrice ? Math.round((discAmt / actualPrice) * 100) : 0;
     return {
-      id: safe_(i.id, 20),
-      category: safe_(i.category || '', 80),
-      name: safe_(i.name, 120),
+      id: pid,
+      category: safe_(i.category || mp.category || '', 80),
+      name: safe_(i.name || mp.name || '', 120),
       size: safe_(i.size, 60),
       qty: Math.max(1, Math.min(500, Number(i.qty) || 1)),
-      price: Math.max(0, Math.min(1000000, Number(i.price) || 0)),
+      price: offerPrice,
+      actualPrice: actualPrice,
+      discountText: discAmt > 0 ? ('₹' + discAmt + ' (' + discPct + '% OFF)') : '₹0 (0%)',
       note: safe_(i.note, 300),
-      image: imgUrl_(i.image),
+      image: imgUrl_(resolvedImg) || resolvedImg,
       currentStock: Math.max(0, parseInt(i.currentStock, 10) || 0)
     };
   });
@@ -802,26 +1096,31 @@ function addOrder_(o) {
     const sizesCol        = items.map(function (i) { return i.size; }).join('\n');
     const quantitiesCol   = items.map(function (i) { return i.qty; }).join('\n');
     const customNotesCol  = items.map(function (i) { return i.note || '-'; }).join('\n');
+    const actualPriceCol  = items.map(function (i) { return i.actualPrice; }).join('\n');
+    const offerPriceCol   = items.map(function (i) { return i.price; }).join('\n');
+    const discountCol     = items.map(function (i) { return i.discountText; }).join('\n');
 
     const imgs = items.map(function (i) { return i.image; }).filter(Boolean);
     const imgCells = [];
     for (let k = 0; k < MAX_IMG_COLS; k++) {
-      imgCells.push(imgs[k] ? '=IMAGE("' + imgs[k] + '")' : '');
+      const formula = imgs[k] ? buildPreviewFormula_(imgs[k], o.siteBaseUrl || '') : '';
+      imgCells.push(formula || '');
     }
 
     const cleanItemsForJson = items.map(function (i) {
-      return { id: i.id, category: i.category, name: i.name, size: i.size, qty: i.qty, price: i.price, note: i.note, image: i.image };
+      return { id: i.id, category: i.category, name: i.name, size: i.size, qty: i.qty, price: i.price, actualPrice: i.actualPrice, discount: i.discountText, note: i.note, image: i.image };
     });
 
     sh.appendRow([
       new Date(Number(o.timestamp) || Date.now()), orderId, safe_(o.date, 40),
       safe_(c.name, 100), "'" + mobile, safe_(c.address, 300), safe_(c.city, 80), "'" + pin,
       productIdsCol, categoriesCol, productNamesCol, sizesCol, quantitiesCol, customNotesCol,
+      actualPriceCol, offerPriceCol, discountCol,
       total, JSON.stringify(cleanItemsForJson)
     ].concat(imgCells, [imgs.join('\n'), 'Pending', new Date(), '']));
     if (imgs.length) sh.setRowHeight(sh.getLastRow(), 100);
 
-    const stockRes = deductStockFromSheet_(items);
+    const stockRes = deductStockFromSheet_(items, o.siteBaseUrl || '', 0);
     return { ok: true, stock: stockRes.stock, sizeStock: stockRes.sizeStock };
   } finally {
     lock.releaseLock();
@@ -850,6 +1149,8 @@ function adminLogin_(username, password) {
     stock: readStockMap_(),
     sizeStock: readSizeStockMap_(),
     products: readProductsMaster_(),
+    categories: readCategoriesMaster_(),
+    offers: readOffersMaster_(),
     deletedIds: getAllDeletedIds_(),
     autoDeliverEnabled: isAutoDeliverEnabled_()
   };
@@ -868,6 +1169,8 @@ function getOrders_(token) {
     stock: readStockMap_(),
     sizeStock: readSizeStockMap_(),
     products: readProductsMaster_(),
+    categories: readCategoriesMaster_(),
+    offers: readOffersMaster_(),
     deletedIds: getAllDeletedIds_(),
     autoDeliverEnabled: isAutoDeliverEnabled_()
   };
@@ -876,6 +1179,127 @@ function getOrders_(token) {
 function adminLogout_(token) {
   if (token) CacheService.getScriptCache().remove('tok_' + token);
   return { ok: true };
+}
+
+function getOrderIdSetProp_(key) {
+  try {
+    const raw = PropertiesService.getScriptProperties().getProperty(key);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function addOrderIdToProp_(key, oid) {
+  const arr = getOrderIdSetProp_(key);
+  if (arr.indexOf(oid) < 0) {
+    arr.push(oid);
+    PropertiesService.getScriptProperties().setProperty(key, JSON.stringify(arr.slice(-1000)));
+  }
+}
+
+function removeOrderIdFromProp_(key, oid) {
+  const arr = getOrderIdSetProp_(key).filter(function (x) { return x !== oid; });
+  PropertiesService.getScriptProperties().setProperty(key, JSON.stringify(arr));
+}
+
+function syncProductRowStockFromSheet_(pid, sizeMapForPid) {
+  if (!pid || !sizeMapForPid) return;
+  try {
+    const pSh = productsSheet_();
+    const pLast = pSh.getLastRow();
+    if (pLast < 2) return;
+    const pids = pSh.getRange(2, 1, pLast - 1, 1).getValues();
+    for (let r = 0; r < pids.length; r++) {
+      if (String(pids[r][0] || '').trim() === pid) {
+        const totalAvail = Object.values(sizeMapForPid).reduce(function (s, v) { return s + (Math.max(0, parseInt(v, 10) || 0)); }, 0);
+        pSh.getRange(r + 2, 7, 1, 2).setValues([[JSON.stringify(sizeMapForPid), totalAvail]]);
+        break;
+      }
+    }
+  } catch (e) {}
+}
+
+function applySaleOrRestoreOnStatusChange_(orderRow, orderId, newStatus) {
+  const SALE_ELIGIBLE = ['Confirmed', 'Custom Making / Partial Stock Ready', 'Packed', 'Shipped', 'Delivered'];
+  let items = [];
+  try {
+    items = JSON.parse(orderRow[18] || '[]');
+  } catch (e) {
+    items = [];
+  }
+  if (!Array.isArray(items) || items.length === 0) return;
+
+  const sh = stockSheet_();
+  const saleCountedIds = getOrderIdSetProp_('SALE_COUNTED_ORDER_IDS');
+  const alreadyCountedSale = saleCountedIds.indexOf(orderId) >= 0;
+
+  if (SALE_ELIGIBLE.indexOf(newStatus) >= 0 && !alreadyCountedSale) {
+    const sizeMap = readSizeStockMap_();
+    items.forEach(function (it) {
+      const pid = String(it.id || '').trim();
+      if (!pid) return;
+      const qty = Math.max(1, parseInt(it.qty, 10) || 1);
+      const sz = String(it.size || 'Free Size (Adjustable Dori)').trim();
+      const curAvail = (sizeMap[pid] && Object.prototype.hasOwnProperty.call(sizeMap[pid], sz))
+        ? Math.max(0, parseInt(sizeMap[pid][sz], 10) || 0)
+        : 0;
+      upsertStockRow_(sh, pid, it.name, curAvail, it.image, false, it.category || '', sz, qty, '');
+    });
+    addOrderIdToProp_('SALE_COUNTED_ORDER_IDS', orderId);
+    removeOrderIdFromProp_('STOCK_RESTORED_ORDER_IDS', orderId);
+  } else if (newStatus === 'Cancelled') {
+    const restoredIds = getOrderIdSetProp_('STOCK_RESTORED_ORDER_IDS');
+    if (restoredIds.indexOf(orderId) < 0) {
+      const sizeMap = readSizeStockMap_();
+      const last = sh.getLastRow();
+      const updatedPids = {};
+
+      items.forEach(function (it) {
+        const pid = String(it.id || '').trim();
+        if (!pid) return;
+        const qty = Math.max(1, parseInt(it.qty, 10) || 1);
+        const sz = String(it.size || 'Free Size (Adjustable Dori)').trim();
+        const curAvail = (sizeMap[pid] && Object.prototype.hasOwnProperty.call(sizeMap[pid], sz))
+          ? Math.max(0, parseInt(sizeMap[pid][sz], 10) || 0)
+          : 0;
+        const restoredAvail = curAvail + qty;
+        if (!sizeMap[pid]) sizeMap[pid] = {};
+        sizeMap[pid][sz] = restoredAvail;
+        updatedPids[pid] = sizeMap[pid];
+
+        let matchedStockRow = false;
+        if (last >= 2) {
+          const sRows = sh.getRange(2, 2, last - 1, 4).getValues();
+          for (let k = 0; k < sRows.length; k++) {
+            const sPid = String(sRows[k][0] || '').trim();
+            const sSz = String(sRows[k][3] || '').trim();
+            if (sPid === pid && (!sSz || sSz === sz)) {
+              const rowNum = k + 2;
+              const prevTotal = Math.max(0, parseInt(sh.getRange(rowNum, 7).getValue(), 10) || 0);
+              const prevSold = Math.max(0, parseInt(sh.getRange(rowNum, 9).getValue(), 10) || 0);
+              const nextSold = Math.max(0, prevSold - qty);
+              const nextTotal = Math.max(restoredAvail + nextSold, prevTotal);
+              sh.getRange(rowNum, 7, 1, 4).setValues([[nextTotal, restoredAvail, nextSold, new Date()]]);
+              matchedStockRow = true;
+              break;
+            }
+          }
+        }
+        if (!matchedStockRow) {
+          upsertStockRow_(sh, pid, it.name, restoredAvail, it.image, false, it.category || '', sz, 0, '');
+        }
+      });
+
+      Object.keys(updatedPids).forEach(function (upid) {
+        syncProductRowStockFromSheet_(upid, updatedPids[upid]);
+      });
+
+      addOrderIdToProp_('STOCK_RESTORED_ORDER_IDS', orderId);
+      removeOrderIdFromProp_('SALE_COUNTED_ORDER_IDS', orderId);
+    }
+  }
 }
 
 function updateStatus_(token, orderId, status, cancelReason) {
@@ -888,12 +1312,20 @@ function updateStatus_(token, orderId, status, cancelReason) {
     const sh = sheet_();
     const last = sh.getLastRow();
     if (last < 2) return { ok: false, error: 'not_found' };
-    const ids = sh.getRange(2, 2, last - 1, 1).getValues();
-    for (let i = 0; i < ids.length; i++) {
-      if (ids[i][0] === orderId) {
+    const allRows = sh.getRange(2, 1, last - 1, Math.min(READ_COLS, sh.getLastColumn())).getValues();
+    for (let i = 0; i < allRows.length; i++) {
+      if (allRows[i][1] === orderId) {
         const now = new Date();
         sh.getRange(i + 2, STATUS_COL, 1, 3).setValues([[status, now, reason]]);
-        return { ok: true, status: status, cancelReason: reason, statusUpdated: now.getTime() };
+        applySaleOrRestoreOnStatusChange_(allRows[i], orderId, status);
+        return {
+          ok: true,
+          status: status,
+          cancelReason: reason,
+          statusUpdated: now.getTime(),
+          stock: readStockMap_(),
+          sizeStock: readSizeStockMap_()
+        };
       }
     }
     return { ok: false, error: 'not_found' };
@@ -907,11 +1339,11 @@ function autoDeliverCheck_(sh, rows) {
   const cutoff = Date.now() - AUTO_DELIVER_DAYS * 24 * 60 * 60 * 1000;
   const now = new Date();
   rows.forEach(function (r, idx) {
-    const st = r[20];
-    const upd = r[21] instanceof Date ? r[21].getTime() : 0;
+    const st = r[24];
+    const upd = r[25] instanceof Date ? r[25].getTime() : 0;
     if (st === 'Shipped' && upd > 0 && upd <= cutoff) {
-      r[20] = 'Delivered';
-      r[21] = now;
+      r[24] = 'Delivered';
+      r[25] = now;
       sh.getRange(idx + 2, STATUS_COL, 1, 2).setValues([['Delivered', now]]);
     }
   });
@@ -943,9 +1375,9 @@ function orderStatus_(list) {
     const b = String(q.mobile || '').replace(/[^0-9]/g, '').slice(-10);
     if (a && a === b) {
       out[q.orderId] = {
-        status: STATUSES.indexOf(r[20]) >= 0 ? r[20] : 'Pending',
-        updated: r[21] instanceof Date ? r[21].getTime() : 0,
-        cancelReason: String(r[22] || '')
+        status: STATUSES.indexOf(r[24]) >= 0 ? r[24] : 'Pending',
+        updated: r[25] instanceof Date ? r[25].getTime() : 0,
+        cancelReason: String(r[26] || '')
       };
     }
   });
@@ -960,20 +1392,19 @@ function readOrders_() {
   autoDeliverCheck_(sh, rows);
   return rows.map(function (r) {
     let items = [];
-    try { items = JSON.parse(r[15] || '[]'); } catch (e) {}
+    try { items = JSON.parse(r[18] || '[]'); } catch (e) {}
     const ts = r[0] instanceof Date ? r[0].getTime() : Number(r[0]) || 0;
     return {
-      orderId: r[1], timestamp: ts, date: String(r[2]), total: Number(r[14]) || 0,
+      orderId: r[1], timestamp: ts, date: String(r[2]), total: Number(r[17]) || 0,
       customer: { name: r[3], mobile: String(r[4]).replace(/^'/, ''), address: r[5], city: r[6],
                   pincode: String(r[7]).replace(/^'/, '') },
       items: items,
-      status: STATUSES.indexOf(r[20]) >= 0 ? r[20] : 'Pending',
-      statusUpdated: r[21] instanceof Date ? r[21].getTime() : 0,
-      cancelReason: String(r[22] || '')
+      status: STATUSES.indexOf(r[24]) >= 0 ? r[24] : 'Pending',
+      statusUpdated: r[25] instanceof Date ? r[25].getTime() : 0,
+      cancelReason: String(r[26] || '')
     };
   }).reverse();
 }
-
 
 function readEnquiries_() {
   const sh = enquirySheet_();
@@ -1048,7 +1479,313 @@ function enquiryStatus_(list) {
   return { ok: true, statuses: out };
 }
 
+// ---------- CATEGORIES MASTER SHEET ("Categories" tab) ----------
+function categoriesSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName(CATEGORIES_SHEET_NAME);
+  if (!sh) {
+    sh = ss.insertSheet(CATEGORIES_SHEET_NAME);
+    sh.appendRow(CATEGORIES_HEADERS);
+    sh.setFrozenRows(1);
+    sh.getRange(1, 1, 1, CATEGORIES_HEADERS.length).setFontWeight('bold').setBackground('#15321e').setFontColor('#ffffff');
+    sh.setColumnWidth(1, 200);
+    sh.setColumnWidth(2, 95);
+    sh.setColumnWidth(3, 110);
+    sh.setColumnWidth(4, 280);
+  }
+  return sh;
+}
+
+function getDeletedCategoryNames_() {
+  try {
+    const raw = PropertiesService.getScriptProperties().getProperty('DELETED_CATEGORY_NAMES');
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function setDeletedCategoryNames_(arr) {
+  const unique = Array.from(new Set((arr || []).map(function (x) { return String(x || '').trim(); }).filter(Boolean)));
+  PropertiesService.getScriptProperties().setProperty('DELETED_CATEGORY_NAMES', JSON.stringify(unique.slice(0, 300)));
+  return unique;
+}
+
+function readCategoriesMaster_() {
+  const sh = categoriesSheet_();
+  const last = sh.getLastRow();
+  if (last < 2) return [];
+  const rows = sh.getRange(2, 1, last - 1, CATEGORIES_HEADERS.length).getValues();
+  const out = [];
+  rows.forEach(function (r) {
+    const cname = String(r[0] || '').trim();
+    if (!cname) return;
+    out.push({
+      name: cname,
+      prefix: String(r[1] || '').trim(),
+      image: String(r[3] || '').trim() || 'assets/Categories/Comming-Soon.png'
+    });
+  });
+  return out;
+}
+
+function saveCategoryMaster_(token, catObj, oldName, siteBaseUrl) {
+  if (!validToken_(token)) return { ok: false, error: 'auth' };
+  if (!catObj || !catObj.name) return { ok: false, error: 'invalid_category' };
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const sh = categoriesSheet_();
+    const cname = safe_(catObj.name, 80);
+    const prevName = safe_(oldName || cname, 80);
+    const prefix = safe_(catObj.prefix || cname.replace(/[^A-Za-z]/g, '').toUpperCase().slice(0, 3), 10);
+    const resolvedImg = resolveMediaUrl_(catObj.image, 'CAT_' + cname.replace(/[^A-Za-z0-9]/g, '_'), siteBaseUrl);
+    const previewFormula = buildPreviewFormula_(resolvedImg, siteBaseUrl);
+    const now = new Date();
+
+    setDeletedCategoryNames_(getDeletedCategoryNames_().filter(function (x) {
+      return x.toLowerCase() !== cname.toLowerCase();
+    }));
+
+    const rowData = [cname, prefix, previewFormula, resolvedImg, now];
+    const last = sh.getLastRow();
+    let targetRow = -1;
+    if (last >= 2) {
+      const names = sh.getRange(2, 1, last - 1, 1).getValues();
+      for (let i = 0; i < names.length; i++) {
+        const existing = String(names[i][0] || '').trim();
+        if (existing.toLowerCase() === prevName.toLowerCase() || existing.toLowerCase() === cname.toLowerCase()) {
+          targetRow = i + 2;
+          break;
+        }
+      }
+    }
+
+    if (targetRow > 0) {
+      sh.getRange(targetRow, 1, 1, CATEGORIES_HEADERS.length).setValues([rowData]);
+      if (previewFormula) sh.setRowHeight(targetRow, 95);
+    } else {
+      sh.appendRow(rowData);
+      if (previewFormula) sh.setRowHeight(sh.getLastRow(), 95);
+    }
+
+    if (prevName && cname && prevName.toLowerCase() !== cname.toLowerCase()) {
+      const pSh = productsSheet_();
+      const pLast = pSh.getLastRow();
+      if (pLast >= 2) {
+        const pCats = pSh.getRange(2, 2, pLast - 1, 1).getValues();
+        for (let r = 0; r < pCats.length; r++) {
+          if (String(pCats[r][0] || '').trim().toLowerCase() === prevName.toLowerCase()) {
+            pSh.getRange(r + 2, 2).setValue(cname);
+          }
+        }
+      }
+      const sSh = stockSheet_();
+      const sLast = sSh.getLastRow();
+      if (sLast >= 2) {
+        const sCats = sSh.getRange(2, 3, sLast - 1, 1).getValues();
+        for (let r = 0; r < sCats.length; r++) {
+          if (String(sCats[r][0] || '').trim().toLowerCase() === prevName.toLowerCase()) {
+            sSh.getRange(r + 2, 3).setValue(cname);
+          }
+        }
+      }
+    }
+
+    return {
+      ok: true,
+      categories: readCategoriesMaster_(),
+      deletedCategoryNames: getDeletedCategoryNames_(),
+      products: readProductsMaster_()
+    };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function deleteCategoryMaster_(token, categoryName) {
+  if (!validToken_(token)) return { ok: false, error: 'auth' };
+  const cname = safe_(categoryName, 80);
+  if (!cname) return { ok: false, error: 'bad_category' };
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const sh = categoriesSheet_();
+    setDeletedCategoryNames_(getDeletedCategoryNames_().concat([cname]));
+    const last = sh.getLastRow();
+    if (last >= 2) {
+      const names = sh.getRange(2, 1, last - 1, 1).getValues();
+      for (let i = names.length - 1; i >= 0; i--) {
+        if (String(names[i][0] || '').trim().toLowerCase() === cname.toLowerCase()) {
+          sh.deleteRow(i + 2);
+        }
+      }
+    }
+
+    const pSh = productsSheet_();
+    const pLast = pSh.getLastRow();
+    const removedPids = [];
+    if (pLast >= 2) {
+      const pRows = pSh.getRange(2, 1, pLast - 1, 2).getValues();
+      for (let r = pRows.length - 1; r >= 0; r--) {
+        if (String(pRows[r][1] || '').trim().toLowerCase() === cname.toLowerCase()) {
+          const pid = String(pRows[r][0] || '').trim();
+          if (pid) removedPids.push(pid);
+          pSh.deleteRow(r + 2);
+        }
+      }
+    }
+    if (removedPids.length > 0) {
+      setDeletedProductIds_(getDeletedProductIds_().concat(removedPids));
+    }
+
+    const sSh = stockSheet_();
+    const sLast = sSh.getLastRow();
+    if (sLast >= 2) {
+      const sCats = sSh.getRange(2, 3, sLast - 1, 1).getValues();
+      for (let r = sCats.length - 1; r >= 0; r--) {
+        if (String(sCats[r][0] || '').trim().toLowerCase() === cname.toLowerCase()) {
+          sSh.deleteRow(r + 2);
+        }
+      }
+    }
+
+    return {
+      ok: true,
+      categories: readCategoriesMaster_(),
+      deletedCategoryNames: getDeletedCategoryNames_(),
+      products: readProductsMaster_(),
+      deletedIds: getAllDeletedIds_()
+    };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// ---------- OFFERS MASTER SHEET ("Offers" tab) ----------
+function offersSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName(OFFERS_SHEET_NAME);
+  if (!sh) {
+    sh = ss.insertSheet(OFFERS_SHEET_NAME);
+    sh.appendRow(OFFERS_HEADERS);
+    sh.setFrozenRows(1);
+    sh.getRange(1, 1, 1, OFFERS_HEADERS.length).setFontWeight('bold').setBackground('#15321e').setFontColor('#ffffff');
+    sh.setColumnWidth(1, 110);
+    sh.setColumnWidth(2, 110);
+    sh.setColumnWidth(5, 210);
+    sh.setColumnWidth(6, 300);
+  }
+  return sh;
+}
+
+function readOffersMaster_() {
+  const sh = offersSheet_();
+  const last = sh.getLastRow();
+  if (last < 2) return [];
+  const rows = sh.getRange(2, 1, last - 1, OFFERS_HEADERS.length).getValues();
+  return rows.map(function (r) {
+    const oid = String(r[0] || '').trim();
+    if (!oid) return null;
+    return {
+      id: oid,
+      type: String(r[1] || 'card').trim(),
+      badge1: String(r[2] || '').trim(),
+      badge2: String(r[3] || '').trim(),
+      title: String(r[4] || '').trim(),
+      desc: String(r[5] || '').trim(),
+      targetCategory: String(r[6] || 'All').trim(),
+      featuredGreen: String(r[7]).toUpperCase() === 'YES' || r[7] === true,
+      active: String(r[8]).toUpperCase() !== 'NO'
+    };
+  }).filter(Boolean);
+}
+
+function saveOfferMaster_(token, offer) {
+  if (!validToken_(token)) return { ok: false, error: 'auth' };
+  if (!offer || !offer.title) return { ok: false, error: 'invalid_offer' };
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const sh = offersSheet_();
+    const oid = safe_(offer.id || ('OFR-' + Date.now().toString().slice(-5)), 30);
+    const rowData = [
+      oid,
+      safe_(offer.type || 'card', 30),
+      safe_(offer.badge1 || '', 60),
+      safe_(offer.badge2 || '', 60),
+      safe_(offer.title || '', 120),
+      safe_(offer.desc || '', 300),
+      safe_(offer.targetCategory || 'All', 80),
+      offer.featuredGreen ? 'YES' : 'NO',
+      offer.active === false ? 'NO' : 'YES',
+      new Date()
+    ];
+    const last = sh.getLastRow();
+    let targetRow = -1;
+    if (last >= 2) {
+      const ids = sh.getRange(2, 1, last - 1, 1).getValues();
+      for (let i = 0; i < ids.length; i++) {
+        if (String(ids[i][0] || '').trim() === oid) {
+          targetRow = i + 2;
+          break;
+        }
+      }
+    }
+    if (targetRow > 0) {
+      sh.getRange(targetRow, 1, 1, OFFERS_HEADERS.length).setValues([rowData]);
+    } else {
+      sh.appendRow(rowData);
+    }
+    return { ok: true, offers: readOffersMaster_() };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function deleteOfferMaster_(token, offerId) {
+  if (!validToken_(token)) return { ok: false, error: 'auth' };
+  const oid = safe_(offerId, 30);
+  if (!oid) return { ok: false, error: 'bad_offer' };
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const sh = offersSheet_();
+    const last = sh.getLastRow();
+    if (last >= 2) {
+      const ids = sh.getRange(2, 1, last - 1, 1).getValues();
+      for (let i = ids.length - 1; i >= 0; i--) {
+        if (String(ids[i][0] || '').trim() === oid) {
+          sh.deleteRow(i + 2);
+        }
+      }
+    }
+    return { ok: true, offers: readOffersMaster_() };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function getOrdersByMobile_(mobile) {
+  const cleanMob = String(mobile || '').replace(/[^0-9]/g, '').slice(-10);
+  if (cleanMob.length !== 10) {
+    return { ok: false, error: 'invalid_mobile' };
+  }
+  const allOrders = readOrders_().filter(function (o) {
+    const om = String((o.customer && o.customer.mobile) || '').replace(/[^0-9]/g, '').slice(-10);
+    return om === cleanMob;
+  });
+  const allEnqs = readEnquiries_().filter(function (eq) {
+    const em = String(eq.mobile || '').replace(/[^0-9]/g, '').slice(-10);
+    return em === cleanMob;
+  });
+  return { ok: true, orders: allOrders, enquiries: allEnqs };
+}
+
 function setup() {
+  categoriesSheet_();
+  offersSheet_();
   sheet_();
   stockSheet_();
   enquirySheet_();

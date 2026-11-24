@@ -1,3 +1,15 @@
+function handleSmartImgError(imgEl, backupSrc) {
+  if (!imgEl) return;
+  const triedBackup = imgEl.dataset.triedBackup === "1";
+  if (!triedBackup && backupSrc && imgEl.src !== backupSrc && !backupSrc.includes("Comming-Soon.png")) {
+    imgEl.dataset.triedBackup = "1";
+    imgEl.src = backupSrc;
+    return;
+  }
+  imgEl.onerror = null;
+  imgEl.src = "assets/Categories/Comming-Soon.png";
+}
+
 // Kisi bhi user-written text ko HTML me dikhane se pehle escape karta hai (XSS se bachav)
 function esc(v) {
   return String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -22,8 +34,13 @@ function toSheetOrder(o) {
     const preOrderStock = typeof it.preOrderStock === "number"
       ? it.preOrderStock
       : (prod ? Math.max(0, parseInt(prod.availableStock, 10) || 0) : 0);
+    const offerP = Number(it.price) || (prod ? Number(prod.price) : 0) || 0;
+    const actualP = Number(it.actualPrice) || (prod && Number(prod.actualPrice) > offerP ? Number(prod.actualPrice) : offerP);
     return {
       ...it,
+      category: it.category || (prod ? prod.category : "") || "",
+      price: offerP,
+      actualPrice: actualP,
       image: getFullImageUrl(it.image),
       currentStock: preOrderStock
     };
@@ -31,6 +48,7 @@ function toSheetOrder(o) {
   return {
     orderId: o.orderId,
     timestamp: o.timestamp,
+    siteBaseUrl: (typeof window !== 'undefined' && window.location) ? window.location.href.split('#')[0].split('?')[0].replace(/\/[^\/]*$/, '') : '',
     date: o.date,
     total: o.total,
     customer: o.customer,
@@ -63,7 +81,19 @@ let stockEnquiryModalInstance = null;
 // ==========================================
 const BASELINE_DEFAULT_PRODUCTS = JSON.parse(JSON.stringify(PRODUCTS));
 
+const BASELINE_DEFAULT_CATEGORIES = JSON.parse(JSON.stringify(CATEGORIES));
+
+function syncCustomCategoriesFromStorage() {
+  try {
+    const customCats = JSON.parse(localStorage.getItem("riddhi_custom_categories_v1") || "null");
+    if (Array.isArray(customCats) && customCats.length > 0) {
+      CATEGORIES.splice(0, CATEGORIES.length, ...customCats);
+    }
+  } catch (e) {}
+}
+
 function syncCustomCatalogFromStorage() {
+  syncCustomCategoriesFromStorage();
   try {
     const customList = JSON.parse(localStorage.getItem("riddhi_custom_products_v1") || "null");
     if (Array.isArray(customList) && customList.length > 0) {
@@ -131,6 +161,7 @@ function getStockForProductSize(prod, sizeName) {
 }
 
 function refreshAllProductViews() {
+  renderHomeOffersAndMarquee();
   renderNewArrivals();
   if (document.getElementById("productListView") && !document.getElementById("productListView").classList.contains("d-none")) {
     applyFilters();
@@ -245,23 +276,79 @@ async function syncGlobalStockFromSheet() {
     const remoteRes = await callScript({ action: "getProducts" });
 
     if (remoteRes && remoteRes.ok) {
+      if (Array.isArray(remoteRes.offers) && remoteRes.offers.length > 0) {
+        localStorage.setItem("riddhi_custom_offers_v1", JSON.stringify(remoteRes.offers));
+        renderHomeOffersAndMarquee();
+      }
+      if (Array.isArray(remoteRes.categories) && remoteRes.categories.length > 0) {
+        const delCats = (Array.isArray(remoteRes.deletedCategoryNames) ? remoteRes.deletedCategoryNames : []).map(x => x.toLowerCase());
+        const mergedCats = JSON.parse(JSON.stringify(BASELINE_DEFAULT_CATEGORIES))
+          .filter(c => !delCats.includes(c.name.toLowerCase()));
+        let cachedCats = [];
+        try {
+          const rc = localStorage.getItem("riddhi_custom_categories_v1");
+          if (rc) cachedCats = JSON.parse(rc);
+        } catch (e) {}
+
+        remoteRes.categories.forEach(sc => {
+          if (!sc || !sc.name || delCats.includes(sc.name.toLowerCase())) return;
+          const baseCat = mergedCats.find(m => m.name.toLowerCase() === sc.name.toLowerCase());
+          const cachedCat = Array.isArray(cachedCats) ? cachedCats.find(cc => cc && cc.name.toLowerCase() === sc.name.toLowerCase()) : null;
+          const preferredLocalImg = (baseCat && baseCat.image && !baseCat.image.includes("Comming-Soon.png"))
+            ? baseCat.image
+            : ((cachedCat && cachedCat.image && !cachedCat.image.includes("Comming-Soon.png")) ? cachedCat.image : "");
+          const scImg = preferredLocalImg || ((sc.image && !sc.image.includes("Comming-Soon.png")) ? sc.image : "assets/Categories/Comming-Soon.png");
+          if (baseCat) {
+            const ci = mergedCats.indexOf(baseCat);
+            mergedCats[ci] = { ...baseCat, ...sc, image: scImg };
+          } else {
+            mergedCats.push({ ...sc, image: scImg });
+          }
+        });
+        CATEGORIES.splice(0, CATEGORIES.length, ...mergedCats);
+        localStorage.setItem("riddhi_custom_categories_v1", JSON.stringify(CATEGORIES));
+        renderCategories();
+      }
       const deletedIds = Array.isArray(remoteRes.deletedIds) ? remoteRes.deletedIds : [];
       const mergedCatalog = JSON.parse(JSON.stringify(BASELINE_DEFAULT_PRODUCTS))
         .filter(p => !deletedIds.includes(p.id));
+
+      let cachedLocalProds = [];
+      try {
+        const rawCached = localStorage.getItem("riddhi_custom_products_v1");
+        if (rawCached) cachedLocalProds = JSON.parse(rawCached);
+      } catch (e) {}
 
       if (Array.isArray(remoteRes.products) && remoteRes.products.length > 0) {
         remoteRes.products.forEach(sp => {
           if (!sp || !sp.id || deletedIds.includes(sp.id)) return;
           const idx = mergedCatalog.findIndex(lp => lp.id === sp.id);
+          const baseItem = idx > -1 ? mergedCatalog[idx] : BASELINE_DEFAULT_PRODUCTS.find(bp => bp.id === sp.id);
+          const cachedItem = Array.isArray(cachedLocalProds) ? cachedLocalProds.find(cp => cp && cp.id === sp.id) : null;
+
+          const baseHasRealImgs = baseItem && Array.isArray(baseItem.images) && baseItem.images.length > 0 && !baseItem.images.every(u => String(u).includes("Comming-Soon.png"));
+          const cachedHasRealImgs = cachedItem && Array.isArray(cachedItem.images) && cachedItem.images.length > 0 && !cachedItem.images.every(u => String(u).includes("Comming-Soon.png"));
+          const spHasRealImgs = Array.isArray(sp.images) && sp.images.length > 0 && !sp.images.every(u => String(u).includes("Comming-Soon.png"));
+
+          // Prefer local folder asset / cached image if valid so images never flicker or disappear when Drive links are slow/blocked
+          const finalImgs = baseHasRealImgs
+            ? baseItem.images
+            : (cachedHasRealImgs ? cachedItem.images : (spHasRealImgs ? sp.images : ["assets/Categories/Comming-Soon.png"]));
+          const finalVid = (baseItem && baseItem.video) || (cachedItem && cachedItem.video) || sp.video || "";
+
           if (idx > -1) {
             mergedCatalog[idx] = {
               ...mergedCatalog[idx],
               ...sp,
-              images: (Array.isArray(sp.images) && sp.images.length > 0) ? sp.images : mergedCatalog[idx].images,
-              video: sp.video || mergedCatalog[idx].video || ""
+              images: finalImgs,
+              video: finalVid
             };
           } else {
-            mergedCatalog.unshift(sp);
+            mergedCatalog.unshift({
+              ...sp,
+              images: finalImgs,
+              video: finalVid
+            });
           }
         });
       }
@@ -281,40 +368,7 @@ async function syncGlobalStockFromSheet() {
       refreshAllProductViews();
     }
 
-    // 2. Ensure baseline catalog rows exist in Stock sheet if missing (excluding deleted IDs)
-    const catalogPayload = [];
-    PRODUCTS.forEach(p => {
-      const szObj = (p.sizeStock && Object.keys(p.sizeStock).length > 0)
-        ? p.sizeStock
-        : { "Free Size (Adjustable Dori)": Math.max(0, parseInt(p.availableStock, 10) || 0) };
-      Object.entries(szObj).forEach(([sz, st]) => {
-        catalogPayload.push({
-          id: p.id,
-          category: p.category,
-          name: p.name,
-          size: sz,
-          image: getFullImageUrl((p.images && p.images[0]) || ""),
-          availableStock: Math.max(0, parseInt(st, 10) || 0)
-        });
-      });
-    });
-
-    const r = await callScript({ action: "syncCatalog", products: catalogPayload });
-    if (r && r.ok && r.sizeStock && typeof r.sizeStock === "object") {
-      let stockChanged = false;
-      PRODUCTS.forEach(p => {
-        if (r.sizeStock[p.id] && Object.keys(r.sizeStock[p.id]).length > 0) {
-          p.sizeStock = { ...r.sizeStock[p.id] };
-          p.sizes = Object.keys(p.sizeStock);
-          p.availableStock = Object.values(p.sizeStock).reduce((s, v) => s + (Math.max(0, parseInt(v, 10) || 0)), 0);
-          stockChanged = true;
-        }
-      });
-      if (stockChanged) {
-        savePersistedStock();
-        refreshAllProductViews();
-      }
-    }
+    // Stock tab is managed manually by Admin from Admin Panel (no auto-seeding of stock rows).
   } catch (e) { /* offline fallback */ }
 }
 
@@ -496,6 +550,139 @@ function calcDiscountPercent(actualPrice, offerPrice) {
   return Math.round(((act - off) / act) * 100);
 }
 
+
+// ==========================================
+// SEPARATE CUSTOMER MOBILE-ONLY LOGIN / LOGOUT SESSION
+// ==========================================
+function getCustomerSessionMobile() {
+  try {
+    const m = String(localStorage.getItem("riddhi_customer_mobile_session") || "").replace(/[^0-9]/g, "").slice(-10);
+    if (m.length === 10) return m;
+  } catch (e) {}
+  return "";
+}
+
+function updateCustomerAccountUI() {
+  const mob = getCustomerSessionMobile();
+  const navBtn = document.getElementById("navCustAccountBtn");
+  const navLbl = document.getElementById("navCustAccountLabel");
+  const sideOut = document.getElementById("sidebarCustLoggedOutView");
+  const sideIn = document.getElementById("sidebarCustLoggedInView");
+  const sideMob = document.getElementById("sidebarCustMobileDisplay");
+  const drwTxt = document.getElementById("drawerCustStatusText");
+  const drwLoginBtn = document.getElementById("drawerCustLoginBtn");
+  const drwLogoutBtn = document.getElementById("drawerCustLogoutBtn");
+
+  if (mob) {
+    const fmtMob = `+91 ${mob.slice(0, 5)} ${mob.slice(5)}`;
+    if (navBtn) {
+      navBtn.className = "btn btn-success btn-sm px-2 py-1 d-flex align-items-center gap-1 rounded-pill";
+      navBtn.title = `Logged in: ${fmtMob} (Click to view Orders/Enquiries)`;
+    }
+    if (navLbl) navLbl.textContent = mob;
+    if (sideOut) sideOut.classList.add("d-none");
+    if (sideIn) sideIn.classList.remove("d-none");
+    if (sideMob) sideMob.textContent = fmtMob;
+    if (drwTxt) drwTxt.innerHTML = `<i class="bi bi-check-circle-fill text-success me-1"></i>Synced: <strong>${esc(fmtMob)}</strong>`;
+    if (drwLoginBtn) drwLoginBtn.classList.add("d-none");
+    if (drwLogoutBtn) drwLogoutBtn.classList.remove("d-none");
+  } else {
+    if (navBtn) {
+      navBtn.className = "btn btn-outline-dark btn-sm px-2 py-1 d-flex align-items-center gap-1 rounded-pill";
+      navBtn.title = "Customer Mobile Login";
+    }
+    if (navLbl) navLbl.textContent = "Login";
+    if (sideOut) sideOut.classList.remove("d-none");
+    if (sideIn) sideIn.classList.add("d-none");
+    if (drwTxt) drwTxt.textContent = "Login with mobile no. to load orders from all devices";
+    if (drwLoginBtn) drwLoginBtn.classList.remove("d-none");
+    if (drwLogoutBtn) drwLogoutBtn.classList.add("d-none");
+  }
+}
+
+function handleCustomerAccountBtnClick() {
+  const mob = getCustomerSessionMobile();
+  if (mob) {
+    const oc = document.getElementById("myOrdersOffcanvas");
+    if (oc) bootstrap.Offcanvas.getOrCreateInstance(oc).show();
+  } else {
+    openCustomerMobileLoginModal();
+  }
+}
+
+function openCustomerMobileLoginModal() {
+  const el = document.getElementById("customerMobileLoginModal");
+  if (!el) return;
+  const inp = document.getElementById("custLoginMobileInput");
+  const err = document.getElementById("custMobileLoginErr");
+  if (err) err.classList.add("d-none");
+  if (inp) inp.value = getCustomerSessionMobile() || "";
+  bootstrap.Modal.getOrCreateInstance(el).show();
+}
+
+async function submitCustomerMobileLogin(e) {
+  e.preventDefault();
+  const inp = document.getElementById("custLoginMobileInput");
+  const err = document.getElementById("custMobileLoginErr");
+  const btn = document.getElementById("custMobileLoginSubmitBtn");
+  const digits = String(inp?.value || "").replace(/[^0-9]/g, "").slice(-10);
+
+  if (digits.length !== 10) {
+    if (err) {
+      err.textContent = "Please enter a valid 10-digit mobile number.";
+      err.classList.remove("d-none");
+    }
+    return;
+  }
+
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span>Loading History...`;
+  }
+
+  try {
+    localStorage.setItem("riddhi_customer_mobile_session", digits);
+    localStorage.removeItem("riddhi_customer_logged_out");
+    // Reset any prior clear-history filter so all previous orders & enquiries for this mobile load immediately!
+    localStorage.removeItem("riddhi_orders_cleared_at");
+    localStorage.removeItem("riddhi_enquiries_cleared_at");
+
+    const savedCust = getSavedCustomer() || { name: "", address: "", city: "", pincode: "" };
+    savedCust.mobile = digits;
+    localStorage.setItem("riddhi_customer", JSON.stringify(savedCust));
+
+    updateCustomerAccountUI();
+    await refreshMyOrderStatuses(true);
+
+    const modalEl = document.getElementById("customerMobileLoginModal");
+    if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+
+    const oc = document.getElementById("myOrdersOffcanvas");
+    if (oc) bootstrap.Offcanvas.getOrCreateInstance(oc).show();
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = `<i class="bi bi-check2-circle me-1"></i> Login &amp; Sync`;
+    }
+  }
+}
+
+function logoutCustomerMobileSession() {
+  try {
+    localStorage.removeItem("riddhi_customer_mobile_session");
+    localStorage.removeItem("riddhi_customer");
+    localStorage.removeItem("riddhi_orders");
+    localStorage.removeItem("riddhi_enquiries");
+    localStorage.setItem("riddhi_customer_logged_out", "1");
+    sessionStorage.removeItem("riddhi_customer_mobile_session");
+    sessionStorage.removeItem("riddhi_orders");
+    sessionStorage.removeItem("riddhi_enquiries");
+  } catch (e) {}
+  updateCustomerAccountUI();
+  renderMyOrders();
+  renderCustomerMyEnquiriesTab();
+}
+
 // ==========================================
 // INITIALIZATION
 // ==========================================
@@ -533,6 +720,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   initCityAutocomplete();
+  renderHomeOffersAndMarquee();
   renderNewArrivals();
   renderCategories();
   initStockCategoryFilters();
@@ -541,6 +729,7 @@ document.addEventListener("DOMContentLoaded", () => {
   autoDeliverLocalOrders();
   renderMyOrders();
   syncPendingOrders();
+  updateCustomerAccountUI();
   updateAdminMenuLabel();
   checkAdminHash();
   if (location.hash === "#favorites") {
@@ -567,7 +756,7 @@ function buildProductCardHtml(prod, idx = 0, showNewBadge = false) {
       <div class="product-card ${isOut ? "out-of-stock" : ""}" onclick="openProductDetail('${prod.id}')">
         <div>
           <div class="position-relative">
-            <img src="${prod.images[0]}" alt="${esc(prod.name)}">
+            <img src="${esc((prod.images && prod.images[0]) || 'assets/Categories/Comming-Soon.png')}" alt="${esc(prod.name)}" onerror="handleSmartImgError(this, 'assets/Categories/Comming-Soon.png');">
             ${showNewBadge ? `<span class="badge bg-warning text-dark position-absolute top-0 start-0 m-2" style="font-size: 10px;">NEW</span>` : ""}
             ${discPct > 0 && !showNewBadge ? `<span class="discount-badge position-absolute top-0 start-0 m-2">${discPct}% OFF</span>` : ""}
             ${isOut
@@ -600,6 +789,106 @@ function buildProductCardHtml(prod, idx = 0, showNewBadge = false) {
   `;
 }
 
+
+// ==========================================
+// HOME PAGE OFFERS & MARQUEE RENDERER (Synced with admin-offers.html & Google Sheet)
+// ==========================================
+const DEFAULT_HOME_OFFERS = [
+  { id: "OFR-MARQ-1", type: "marquee", badge1: "Festive Offer", badge2: "", title: "Up to 30% OFF on Handcrafted Chokers, Nath & Bridal Combos!", desc: "", targetCategory: "All", targetCategories: ["All"], featuredGreen: false, active: true },
+  { id: "OFR-MARQ-2", type: "marquee", badge1: "Limited Stock", badge2: "", title: "Only 1–2 Ready Pieces per Design — Book Yours Before It Sells Out!", desc: "", targetCategory: "All", targetCategories: ["All"], featuredGreen: false, active: true },
+  { id: "OFR-MARQ-3", type: "marquee", badge1: "Custom Bulk", badge2: "", title: "Need 3–4+ Pieces for Weddings or Haldi? Custom Making Available!", desc: "", targetCategory: "All", targetCategories: ["All"], featuredGreen: false, active: true },
+  { id: "OFR-CARD-1", type: "card", badge1: "LIMITED TIME DEAL", badge2: "FLAT ₹400 OFF", title: "Bridal & Festive Combos", desc: "Complete Choker + Necklace + Earrings + Mangalsutra sets at special festive offer prices.", targetCategory: "Combo Set", targetCategories: ["Combo Set"], featuredGreen: true, active: true },
+  { id: "OFR-CARD-2", type: "card", badge1: "HURRY • 1–2 PCS LEFT", badge2: "READY TO SHIP", title: "Exclusive Handmade Drops", desc: "Each piece is handcrafted in small batches. Grab ready stock before it switches to Available Soon!", targetCategory: "All", targetCategories: ["All"], featuredGreen: false, active: true },
+  { id: "OFR-CARD-3", type: "card", badge1: "WEDDING & HALDI SPECIAL", badge2: "25%–32% OFF", title: "Peshwai Nath & Haldi Sets", desc: "Traditional Moti Nath, Bugadi & Sugar-Ball sets. Bulk 3+ custom orders welcome!", targetCategory: "Nath", targetCategories: ["Nath"], featuredGreen: false, active: true }
+];
+
+function getHomeOffersConfig() {
+  try {
+    const raw = localStorage.getItem("riddhi_custom_offers_v1");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (e) {}
+  return JSON.parse(JSON.stringify(DEFAULT_HOME_OFFERS));
+}
+
+function renderHomeOffersAndMarquee() {
+  const allOffers = getHomeOffersConfig().filter(o => o && o.active !== false);
+
+  const marqueeTrack = document.getElementById("offerMarqueeTrack");
+  if (marqueeTrack) {
+    const marqItems = allOffers.filter(o => o.type === "marquee");
+    const listToUse = marqItems.length > 0 ? marqItems : DEFAULT_HOME_OFFERS.filter(o => o.type === "marquee");
+    const singlePass = listToUse.map(m => `
+      <div class="offer-marquee-item">
+        <span class="gold-pill">${esc(m.badge1 || "Offer")}</span>
+        <span>${esc(m.title || "")}</span>
+      </div>`).join("");
+    marqueeTrack.innerHTML = singlePass + singlePass;
+  }
+
+  const cardsRow = document.getElementById("homeOfferCardsRow");
+  if (cardsRow) {
+    const cardItems = allOffers.filter(o => o.type !== "marquee");
+    if (cardItems.length === 0) {
+      cardsRow.innerHTML = "";
+      return;
+    }
+    cardsRow.innerHTML = cardItems.map((c, idx) => {
+      const catsArr = Array.isArray(c.targetCategories) && c.targetCategories.length > 0
+        ? c.targetCategories
+        : (c.targetCategory ? [c.targetCategory] : ["All"]);
+      const encodedCats = encodeURIComponent(JSON.stringify(catsArr));
+      const isGreen = !!c.featuredGreen;
+      const delay = Math.min(idx * 0.08, 0.35).toFixed(2);
+      return `
+        <div class="col-12 col-md-4 stagger-card" style="animation-delay: ${delay}s;">
+          <div class="offer-highlight-card ${isGreen ? "featured-green" : ""}" onclick="openOfferTargetCategories('${encodedCats}', '${esc(c.title || "")}')">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span class="${isGreen ? "offer-urgency-pill" : "badge bg-danger"}">${esc(c.badge1 || "OFFER")}</span>
+              ${c.badge2 ? `<span class="badge ${isGreen ? "" : "bg-success-subtle text-success border border-success-subtle"}" style="${isGreen ? "background-color: var(--accent-gold); color: #15321e;" : ""}">${esc(c.badge2)}</span>` : ""}
+            </div>
+            <h5 class="brand-font fw-bold mb-1" style="color: ${isGreen ? "var(--accent-gold-light)" : "var(--primary-green)"};">${esc(c.title || "")}</h5>
+            <p class="small mb-2 ${isGreen ? "opacity-90" : "text-muted"}">${esc(c.desc || "")}</p>
+            <span class="small fw-semibold ${isGreen ? "text-warning" : ""}" style="${isGreen ? "" : "color: var(--primary-green);"}">Shop Now <i class="bi bi-arrow-right"></i></span>
+          </div>
+        </div>`;
+    }).join("");
+  }
+}
+
+let activeMultiCategoryFilter = null;
+
+function openOfferTargetCategories(encodedCatsJson, offerTitle = "") {
+  let cats = ["All"];
+  try {
+    const parsed = JSON.parse(decodeURIComponent(encodedCatsJson));
+    if (Array.isArray(parsed) && parsed.length > 0) cats = parsed;
+  } catch (e) {}
+
+  if (cats.includes("All") || cats.length === 0) {
+    activeMultiCategoryFilter = null;
+    openProductsView("All");
+    return;
+  }
+  if (cats.length === 1) {
+    activeMultiCategoryFilter = null;
+    openProductsView(cats[0]);
+    return;
+  }
+
+  activeMultiCategoryFilter = cats;
+  hideAllViews();
+  document.getElementById("productListView").classList.remove("d-none");
+  document.getElementById("filterCategory").value = "All";
+  document.getElementById("filterSearch").value = "";
+  document.getElementById("filterPrice").value = "default";
+  document.getElementById("collectionHeading").innerText = offerTitle ? `${offerTitle} (${cats.join(", ")})` : cats.join(" & ");
+  applyFilters();
+  window.scrollTo(0, 0);
+}
+
 // ==========================================
 // NEW ARRIVALS ON HOME PAGE
 // ==========================================
@@ -617,6 +906,9 @@ function renderCategories() {
   const homeGrid = document.getElementById("homeCategoryGrid");
   const sidebarList = document.getElementById("sidebarCategoryList");
   const filterDropdown = document.getElementById("filterCategory");
+  if (homeGrid) homeGrid.innerHTML = "";
+  if (sidebarList) sidebarList.innerHTML = "";
+  if (filterDropdown) filterDropdown.innerHTML = `<option value="All">All Categories</option>`;
 
   CATEGORIES.forEach((cat, idx) => {
     const delay = Math.min(idx * 0.04, 0.5).toFixed(2);
@@ -624,7 +916,7 @@ function renderCategories() {
       homeGrid.innerHTML += `
         <div class="col-6 col-md-4 col-lg-3 stagger-card" style="animation-delay: ${delay}s;">
           <div class="custom-card" onclick="openProductsView('${cat.name}')">
-            <img src="${cat.image}" alt="${cat.name}">
+            <img src="${esc(cat.image)}" alt="${esc(cat.name)}" onerror="handleSmartImgError(this, 'assets/Categories/Comming-Soon.png');">
             <div class="card-footer-title">${cat.name}</div>
           </div>
         </div>
@@ -667,8 +959,14 @@ function navigateTo(viewName) {
 }
 
 function openProductsView(selectedCat = "All") {
+  if (selectedCat !== "All") activeMultiCategoryFilter = null;
   hideAllViews();
   document.getElementById("productListView").classList.remove("d-none");
+  if (selectedCat === "All" && Array.isArray(activeMultiCategoryFilter) && activeMultiCategoryFilter.length > 1) {
+    // keep custom multi-category heading
+  } else {
+    activeMultiCategoryFilter = null;
+  }
   document.getElementById("filterCategory").value = selectedCat;
   document.getElementById("filterSearch").value = "";
   document.getElementById("filterPrice").value = "default";
@@ -685,7 +983,11 @@ function applyFilters() {
     selectedCat === "All" ? "All Products" : selectedCat + " Collection";
 
   let filtered = PRODUCTS.filter(prod => {
-    const matchCat = (selectedCat === "All") || (prod.category.toLowerCase() === selectedCat.toLowerCase());
+    const matchCat = (selectedCat !== "All")
+      ? (prod.category.toLowerCase() === selectedCat.toLowerCase())
+      : (Array.isArray(activeMultiCategoryFilter) && activeMultiCategoryFilter.length > 0
+          ? activeMultiCategoryFilter.some(mc => String(mc).toLowerCase() === String(prod.category || "").toLowerCase())
+          : true);
     const matchSearch = prod.name.toLowerCase().includes(searchText) ||
                         prod.category.toLowerCase().includes(searchText) ||
                         prod.desc.toLowerCase().includes(searchText);
@@ -825,16 +1127,16 @@ function openProductDetail(productId) {
     : ["assets/Categories/Comming-Soon.png"];
   prodImgs.slice(0, 3).forEach((imgUrl, idx) => {
     thumbContainer.innerHTML += `
-      <div class="thumb-item ${idx === 0 ? "active" : ""}" onclick="setMainMedia('image', '${imgUrl}', this)">
-        <img src="${imgUrl}" alt="Photo ${idx + 1}">
+      <div class="thumb-item ${idx === 0 ? "active" : ""}" onclick="setMainMedia('image', '${encodeURIComponent(imgUrl)}', this)">
+        <img src="${esc(imgUrl)}" alt="Photo ${idx + 1}">
       </div>
     `;
   });
 
   if (currentProduct.video) {
     thumbContainer.innerHTML += `
-      <div class="thumb-item" onclick="setMainMedia('video', '${currentProduct.video}', this)">
-        <img src="${currentProduct.images[0]}" alt="Video Preview">
+      <div class="thumb-item" onclick="setMainMedia('video', '${encodeURIComponent(currentProduct.video)}', this)">
+        <img src="${esc(prodImgs[0])}" alt="Video Preview">
         <div class="video-badge-icon"><i class="bi bi-play-circle-fill"></i></div>
       </div>
     `;
@@ -847,8 +1149,28 @@ function openProductDetail(productId) {
   if (productModalInstance) productModalInstance.show();
 }
 
+function buildVideoPlayerHtml(rawSrc, posterImg, isFullscreen = false) {
+  const cleanSrc = String(rawSrc || "").trim();
+  const driveMatch = cleanSrc.match(/drive\.google\.com\/(?:file\/d\/|uc\?[^#]*id=)([A-Za-z0-9_-]+)/i);
+  if (driveMatch && driveMatch[1]) {
+    const previewUrl = `https://drive.google.com/file/d/${driveMatch[1]}/preview`;
+    const styleStr = isFullscreen
+      ? "width:92vw;height:82vh;border:0;border-radius:10px;background:#000;"
+      : "width:100%;height:100%;border:0;background:#000;";
+    return `<iframe src="${esc(previewUrl)}" allow="autoplay; fullscreen" allowfullscreen style="${styleStr}"></iframe>`;
+  }
+  const styleStr = isFullscreen
+    ? "max-width:96vw;max-height:90vh;border-radius:10px;background:#000;"
+    : "width:100%;height:100%;object-fit:cover;background:#000;";
+  return `
+    <video id="${isFullscreen ? "fullscreenProductVideo" : "activeProductVideo"}" src="${esc(cleanSrc)}" poster="${esc(posterImg)}" controls autoplay muted loop playsinline preload="auto" style="${styleStr}">
+      <source src="${esc(cleanSrc)}" type="video/mp4">
+    </video>`;
+}
 function setMainMedia(type, src, thumbEl) {
-  currentActiveMedia = { type, src };
+  let cleanSrc = String(src || "");
+  try { cleanSrc = decodeURIComponent(cleanSrc); } catch (e) {}
+  currentActiveMedia = { type, src: cleanSrc };
   const mainBox = document.getElementById("modalMainMedia");
   document.querySelectorAll(".thumb-item").forEach(el => el.classList.remove("active"));
   if (thumbEl) thumbEl.classList.add("active");
@@ -856,17 +1178,16 @@ function setMainMedia(type, src, thumbEl) {
   const fsBtnHtml = `<button type="button" class="fullscreen-btn" onclick="openFullscreenMedia()" title="Full Screen"><i class="bi bi-arrows-fullscreen"></i> Full Screen</button>`;
 
   if (type === "video") {
-    mainBox.innerHTML = `${fsBtnHtml}<video id="activeProductVideo" src="${src}" poster="${currentProduct ? currentProduct.images[0] : ''}" controls autoplay muted loop playsinline preload="auto"></video>`;
+    const posterImg = (currentProduct && currentProduct.images && currentProduct.images[0]) ? currentProduct.images[0] : "assets/Categories/Comming-Soon.png";
+    mainBox.innerHTML = `${fsBtnHtml}${buildVideoPlayerHtml(cleanSrc, posterImg, false)}`;
     const vidEl = document.getElementById("activeProductVideo");
     if (vidEl) {
       vidEl.muted = true;
-      const playPromise = vidEl.play();
-      if (playPromise !== undefined) {
-        playPromise.catch(() => {});
-      }
+      const p = vidEl.play();
+      if (p !== undefined) p.catch(() => {});
     }
   } else {
-    mainBox.innerHTML = `${fsBtnHtml}<img src="${src}" alt="Product View" onclick="openFullscreenMedia()">`;
+    mainBox.innerHTML = `${fsBtnHtml}<img src="${esc(cleanSrc)}" alt="Product View" onclick="openFullscreenMedia()">`;
   }
 }
 
@@ -877,9 +1198,16 @@ function openFullscreenMedia() {
   if (vid) vid.pause();
 
   if (currentActiveMedia.type === "video") {
-    content.innerHTML = `<video src="${currentActiveMedia.src}" controls autoplay muted loop playsinline preload="auto"></video>`;
+    const posterImg = (currentProduct && currentProduct.images && currentProduct.images[0]) ? currentProduct.images[0] : "assets/Categories/Comming-Soon.png";
+    content.innerHTML = buildVideoPlayerHtml(currentActiveMedia.src, posterImg, true);
+    const fVid = document.getElementById("fullscreenProductVideo");
+    if (fVid) {
+      fVid.muted = true;
+      const p = fVid.play();
+      if (p !== undefined) p.catch(() => {});
+    }
   } else {
-    content.innerHTML = `<img src="${currentActiveMedia.src}" alt="Full Screen View">`;
+    content.innerHTML = `<img src="${esc(currentActiveMedia.src)}" alt="Full Screen View">`;
   }
   overlay.classList.add("active");
 }
@@ -1395,6 +1723,7 @@ function submitCustomerDetails(e) {
 
   const customerObj = { name, mobile, address, city, pincode };
   localStorage.setItem("riddhi_customer", JSON.stringify(customerObj));
+  if (customerObj.mobile) { localStorage.setItem("riddhi_customer_mobile_session", customerObj.mobile); updateCustomerAccountUI(); }
   pendingCustomerObj = customerObj;
 
   customerModalInstance.hide();
@@ -1496,8 +1825,15 @@ function executeOrderSingle(cust) {
   msg += formatCustomerBlock(cust);
 
   const items = [{
-    id: currentProduct.id, name: currentProduct.name, size, qty,
-    price: currentProduct.price, note: customNote, image: currentProduct.images[0],
+    id: currentProduct.id,
+    category: currentProduct.category || "",
+    name: currentProduct.name,
+    size,
+    qty,
+    price: currentProduct.price,
+    actualPrice: currentProduct.actualPrice || currentProduct.price,
+    note: customNote,
+    image: currentProduct.images[0],
     preOrderStock: Math.max(0, parseInt(currentProduct.availableStock, 10) || 0)
   }];
 
@@ -1519,8 +1855,15 @@ function executeOrderCart(cust) {
   const items = cart.map(item => {
     const pObj = PRODUCTS.find(p => p.id === item.id);
     return {
-      id: item.id, name: item.name, size: item.size, qty: item.qty,
-      price: item.price, note: item.customNote || "", image: item.images[0],
+      id: item.id,
+      category: item.category || (pObj ? pObj.category : "") || "",
+      name: item.name,
+      size: item.size,
+      qty: item.qty,
+      price: item.price,
+      actualPrice: item.actualPrice || (pObj ? pObj.actualPrice : 0) || item.price,
+      note: item.customNote || "",
+      image: item.images[0],
       preOrderStock: pObj ? Math.max(0, parseInt(pObj.availableStock, 10) || 0) : 0
     };
   });
@@ -1663,19 +2006,38 @@ function customerStatusHtml(ord) {
 }
 
 // WhatsApp status message: NO image link, NO duplicate "Jewellery by Riddhi" signature at bottom
-function adminStatusControl(orderId, status, custName, custMobile, cancelReason = "") {
+function buildOrderNotifyWhatsAppHref(orderId, status, custName, custMobile, cancelReason = "") {
   const st = normStatus(status);
   let wa = String(custMobile || "").replace(/[^0-9]/g, "");
   if (wa.length === 10) wa = "91" + wa;
   const reasonLine = (st === "Cancelled" && cancelReason) ? `\n📝 *Reason:* ${cancelReason}` : "";
   const text = `Hello *Jewellery by Riddhi* Customer ${custName || ""}! ✨\n📦 *Order ID:* ${orderId}\n📌 *Order Status:* *${STATUS_META[st].label}*${reasonLine}\n${STATUS_META[st].msg}`;
+  return `https://wa.me/${wa}?text=${encodeURIComponent(text)}`;
+}
+
+function updateOrderWhatsAppNotifyLink(orderId, overrideStatus = null, overrideReason = null) {
+  const safeId = String(orderId || "");
+  const btn = document.getElementById("waNotifyBtn_" + safeId);
+  const sel = document.querySelector(`select[data-oid="${safeId}"]`);
+  const st = normStatus(overrideStatus || (sel ? sel.value : "Pending"));
+  const ordObj = (adminOrders || []).find(o => o.orderId === safeId) || getLocalOrders().find(o => o.orderId === safeId) || {};
+  const cust = ordObj.customer || {};
+  const reason = overrideReason !== null ? overrideReason : (ordObj.cancelReason || "");
+  if (btn) {
+    btn.href = buildOrderNotifyWhatsAppHref(safeId, st, cust.name || "", cust.mobile || "", reason);
+  }
+}
+
+function adminStatusControl(orderId, status, custName, custMobile, cancelReason = "") {
+  const st = normStatus(status);
+  const href = buildOrderNotifyWhatsAppHref(orderId, st, custName, custMobile, cancelReason);
   return `
     <div class="my-2">
       <div class="d-flex flex-wrap align-items-center gap-2">
         <select class="form-select form-select-sm w-auto" data-oid="${esc(orderId)}" data-prev="${esc(st)}" onchange="adminChangeStatus(this)" aria-label="Order status">
           ${ORDER_STATUSES.map(x => `<option value="${x}" ${x === st ? "selected" : ""}>${STATUS_META[x].label}</option>`).join("")}
         </select>
-        <a href="https://wa.me/${wa}?text=${encodeURIComponent(text)}" target="_blank" rel="noopener" class="btn btn-outline-success btn-sm py-0 px-2" style="font-size:11px;"><i class="bi bi-whatsapp"></i> Notify Customer</a>
+        <a id="waNotifyBtn_${esc(orderId)}" href="${href}" target="_blank" rel="noopener" class="btn btn-outline-success btn-sm py-0 px-2" style="font-size:11px;"><i class="bi bi-whatsapp"></i> Notify Customer</a>
       </div>
       ${st === "Cancelled" && cancelReason ? `<div class="small text-danger mt-1" style="font-size:11px;"><i class="bi bi-info-circle me-1"></i><strong>Cancel Reason:</strong> ${esc(cancelReason)}</div>` : ""}
     </div>`;
@@ -1684,6 +2046,13 @@ function adminStatusControl(orderId, status, custName, custMobile, cancelReason 
 function adminChangeStatus(sel) {
   const orderId = sel.dataset.oid;
   const status = sel.value;
+  updateOrderWhatsAppNotifyLink(orderId, status);
+  if (status !== "Cancelled") {
+    if (!confirm(`Confirm updating Order ${orderId} status to "${STATUS_META[status]?.label || status}"?`)) {
+      sel.value = sel.dataset.prev || "Pending";
+      return;
+    }
+  }
 
   if (status === "Cancelled") {
     pendingCancelOrderId = orderId;
@@ -1751,6 +2120,7 @@ async function submitAdminCancelOrder() {
   pendingCancelOrderId = null;
   if (adminCancelModalInstance) adminCancelModalInstance.hide();
 
+  updateOrderWhatsAppNotifyLink(oid, "Cancelled", combinedReason);
   await applyAdminStatusUpdate(oid, "Cancelled", combinedReason, null);
   if (btn) btn.disabled = false;
 }
@@ -1766,7 +2136,8 @@ async function applyAdminStatusUpdate(orderId, status, cancelReason = "", selEl 
       if (!r.ok) {
         if (r.error === "auth") {
           localStorage.removeItem("riddhi_admin_session"); sessionStorage.removeItem("riddhi_admin_session");
-          updateAdminMenuLabel();
+          updateCustomerAccountUI();
+  updateAdminMenuLabel();
           alert("Session expired. Please login as admin again.");
           return;
         }
@@ -1777,6 +2148,19 @@ async function applyAdminStatusUpdate(orderId, status, cancelReason = "", selEl 
       const orders = getLocalOrders();
       const o = orders.find(x => x.orderId === orderId);
       if (o) {
+        if (status === "Cancelled" && o.status !== "Cancelled" && Array.isArray(o.items)) {
+          o.items.forEach(it => {
+            const prod = PRODUCTS.find(p => p.id === it.id);
+            const q = Math.max(1, parseInt(it.qty, 10) || 1);
+            const sz = it.size || (prod && prod.sizes && prod.sizes[0]) || "Free Size (Adjustable Dori)";
+            if (prod && prod.sizeStock && Object.prototype.hasOwnProperty.call(prod.sizeStock, sz)) {
+              prod.sizeStock[sz] = (parseInt(prod.sizeStock[sz], 10) || 0) + q;
+              prod.availableStock = Object.values(prod.sizeStock).reduce((s, v) => s + (Math.max(0, parseInt(v, 10) || 0)), 0);
+            }
+          });
+          savePersistedStock();
+          refreshAllProductViews();
+        }
         o.status = status;
         o.cancelReason = status === "Cancelled" ? cancelReason : "";
         o.statusUpdated = updated;
@@ -1798,9 +2182,78 @@ async function applyAdminStatusUpdate(orderId, status, cancelReason = "", selEl 
   }
 }
 
-async function refreshMyOrderStatuses() {
+function getCustomerLookupMobile() {
+  // Strictly require active customer mobile login session so no history is shown without login
+  return getCustomerSessionMobile();
+}
+
+async function promptCustomerMobileSync() {
+  const inp = prompt("Enter your 10-digit Mobile Number to load all your Orders & Enquiries from any device:");
+  if (!inp) return;
+  const digits = inp.replace(/[^0-9]/g, "").slice(-10);
+  if (digits.length !== 10) {
+    alert("Please enter a valid 10-digit mobile number.");
+    return;
+  }
+  const existing = getSavedCustomer() || { name: "", address: "", city: "", pincode: "" };
+  existing.mobile = digits;
+  localStorage.setItem("riddhi_customer", JSON.stringify(existing));
+  await refreshMyOrderStatuses();
+}
+
+async function refreshMyOrderStatuses(forceReplace = false) {
   autoDeliverLocalOrders();
-  if (!APPS_SCRIPT_URL || isAdminLoggedIn()) return;
+  if (!APPS_SCRIPT_URL || !isCustomerStorefrontPage()) return;
+
+  // 1. Cross-device full sync by customer's 10-digit mobile number!
+  const lookupMob = getCustomerLookupMobile();
+  if (lookupMob) {
+    try {
+      const mobRes = await callScript({ action: "getOrdersByMobile", mobile: lookupMob });
+      if (mobRes && mobRes.ok) {
+        const ordClearedAt = forceReplace ? 0 : Number(localStorage.getItem("riddhi_orders_cleared_at") || 0);
+        if (Array.isArray(mobRes.orders)) {
+          const localOrds = forceReplace ? [] : getLocalOrders();
+          const mergedMap = {};
+          localOrds.forEach(o => { if (o && o.orderId) mergedMap[o.orderId] = o; });
+          mobRes.orders.forEach(so => {
+            if (so && so.orderId && (Number(so.timestamp) || 0) > ordClearedAt) {
+              mergedMap[so.orderId] = { ...(mergedMap[so.orderId] || {}), ...so };
+            }
+          });
+          const mergedArr = Object.values(mergedMap).sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0));
+          localStorage.setItem("riddhi_orders", JSON.stringify(mergedArr));
+          // Auto-fill saved customer profile from latest order if name/address was empty
+          if (mergedArr.length > 0 && mergedArr[0].customer) {
+            const latestC = mergedArr[0].customer;
+            const curC = getSavedCustomer() || {};
+            if (!curC.name && latestC.name) {
+              localStorage.setItem("riddhi_customer", JSON.stringify({ ...latestC, mobile: lookupMob }));
+            }
+          }
+        }
+        const enqClearedAt = forceReplace ? 0 : Number(localStorage.getItem("riddhi_enquiries_cleared_at") || 0);
+        if (Array.isArray(mobRes.enquiries)) {
+          let localEnqs = [];
+          if (!forceReplace) {
+            try { localEnqs = JSON.parse(localStorage.getItem("riddhi_enquiries") || "[]"); } catch (e) {}
+          }
+          const eqMap = {};
+          localEnqs.forEach(q => { if (q && q.enquiryId) eqMap[q.enquiryId] = q; });
+          mobRes.enquiries.forEach(sq => {
+            if (sq && sq.enquiryId && (Number(sq.timestamp) || 0) > enqClearedAt) {
+              eqMap[sq.enquiryId] = { ...(eqMap[sq.enquiryId] || {}), ...sq };
+            }
+          });
+          const mergedEqs = Object.values(eqMap).sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0));
+          localStorage.setItem("riddhi_enquiries", JSON.stringify(mergedEqs));
+        }
+        renderMyOrders();
+        if (activeCustomerTab === "enquiries") renderCustomerMyEnquiriesTab();
+      }
+    } catch (e) {}
+  }
+
   const orders = getLocalOrders();
   if (!orders.length) return;
   try {
@@ -1849,12 +2302,61 @@ function safeImgUrl(u) {
   return /^https?:\/\/[^\s"'<>]+$/i.test(full) ? full : "";
 }
 
-function buildItemsHtml(items) {
-  return (items || []).map(it => `
-    <div class="mb-1 d-flex gap-2 align-items-start">
-      ${safeImgUrl(it.image) ? `<img src="${esc(safeImgUrl(it.image))}" alt="" referrerpolicy="no-referrer" style="width:44px;height:44px;object-fit:cover;border-radius:6px;flex-shrink:0;">` : ""}
-      <div><strong>${esc(it.name)}</strong> (${esc(it.id)})<br>
-      <span class="text-muted" style="font-size:11px;">Size: ${esc(it.size)} | Qty: ${esc(it.qty)} | ₹${esc(it.price * it.qty)}${it.note ? ` | Note: ${esc(it.note)}` : ""}</span></div>
+
+async function adminAllocateOrderItemQty(orderId, itemIndex, maxOrderedQty) {
+  const s = getAdminSession();
+  if (!s) return;
+  const inputVal = prompt(`Customer ordered ${maxOrderedQty} pc(s). Enter exact quantity to give to customer (remaining ${maxOrderedQty} - qty will return to stock):`, String(Math.max(1, Math.floor(maxOrderedQty / 2))));
+  if (inputVal === null) return;
+  const targetQty = Math.max(0, Math.min(maxOrderedQty, parseInt(inputVal, 10) || 0));
+
+  try {
+    if (s.mode === "sheet" && APPS_SCRIPT_URL) {
+      const r = await callScript({
+        action: "allocateOrderQty",
+        token: s.token,
+        orderId,
+        itemIndex,
+        newQty: targetQty
+      });
+      if (!r || !r.ok) {
+        alert("Could not update allocated quantity in Google Sheet.");
+        return;
+      }
+      const ord = adminOrders.find(o => o.orderId === orderId);
+      if (ord && Array.isArray(ord.items) && ord.items[itemIndex]) {
+        ord.items[itemIndex].qty = targetQty;
+        if (typeof r.total === "number") ord.total = r.total;
+      }
+      if (r.sizeStock) {
+        PRODUCTS.forEach(p => {
+          if (r.sizeStock[p.id]) {
+            p.sizeStock = { ...r.sizeStock[p.id] };
+            p.sizes = Object.keys(p.sizeStock);
+            p.availableStock = Object.values(p.sizeStock).reduce((sum, v) => sum + (Math.max(0, parseInt(v, 10) || 0)), 0);
+          }
+        });
+        savePersistedStock();
+      }
+    }
+    alert(`Allocated ${targetQty} pc(s) to customer and restored ${maxOrderedQty - targetQty} pc(s) to stock.`);
+    if (typeof renderOrdersWorkspace === "function") renderOrdersWorkspace();
+    renderAllCustomersSummary();
+  } catch (e) {
+    alert("Error allocating quantity.");
+  }
+}
+
+function buildItemsHtml(items, orderId = "") {
+  const showAlloc = !isCustomerStorefrontPage() && isAdminLoggedIn() && orderId;
+  return (items || []).map((it, idx) => `
+    <div class="mb-1 d-flex gap-2 align-items-start justify-content-between">
+      <div class="d-flex gap-2 align-items-start">
+        ${safeImgUrl(it.image) ? `<img src="${esc(safeImgUrl(it.image))}" alt="" referrerpolicy="no-referrer" style="width:44px;height:44px;object-fit:cover;border-radius:6px;flex-shrink:0;">` : ""}
+        <div><strong>${esc(it.name)}</strong> (${esc(it.id)})<br>
+        <span class="text-muted" style="font-size:11px;">Size: ${esc(it.size)} | Qty: <strong>${esc(it.qty)}</strong> | ₹${esc(it.price * it.qty)}${it.note ? ` | Note: ${esc(it.note)}` : ""}</span></div>
+      </div>
+      ${showAlloc ? `<button type="button" class="btn btn-outline-warning text-dark btn-sm py-0 px-2" style="font-size:10px;" onclick="adminAllocateOrderItemQty('${esc(orderId)}', ${idx}, ${Math.max(1, parseInt(it.qty, 10) || 1)})" title="Give partial quantity to customer & restore rest to stock"><i class="bi bi-sliders"></i> Split Qty</button>` : ""}
     </div>`).join("");
 }
 
@@ -2023,10 +2525,36 @@ function renderCustomerMyEnquiriesTab() {
   const container = document.getElementById("myEnquiriesTabListContainer");
   if (!container) return;
 
+  const loggedCustMob = getCustomerSessionMobile();
   let enqs = [];
-  try {
-    enqs = JSON.parse(localStorage.getItem("riddhi_enquiries") || "[]");
-  } catch (e) {}
+  if (loggedCustMob) {
+    try {
+      const parsedE = JSON.parse(localStorage.getItem("riddhi_enquiries") || "[]");
+      if (Array.isArray(parsedE)) {
+        enqs = parsedE.filter(eq => String(eq.mobile || "").replace(/[^0-9]/g, "").slice(-10) === loggedCustMob);
+      }
+    } catch (e) {}
+  }
+  const enqNavB = document.getElementById("navEnquiriesCount");
+  if (enqNavB) {
+    if (enqs.length > 0) {
+      enqNavB.innerText = enqs.length;
+      enqNavB.classList.remove("d-none");
+    } else {
+      enqNavB.classList.add("d-none");
+    }
+  }
+  if (!loggedCustMob) {
+    container.innerHTML = `
+      <div class="text-center text-muted my-4 p-3 bg-white rounded-3 border shadow-sm">
+        <i class="bi bi-chat-dots fs-1 text-warning"></i>
+        <p class="small text-muted my-2">Login with your mobile number to view your enquiries.</p>
+        <button type="button" class="btn btn-green btn-sm rounded-pill px-4" onclick="openCustomerMobileLoginModal()">
+          <i class="bi bi-phone me-1"></i> Login with Mobile No.
+        </button>
+      </div>`;
+    return;
+  }
 
   const stFilter = document.getElementById("myEnquiriesStatusFilter")?.value || "all";
   const dateFilter = document.getElementById("myEnquiriesDateFilter")?.value || "all";
@@ -2084,11 +2612,25 @@ function renderMyOrders() {
   autoDeliverLocalOrders();
   const container = document.getElementById("myOrdersListContainer");
   const badge = document.getElementById("navOrdersCount");
-  const adminView = isAdminLoggedIn();
+  const adminView = isAdminLoggedIn() && !isCustomerStorefrontPage();
 
-  let allOrders = adminView
-    ? adminOrders.slice().sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
-    : getLocalOrders();
+  const loggedCustMob = getCustomerSessionMobile();
+  let allOrders = [];
+  if (adminView) {
+    allOrders = adminOrders.slice().sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+  } else if (loggedCustMob) {
+    allOrders = getLocalOrders().filter(o => String((o.customer || {}).mobile || "").replace(/[^0-9]/g, "").slice(-10) === loggedCustMob);
+  }
+
+  let enqsList = [];
+  if (!adminView && loggedCustMob) {
+    try {
+      const rawE = JSON.parse(localStorage.getItem("riddhi_enquiries") || "[]");
+      if (Array.isArray(rawE)) {
+        enqsList = rawE.filter(eq => String(eq.mobile || "").replace(/[^0-9]/g, "").slice(-10) === loggedCustMob);
+      }
+    } catch (e) {}
+  }
 
   if (badge) {
     if (allOrders.length > 0) {
@@ -2097,6 +2639,28 @@ function renderMyOrders() {
     } else {
       badge.classList.add("d-none");
     }
+  }
+  const enqBadge = document.getElementById("navEnquiriesCount");
+  if (enqBadge) {
+    if (enqsList.length > 0) {
+      enqBadge.innerText = enqsList.length;
+      enqBadge.classList.remove("d-none");
+    } else {
+      enqBadge.classList.add("d-none");
+    }
+  }
+
+  if (!adminView && !loggedCustMob && container) {
+    container.innerHTML = `
+      <div class="text-center text-muted my-5 p-3 bg-white rounded-3 border shadow-sm">
+        <i class="bi bi-shield-lock fs-1 text-success"></i>
+        <h6 class="brand-font fw-bold mt-2 text-dark">Customer Login Required</h6>
+        <p class="small text-muted mb-3">Please login with your 10-digit mobile number to view your orders &amp; enquiries.</p>
+        <button type="button" class="btn btn-green btn-sm rounded-pill px-4 fw-semibold" onclick="openCustomerMobileLoginModal()">
+          <i class="bi bi-phone me-1"></i> Login with Mobile No.
+        </button>
+      </div>`;
+    return;
   }
 
   const warn = adminView && (getAdminSession() || {}).mode === "local"
@@ -2141,7 +2705,10 @@ function renderMyOrders() {
   }
 
   const refreshBtn = (!adminView && APPS_SCRIPT_URL)
-    ? `<button type="button" class="btn btn-outline-dark btn-sm w-100 mb-3 rounded-pill" onclick="refreshMyOrderStatuses()"><i class="bi bi-arrow-clockwise me-1"></i>Refresh Order Status</button>`
+    ? `<div class="d-flex gap-1 mb-3">
+         <button type="button" class="btn btn-outline-dark btn-sm flex-fill rounded-pill" style="font-size:11px;" onclick="refreshMyOrderStatuses()"><i class="bi bi-arrow-clockwise me-1"></i>Refresh Status</button>
+         <button type="button" class="btn btn-outline-success btn-sm rounded-pill px-2" style="font-size:11px;" onclick="promptCustomerMobileSync()"><i class="bi bi-phone me-1"></i>Sync Mobile</button>
+       </div>`
     : "";
 
   container.innerHTML = warn + refreshBtn + orders.map(ord => {
@@ -2152,7 +2719,7 @@ function renderMyOrders() {
       ? `https://wa.me/${cleanCustPhone}`
       : `https://wa.me/${cleanCustPhone}?text=${encodeURIComponent(ord.fullMessage || "")}`;
     const waLabel = adminView ? "Chat with Customer" : "Send Copy to My WhatsApp";
-    const itemsHtml = ord.items ? buildItemsHtml(ord.items) : (ord.itemsHtml || "");
+    const itemsHtml = ord.items ? buildItemsHtml(ord.items, ord.orderId) : (ord.itemsHtml || "");
     const statusHtml = adminView
       ? adminStatusControl(ord.orderId, ord.status, cust.name, cust.mobile, ord.cancelReason || "")
       : customerStatusHtml(ord);
@@ -2186,7 +2753,16 @@ function renderMyOrders() {
 function clearOrderHistory() {
   if (confirm("Clear saved order history from this browser?")) {
     localStorage.removeItem("riddhi_orders");
+    localStorage.setItem("riddhi_orders_cleared_at", String(Date.now()));
     renderMyOrders();
+  }
+}
+
+function clearEnquiryHistory() {
+  if (confirm("Clear saved enquiry history from this browser?")) {
+    localStorage.removeItem("riddhi_enquiries");
+    localStorage.setItem("riddhi_enquiries_cleared_at", String(Date.now()));
+    renderCustomerMyEnquiriesTab();
   }
 }
 
@@ -2255,10 +2831,36 @@ const ENQUIRY_STATUS_DESC = {
 };
 
 function buildCustomerEnquiriesTrackerHtml() {
+  const loggedCustMob = getCustomerSessionMobile();
   let enqs = [];
-  try {
-    enqs = JSON.parse(localStorage.getItem("riddhi_enquiries") || "[]");
-  } catch (e) {}
+  if (loggedCustMob) {
+    try {
+      const parsedE = JSON.parse(localStorage.getItem("riddhi_enquiries") || "[]");
+      if (Array.isArray(parsedE)) {
+        enqs = parsedE.filter(eq => String(eq.mobile || "").replace(/[^0-9]/g, "").slice(-10) === loggedCustMob);
+      }
+    } catch (e) {}
+  }
+  const enqNavB = document.getElementById("navEnquiriesCount");
+  if (enqNavB) {
+    if (enqs.length > 0) {
+      enqNavB.innerText = enqs.length;
+      enqNavB.classList.remove("d-none");
+    } else {
+      enqNavB.classList.add("d-none");
+    }
+  }
+  if (!loggedCustMob) {
+    container.innerHTML = `
+      <div class="text-center text-muted my-4 p-3 bg-white rounded-3 border shadow-sm">
+        <i class="bi bi-chat-dots fs-1 text-warning"></i>
+        <p class="small text-muted my-2">Login with your mobile number to view your enquiries.</p>
+        <button type="button" class="btn btn-green btn-sm rounded-pill px-4" onclick="openCustomerMobileLoginModal()">
+          <i class="bi bi-phone me-1"></i> Login with Mobile No.
+        </button>
+      </div>`;
+    return;
+  }
   if (!Array.isArray(enqs) || enqs.length === 0) return "";
 
   return `
@@ -2346,6 +2948,11 @@ ${ENQUIRY_STATUS_DESC[st] || ""}`;
 async function adminUpdateEnquiryStatus(enquiryId, newStatus, selEl = null) {
   const s = getAdminSession();
   if (!s) return;
+  if (!confirm(`Confirm updating Enquiry ${enquiryId} status to "${newStatus}"?`)) {
+    if (typeof renderEnquiriesWorkspace === "function") renderEnquiriesWorkspace();
+    else renderAdminEnquiriesList();
+    return;
+  }
   if (selEl) selEl.disabled = true;
   try {
     if (s.mode === "sheet" && APPS_SCRIPT_URL) {
@@ -2362,25 +2969,35 @@ async function adminUpdateEnquiryStatus(enquiryId, newStatus, selEl = null) {
   }
 }
 
+function isCustomerStorefrontPage() {
+  const path = (window.location.pathname || "").toLowerCase();
+  return !path.includes("admin-");
+}
 function getAdminSession() {
-  try { return JSON.parse((localStorage.getItem("riddhi_admin_session") || sessionStorage.getItem("riddhi_admin_session")) || "null"); } catch (e) { return null; }
+  try {
+    const raw = localStorage.getItem("riddhi_admin_session") || sessionStorage.getItem("riddhi_admin_session");
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return null;
+    if (parsed.mode === "sheet" && !parsed.token) return null;
+    if (parsed.mode !== "sheet" && parsed.mode !== "local") return null;
+    return parsed;
+  } catch (e) {
+    return null;
+  }
 }
 function isAdminLoggedIn() {
-  return !!getAdminSession();
+  const s = getAdminSession();
+  return !!(s && (s.mode === "local" || (s.mode === "sheet" && s.token)));
 }
 function updateAdminMenuLabel() {
-  const loggedIn = isAdminLoggedIn();
-  const el = document.getElementById("adminMenuLabel");
-  if (el) el.textContent = loggedIn ? "Admin Panel (Customers & Orders)" : "Admin Login";
-
-  // Toggle persistent Admin section in Left Sidebar
-  const sidebarAdmin = document.getElementById("sidebarAdminSection");
-  if (sidebarAdmin) {
-    sidebarAdmin.classList.toggle("d-none", !loggedIn);
-    if (loggedIn) {
-      refreshStockManagerDropdowns();
-      syncAutoDeliverUI(isAutoDeliverEnabled());
-    }
+  // Never expose Admin Panel on customer storefront pages (index.html, about.html, care-guide.html)
+  if (isCustomerStorefrontPage()) {
+    const sidebarAdmin = document.getElementById("sidebarAdminSection");
+    if (sidebarAdmin) sidebarAdmin.remove();
+    const custModal = document.getElementById("allCustomersModal");
+    if (custModal) custModal.remove();
+    return;
   }
 }
 
@@ -2441,32 +3058,34 @@ function adminLogoTap() {
 function checkAdminHash() {
   if (location.hash === "#admin") {
     history.replaceState(null, "", location.pathname + location.search);
-    handleAdminClick();
+    setTimeout(() => handleAdminClick(), 50);
   }
 }
 window.addEventListener("hashchange", checkAdminHash);
 
 async function refreshAdminHistory() {
-  if (!isAdminLoggedIn()) return;
+  if (!isAdminLoggedIn() || isCustomerStorefrontPage()) return;
   try {
     if (await loadAdminOrders()) renderMyOrders();
-    else renderMyOrders();
   } catch (e) { /* keep existing */ }
 }
 document.addEventListener("show.bs.offcanvas", ev => {
   if (ev.target && ev.target.id === "myOrdersOffcanvas") {
     renderMyOrders();
-    refreshAdminHistory();
     refreshMyOrderStatuses();
   }
   if (ev.target && ev.target.id === "menuOffcanvas") {
-    updateAdminMenuLabel();
+    updateCustomerAccountUI();
+  updateAdminMenuLabel();
   }
 });
 
 function handleAdminClick() {
-  if (isAdminLoggedIn()) openAllCustomersModal();
-  else openAdminLogin();
+  if (isAdminLoggedIn()) {
+    window.location.href = "admin-orders.html";
+  } else {
+    openAdminLogin();
+  }
 }
 
 function openAdminLogin() {
@@ -2537,13 +3156,14 @@ async function submitAdminLogin(e) {
     }
 
     clearAdminFails();
-    localStorage.setItem("riddhi_admin_session", JSON.stringify(session)); sessionStorage.setItem("riddhi_admin_session", JSON.stringify(session));
-    updateAdminMenuLabel();
-    renderMyOrders();
+    localStorage.setItem("riddhi_admin_session", JSON.stringify(session));
+    sessionStorage.setItem("riddhi_admin_session", JSON.stringify(session));
 
     const loginEl = document.getElementById("adminLoginModal");
-    loginEl.addEventListener("hidden.bs.modal", () => openAllCustomersModal(true), { once: true });
-    bootstrap.Modal.getOrCreateInstance(loginEl).hide();
+    if (loginEl) {
+      bootstrap.Modal.getOrCreateInstance(loginEl).hide();
+    }
+    window.location.href = "admin-orders.html";
   } finally {
     btn.disabled = false;
     btn.innerHTML = oldLabel;
@@ -2554,15 +3174,14 @@ async function submitAdminLogin(e) {
 // Admin logs out ONLY when clicking the Logout button
 async function adminLogout() {
   const s = getAdminSession();
-  localStorage.removeItem("riddhi_admin_session"); sessionStorage.removeItem("riddhi_admin_session");
+  localStorage.removeItem("riddhi_admin_session");
+  sessionStorage.removeItem("riddhi_admin_session");
   adminOrders = [];
-  updateAdminMenuLabel();
-  renderMyOrders();
-  const panel = document.getElementById("allCustomersModal");
-  if (panel) bootstrap.Modal.getOrCreateInstance(panel).hide();
+  adminEnquiries = [];
   if (s && s.mode === "sheet" && APPS_SCRIPT_URL) {
     try { await callScript({ action: "adminLogout", token: s.token }); } catch (e) { /* ignore */ }
   }
+  window.location.href = "admin-orders.html";
 }
 
 async function loadAdminOrders() {
@@ -2572,7 +3191,8 @@ async function loadAdminOrders() {
     const r = await callScript({ action: "getOrders", token: s.token });
     if (!r.ok) {
       localStorage.removeItem("riddhi_admin_session"); sessionStorage.removeItem("riddhi_admin_session");
-      updateAdminMenuLabel();
+      updateCustomerAccountUI();
+  updateAdminMenuLabel();
       return false;
     }
     adminOrders = r.orders || [];
@@ -2661,7 +3281,7 @@ function groupOrdersByCustomer(orders) {
       status: ord.status,
       cancelReason: ord.cancelReason || "",
       custName: cust.name, custMobile: cust.mobile,
-      itemsHtml: ord.items ? buildItemsHtml(ord.items) : (ord.itemsHtml || "")
+      itemsHtml: ord.items ? buildItemsHtml(ord.items, ord.orderId) : (ord.itemsHtml || "")
     });
   });
   return Object.values(map);
