@@ -728,3 +728,26 @@ img, video, iframe {
     overflow-x: visible !important;
   }
 }
+
+.offer-highlight-card {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  min-height: 195px;
+}
+.offer-card-title {
+  min-height: 52px;
+  display: flex;
+  align-items: flex-start;
+  line-height: 1.28;
+}
+.offer-card-desc {
+  min-height: 44px;
+  line-height: 1.42;
+}
+.btn {
+  border-radius: 50px !important;
+}
+.btn.rounded-square {
+  border-radius: 4px !important;
+}

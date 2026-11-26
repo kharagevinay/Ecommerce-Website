@@ -15,6 +15,8 @@
       color: #fff;
       border-bottom: 2px solid var(--accent-gold);
     }
+  
+    select.form-select, .btn-outline-primary, .btn-outline-danger { border-radius: 4px !important; }
   </style>
 </head>
 <body>
@@ -22,7 +24,7 @@
   <nav class="admin-top-bar py-2 px-3 sticky-top shadow-sm">
     <div class="container d-flex flex-wrap justify-content-between align-items-center gap-2">
       <div class="d-flex align-items-center gap-2">
-        <img src="assets/logo.png" alt="Logo" style="width: 46px; height: 46px; border-radius: 50%; border: 1.5px solid var(--accent-gold);">
+        <img src="assets/logo.png" alt="Logo" style="width: 46px; height: 46px; border-radius: 50%; ">
         <div>
           <h5 class="brand-font fw-bold m-0" style="color: var(--accent-gold-light);">Offers &amp; Banners Manager</h5>
           <small class="text-light opacity-75" style="font-size: 11px;">Add, Update &amp; Delete Home Page Offers &amp; Top Marquee — Synced with Google Sheet</small>
@@ -122,8 +124,9 @@
               </div>
 
               <div class="mb-2" id="fOfferCatWrap">
-                <label class="form-label small fw-semibold mb-1">Opens Category on Click</label>
-                <select id="fOfferTargetCategory" class="form-select form-select-sm"></select>
+                <label class="form-label small fw-semibold mb-1">Opens Category on Click (Multi-Select)</label>
+                <select id="fOfferTargetCategory" class="form-select form-select-sm" multiple size="5"></select>
+                <small class="text-muted d-block mt-1" style="font-size:10.5px;">Select one or more categories (All Products selects everything).</small>
               </div>
 
               <div class="d-flex flex-wrap gap-3 my-2 p-2 rounded bg-light border">
@@ -409,7 +412,11 @@
       const badge2 = document.getElementById("fOfferBadge2").value.trim();
       const title = document.getElementById("fOfferTitle").value.trim();
       const desc = document.getElementById("fOfferDesc").value.trim();
-      const targetCategory = document.getElementById("fOfferTargetCategory").value || "All";
+      const catSelEl = document.getElementById("fOfferTargetCategory");
+      let selectedCats = Array.from(catSelEl ? catSelEl.selectedOptions : []).map(o => o.value).filter(Boolean);
+      if (selectedCats.length === 0) selectedCats = ["All"];
+      if (selectedCats.includes("All")) selectedCats = ["All"];
+      const targetCategory = selectedCats.join(", ");
       const featuredGreen = document.getElementById("fOfferFeaturedGreen").checked;
       const active = document.getElementById("fOfferActive").checked;
 
@@ -436,6 +443,7 @@
             title,
             desc: type === "card" ? desc : "",
             targetCategory: type === "card" ? targetCategory : "All",
+            targetCategories: type === "card" ? selectedCats : ["All"],
             featuredGreen: type === "card" ? featuredGreen : false,
             active
           };
@@ -467,7 +475,15 @@
       document.getElementById("fOfferBadge2").value = item.badge2 || "";
       document.getElementById("fOfferTitle").value = item.title || "";
       document.getElementById("fOfferDesc").value = item.desc || "";
-      document.getElementById("fOfferTargetCategory").value = item.targetCategory || "All";
+      const editCatSel = document.getElementById("fOfferTargetCategory");
+      const savedMulti = Array.isArray(item.targetCategories) && item.targetCategories.length > 0
+        ? item.targetCategories
+        : String(item.targetCategory || "All").split(",").map(s => s.trim()).filter(Boolean);
+      if (editCatSel) {
+        Array.from(editCatSel.options).forEach(opt => {
+          opt.selected = savedMulti.some(m => m.toLowerCase() === opt.value.toLowerCase());
+        });
+      }
       document.getElementById("fOfferFeaturedGreen").checked = !!item.featuredGreen;
       document.getElementById("fOfferActive").checked = item.active !== false;
 

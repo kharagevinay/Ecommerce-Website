@@ -131,7 +131,7 @@
           </li>
           <li class="list-group-item bg-transparent d-flex justify-content-between align-items-center">
             <a href="javascript:void(0)" class="text-decoration-none text-dark fw-semibold flex-grow-1" data-bs-toggle="offcanvas" data-bs-target="#myOrdersOffcanvas" onclick="switchCustomerActivityTab('enquiries')">
-              <i class="bi bi-chat-dots-fill text-warning me-2"></i>My Enquiries
+              <i class="bi bi-chat-dots-fill text-warning me-2"></i>My Enquiries <i class="bi bi-bell-fill text-danger small ms-1"></i>
             </a>
             <span id="navEnquiriesCount" class="badge rounded-pill bg-danger d-none">0</span>
           </li>
@@ -152,12 +152,12 @@
             </a>
           </li>
           <li class="list-group-item bg-transparent">
-            <a href="javascript:void(0)" class="text-decoration-none text-dark fw-semibold" onclick="openPolicyModal('shipping')" data-bs-dismiss="offcanvas">
+            <a href="shipping-policy.html" class="text-decoration-none text-dark fw-semibold">
               <i class="bi bi-truck me-2"></i>Shipping Policy
             </a>
           </li>
           <li class="list-group-item bg-transparent">
-            <a href="javascript:void(0)" class="text-decoration-none text-dark fw-semibold" onclick="openPolicyModal('return')" data-bs-dismiss="offcanvas">
+            <a href="return-policy.html" class="text-decoration-none text-dark fw-semibold">
               <i class="bi bi-arrow-counterclockwise me-2"></i>Return Policy
             </a>
           </li>
@@ -511,18 +511,16 @@
             Confirming will place your order, reserve your stock, and open WhatsApp to send your order details.
           </div>
         </div>
-        <div class="modal-footer border-0 d-flex flex-wrap justify-content-between gap-2">
-          <button type="button" class="btn btn-outline-dark btn-sm rounded-pill px-3" onclick="editOrderDetailsFromConfirm()">
+        <div class="modal-footer border-0 d-grid gap-2 pt-2">
+          <button type="button" class="btn btn-outline-dark btn-sm w-100 rounded-square py-2 fw-medium" onclick="editOrderDetailsFromConfirm()">
             <i class="bi bi-pencil-square me-1"></i> Edit Details
           </button>
-          <div class="d-flex gap-2">
-            <button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3" data-bs-dismiss="modal">
-              No, Cancel
-            </button>
-            <button type="button" class="btn btn-green btn-sm rounded-pill px-3 fw-semibold" onclick="confirmAndSendOrderWhatsApp()">
-              <i class="bi bi-whatsapp me-1"></i> Yes, Confirm &amp; Send on WhatsApp
-            </button>
-          </div>
+          <button type="button" class="btn btn-outline-danger btn-sm w-100 rounded-square py-2 fw-medium" data-bs-dismiss="modal">
+            No, Cancel
+          </button>
+          <button type="button" class="btn btn-green btn-sm w-100 rounded-square py-2 fw-semibold" onclick="confirmAndSendOrderWhatsApp()">
+            <i class="bi bi-whatsapp me-1"></i> Yes, Confirm
+          </button>
         </div>
       </div>
     </div>
@@ -869,39 +867,35 @@
     </div>
   </div>
 
-  <!-- CUSTOMER MOBILE-ONLY LOGIN MODAL (Separate from Admin Login) -->
+  <!-- CUSTOMER MOBILE-ONLY LOGIN MODAL (Jewellery by Riddhi) -->
   <div class="modal fade" id="customerMobileLoginModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-sm">
-      <div class="modal-content" style="background-color: var(--cream-bg); border-radius: 16px; border: 2px solid var(--accent-gold);">
-        <div class="modal-header" style="background-color: var(--primary-green); color: #fff;">
-          <h5 class="modal-title brand-font"><i class="bi bi-phone-vibrate me-2 text-warning"></i>Customer Login</h5>
-          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      <div class="modal-content" style="background-color: var(--cream-bg); border-radius: 18px; border: 2px solid var(--accent-gold); box-shadow: 0 14px 34px rgba(21,50,30,0.22);">
+        <div class="modal-header justify-content-center py-3" style="background: linear-gradient(135deg, #102617, var(--primary-green)); color: #fff; border-radius: 16px 16px 0 0; border-bottom: 1.5px solid var(--accent-gold);">
+          <h5 class="modal-title brand-font fw-bold m-0" style="color: var(--accent-gold-light);"><i class="bi bi-shield-check me-2 text-warning"></i>Login</h5>
         </div>
         <form onsubmit="submitCustomerMobileLogin(event)" autocomplete="off">
-          <div class="modal-body">
-            <p class="small text-muted mb-2">Enter your <strong>10-digit Mobile Number</strong> to view all your previous Orders &amp; Enquiries on any device:</p>
+          <div class="modal-body pt-3">
             <div id="custMobileLoginErr" class="alert alert-danger py-1 px-2 small d-none"></div>
             <div class="mb-2">
               <label class="form-label small fw-semibold" for="custLoginMobileInput">Mobile Number (10 digits) *</label>
               <div class="input-group input-group-sm">
-                <span class="input-group-text bg-white fw-bold">+91</span>
-                <input type="tel" id="custLoginMobileInput" class="form-control fw-bold" required pattern="[0-9]{10}" minlength="10" maxlength="10"
+                <span class="input-group-text bg-white fw-bold rounded-start-pill px-3">+91</span>
+                <input type="tel" id="custLoginMobileInput" class="form-control fw-bold rounded-end-pill" required pattern="[0-9]{10}" minlength="10" maxlength="10"
                        oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,10)" placeholder="e.g. 9876543210">
               </div>
             </div>
           </div>
-          <div class="modal-footer border-0 pt-0">
+          <div class="modal-footer border-0 pt-0 justify-content-center gap-2 pb-3">
             <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" data-bs-dismiss="modal">Cancel</button>
             <button type="submit" id="custMobileLoginSubmitBtn" class="btn btn-green btn-sm rounded-pill px-4 fw-semibold">
-              <i class="bi bi-check2-circle me-1"></i> Login &amp; Sync
+              <i class="bi bi-shield-check me-1"></i> Login
             </button>
           </div>
         </form>
       </div>
     </div>
-  </div>
-
-  <!-- ADMIN LOGIN MODAL -->
+  </div>  <!-- ADMIN LOGIN MODAL -->
   <div class="modal fade" id="adminLoginModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-sm">
       <div class="modal-content" style="background-color: var(--cream-bg); border-radius: 16px;">
@@ -986,7 +980,7 @@
     </div>
   </div>
 
-  <div class="modal fade" id="policyModal" tabindex="-1" aria-hidden="true">
+  <div class="modal fade" id="policyModal" tabindex="-1" aria-hidden="true" style=" background: rgba(0, 0, 0, 0.7);">
     <div class="modal-dialog modal-dialog-centered modal-lg">
       <div class="modal-content" style="background-color: var(--cream-bg); border-radius: 16px;">
         <div class="modal-header" style="background-color: var(--primary-green); color: #fff;">

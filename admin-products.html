@@ -41,6 +41,8 @@
       border-radius: 8px;
       border: 1px solid #d8c3a5;
     }
+  
+    select.form-select, .btn-outline-primary, .btn-outline-danger { border-radius: 4px !important; }
   </style>
 </head>
 <body>
@@ -49,7 +51,7 @@
   <nav class="admin-top-bar py-2 px-3 sticky-top shadow-sm">
     <div class="container d-flex flex-wrap justify-content-between align-items-center gap-2">
       <div class="d-flex align-items-center gap-2">
-        <img src="assets/logo.png" alt="Logo" style="width: 48px; height: 48px; border-radius: 50%; border: 1.5px solid var(--accent-gold);">
+        <img src="assets/logo.png" alt="Logo" style="width: 48px; height: 48px; border-radius: 50%; ">
         <div>
           <h5 class="brand-font fw-bold m-0" style="color: var(--accent-gold-light);">Product, Size &amp; Stock Manager</h5>
           <small class="text-light opacity-75" style="font-size: 11px;">Jewellery by Riddhi — Synced with Google Sheet</small>
@@ -1347,6 +1349,8 @@
         "Yes, Delete Product",
         async () => {
           const updated = getCatalogProducts().filter(p => p.id !== prodId);
+          const remainingInCat = updated.filter(p => String(p.category || "").toLowerCase() === String(prod.category || "").toLowerCase()).length;
+          const deleteCategoryFolder = remainingInCat === 0;
           saveCatalogLocalOnly(updated);
           const localBase = getLocalSaveEndpointBase();
           if (localBase !== null && prod) {
@@ -1354,7 +1358,7 @@
               await fetch(`${localBase}/api/delete-product-assets`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ category: prod.category, productId: prodId, allProducts: updated, allCategories: getEffectiveCategories() })
+                body: JSON.stringify({ category: prod.category, productId: prodId, deleteCategoryFolder, allProducts: updated, allCategories: getEffectiveCategories() })
               });
             } catch (err) {}
           }

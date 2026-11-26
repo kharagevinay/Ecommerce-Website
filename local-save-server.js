@@ -164,7 +164,7 @@ const server = http.createServer((req, res) => {
     req.on("data", chunk => (body += chunk));
     req.on("end", () => {
       try {
-        const { category, productId, allProducts = null, allCategories = null } = JSON.parse(body);
+        const { category, productId, deleteCategoryFolder = false, allProducts = null, allCategories = null } = JSON.parse(body);
         const safeCat = String(category || "").replace(/[^A-Za-z0-9\-_ ]/g, "").trim();
         const safeId = String(productId || "").replace(/[^A-Za-z0-9\-_]/g, "").trim();
         if (safeCat && safeId) {
@@ -172,6 +172,13 @@ const server = http.createServer((req, res) => {
           if (fs.existsSync(folderPath)) {
             fs.rmSync(folderPath, { recursive: true, force: true });
             console.log(`[DELETED] Product folder removed from assets/: ${folderPath}`);
+          }
+          if (deleteCategoryFolder) {
+            const catFolderPath = path.join(ROOT_DIR, "assets", "Categories", safeCat);
+            if (fs.existsSync(catFolderPath)) {
+              fs.rmSync(catFolderPath, { recursive: true, force: true });
+              console.log(`[DELETED] Empty category folder removed from assets/: ${catFolderPath}`);
+            }
           }
         }
         if (Array.isArray(allProducts)) {

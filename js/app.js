@@ -591,7 +591,7 @@ function updateCustomerAccountUI() {
       navBtn.className = "btn btn-outline-dark btn-sm px-2 py-1 d-flex align-items-center gap-1 rounded-pill";
       navBtn.title = "Customer Mobile Login";
     }
-    if (navLbl) navLbl.textContent = "Login";
+    if (navLbl) navLbl.textContent = mob;
     if (sideOut) sideOut.classList.remove("d-none");
     if (sideIn) sideIn.classList.add("d-none");
     if (drwTxt) drwTxt.textContent = "Login with mobile no. to load orders from all devices";
@@ -843,15 +843,15 @@ function renderHomeOffersAndMarquee() {
       const isGreen = !!c.featuredGreen;
       const delay = Math.min(idx * 0.08, 0.35).toFixed(2);
       return `
-        <div class="col-12 col-md-4 stagger-card" style="animation-delay: ${delay}s;">
-          <div class="offer-highlight-card ${isGreen ? "featured-green" : ""}" onclick="openOfferTargetCategories('${encodedCats}', '${esc(c.title || "")}')">
+        <div class="col-12 col-md-4 d-flex stagger-card" style="animation-delay: ${delay}s;">
+          <div class="offer-highlight-card w-100 ${isGreen ? "featured-green" : ""}" onclick="openOfferTargetCategories('${encodedCats}', '${esc(c.title || "")}')">
             <div class="d-flex justify-content-between align-items-center mb-2">
               <span class="${isGreen ? "offer-urgency-pill" : "badge bg-danger"}">${esc(c.badge1 || "OFFER")}</span>
               ${c.badge2 ? `<span class="badge ${isGreen ? "" : "bg-success-subtle text-success border border-success-subtle"}" style="${isGreen ? "background-color: var(--accent-gold); color: #15321e;" : ""}">${esc(c.badge2)}</span>` : ""}
             </div>
-            <h5 class="brand-font fw-bold mb-1" style="color: ${isGreen ? "var(--accent-gold-light)" : "var(--primary-green)"};">${esc(c.title || "")}</h5>
-            <p class="small mb-2 ${isGreen ? "opacity-90" : "text-muted"}">${esc(c.desc || "")}</p>
-            <span class="small fw-semibold ${isGreen ? "text-warning" : ""}" style="${isGreen ? "" : "color: var(--primary-green);"}">Shop Now <i class="bi bi-arrow-right"></i></span>
+            <h5 class="brand-font fw-bold mb-1 offer-card-title" style="color: ${isGreen ? "var(--accent-gold-light)" : "var(--primary-green)"};">${esc(c.title || "")}</h5>
+            <p class="small mb-2 offer-card-desc ${isGreen ? "opacity-90" : "text-muted"}">${esc(c.desc || "")}</p>
+            <span class="small fw-semibold offer-card-footer-link ${isGreen ? "text-warning" : ""}" style="${isGreen ? "" : "color: var(--primary-green);"}">Shop Now <i class="bi bi-arrow-right"></i></span>
           </div>
         </div>`;
     }).join("");
@@ -2447,26 +2447,63 @@ function openPolicyModal(type) {
   if (type === "shipping") {
     titleEl.innerHTML = `<i class="bi bi-truck me-2"></i>Shipping Policy`;
     bodyEl.innerHTML = `
-      <h6 class="fw-bold" style="color: var(--primary-green);">Order Processing &amp; Dispatch</h6>
-      <p class="small text-muted">All pieces at <strong>Jewellery by Riddhi</strong> are handmade to order or carefully inspected before dispatch. Ready-to-ship items are dispatched within <strong>2–4 business days</strong>, and custom/bulk orders (3+ pieces) take <strong>5–8 business days</strong>.</p>
-      <h6 class="fw-bold" style="color: var(--primary-green);">Delivery Timelines &amp; Charges</h6>
-      <ul class="small text-muted">
-        <li><strong>Pune &amp; Maharashtra:</strong> Typically 2–4 working days after dispatch.</li>
-        <li><strong>Rest of India:</strong> Typically 4–7 working days via trusted courier partners.</li>
-        <li>Shipping charges (if applicable) are confirmed on WhatsApp prior to final payment.</li>
+      <h6 class="fw-bold" style="color: var(--primary-green);">Made with Love, Delivered with Care ❤️</h6>
+      <p class="small text-muted">Every piece at <strong>Jewellery by Riddhi</strong> is thoughtfully handmade to order or carefully quality-checked before it makes its way to you. We ensure every order is prepared with love and attention to detail.</p>
+      <h6 class="fw-bold" style="color: var(--primary-green);">🚚 Delivery at Your Doorstep</h6>
+      <p class="small text-muted mb-1">We deliver across India with trusted courier partners.</p>
+      <ul class="small text-muted mb-3">
+        <li><strong>Within Pune:</strong> Delivered within <strong>7–8 business days</strong>.</li>
+        <li><strong>Outside Pune:</strong> Delivered within <strong>12–15 business days</strong>.</li>
       </ul>
+      <h6 class="fw-bold" style="color: var(--primary-green);">📦 Shipping Charges</h6>
+      <p class="small text-muted mb-2">Shipping charges are applicable on all orders and will be communicated before order confirmation.</p>
+      <p class="small fw-semibold mb-0" style="color: var(--primary-green);">Thank you for choosing Jewellery by Riddhi. Every piece is made special, just for you! ✨</p>
     `;
   } else {
     titleEl.innerHTML = `<i class="bi bi-arrow-counterclockwise me-2"></i>Return &amp; Replacement Policy`;
     bodyEl.innerHTML = `
-      <h6 class="fw-bold" style="color: var(--primary-green);">Damage or Wrong Item Replacement</h6>
-      <p class="small text-muted">Because every item is handcrafted and customized, we do not offer general change-of-mind returns. However, if you receive a <strong>damaged, defective, or incorrect product</strong>, we gladly offer a replacement or resolution.</p>
-      <h6 class="fw-bold" style="color: var(--primary-green);">Mandatory Unboxing Video Requirement</h6>
-      <ul class="small text-muted">
-        <li>Please record a <strong>clear, continuous unboxing video</strong> from the moment you open the sealed parcel.</li>
-        <li>Contact us on WhatsApp (<strong>${BRAND_PHONE_DISPLAY}</strong>) within <strong>24 hours of delivery</strong> with the unboxing video and order details.</li>
-        <li>Custom-made or bulk orders (3+ pieces) are eligible for replacement only in case of transit damage or wrong item sent.</li>
-      </ul>
+      
+<h6 class="fw-bold" style="color: var(--primary-green);">
+  ↩️ Return &amp; Replacement Policy
+</h6>
+
+<p class="small text-muted">
+  At <strong>Jewellery by Riddhi</strong>, every piece is crafted with care and attention to detail. As our jewellery is carefully made and inspected before dispatch, we follow a strict <strong>No Return &amp; No Replacement Policy</strong>.
+</p>
+
+<p class="small fw-semibold text-dark mb-1">
+  📌 Please note the following before placing your order:
+</p>
+
+<ul class="small text-muted mb-3">
+  <li><strong>🚫 No Returns:</strong> Once an order is placed and confirmed, it cannot be returned or refunded.</li>
+
+  <li><strong>🔄 No Replacements:</strong> We do not offer replacements for products due to personal preferences, colour differences, design choices, or incorrect size selection.</li>
+
+  <li><strong>🛍️ Order Confirmation:</strong> Please review your product details, size, design, and other specifications carefully before confirming your purchase.</li>
+
+  <li><strong>📦 Damaged Products:</strong> If you receive a product that is damaged during transit, please contact us within <strong>24 hours of delivery</strong> with clear photos and an unboxing video for review.</li>
+</ul>
+
+<p class="small text-muted mb-2">
+  We request you to shop thoughtfully and feel free to contact us if you have any questions before placing your order.
+</p>
+
+<p class="small text-muted mb-2">
+  <strong>📞 Contact Us:</strong>
+  <a href="tel:+91918412981213" class="text-decoration-none fw-semibold" style="color: var(--primary-green);">
+    +91 84129 81213
+  </a>
+  <span class="mx-1">|</span>
+  <a href="https://wa.me/918412981213" target="_blank" class="text-decoration-none fw-semibold" style="color: var(--primary-green);">
+    <i class="fab fa-whatsapp"></i> WhatsApp Us
+  </a>
+</p>
+
+<p class="small fw-semibold mb-0" style="color: var(--primary-green);">
+  ❤️ Thank you for choosing Jewellery by Riddhi. We truly appreciate your trust and support!
+</p>
+
     `;
   }
 
@@ -3100,7 +3137,7 @@ function adminLogoTap() {
 function checkAdminHash() {
   if (location.hash === "#admin") {
     history.replaceState(null, "", location.pathname + location.search);
-    setTimeout(() => handleAdminClick(), 50);
+    setTimeout(() => openAdminLogin(), 50);
   }
 }
 window.addEventListener("hashchange", checkAdminHash);
@@ -3123,11 +3160,7 @@ document.addEventListener("show.bs.offcanvas", ev => {
 });
 
 function handleAdminClick() {
-  if (isAdminLoggedIn()) {
-    window.location.href = "admin-orders.html";
-  } else {
-    openAdminLogin();
-  }
+  openAdminLogin();
 }
 
 function openAdminLogin() {
