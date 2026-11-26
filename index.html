@@ -61,12 +61,23 @@
           </div>
         </div>
 
-        <!-- Right: Customer Mobile Login Only (Desktop & Mobile) -->
+        <!-- Right: Customer Mobile Login & Profile Menu -->
         <div class="nav-right-slot d-flex align-items-center gap-1 gap-md-2">
-          <button id="navCustAccountBtn" class="btn btn-outline-dark btn-sm px-2 px-md-3 py-1 d-flex align-items-center gap-1 rounded-pill" onclick="handleCustomerAccountBtnClick()" title="Customer Mobile Login">
-            <i class="bi bi-person-circle fs-6"></i>
-            <span id="navCustAccountLabel" class="small fw-semibold">Login</span>
-          </button>
+          <div class="profile-account-wrap">
+            <button id="navCustAccountBtn" type="button" class="btn btn-outline-dark btn-sm px-2 px-md-3 py-1 d-flex align-items-center rounded-pill" onclick="handleCustomerAccountBtnClick(event)" title="Customer Mobile Login">
+              <i class="bi bi-person-circle fs-6"></i>
+              <span id="navCustAccountLabel" class="small fw-semibold">Login</span>
+            </button>
+            <div id="headerProfileDropdown" class="profile-account-menu d-none">
+              <div class="px-2 py-1 border-bottom mb-1 small">
+                <div class="text-muted" style="font-size:10px;">Logged In Mobile</div>
+                <div class="fw-bold text-dark" id="headerProfileMobileText">+91 00000 00000</div>
+              </div>
+              <button type="button" class="btn btn-outline-danger btn-sm w-100 rounded-2 py-1 px-2 fw-semibold" style="font-size:12px;" onclick="closeHeaderProfileMenu(); logoutCustomerMobileSession()">
+                <i class="bi bi-box-arrow-right me-1"></i> Logout
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -109,31 +120,31 @@
         <ul class="list-group list-group-flush mb-3">
           <li class="list-group-item bg-transparent">
             <a href="javascript:void(0)" class="text-decoration-none text-dark fw-semibold" onclick="navigateTo('home')" data-bs-dismiss="offcanvas">
-              <i class="bi bi-house-door me-2"></i>Home
+              <i class="bi bi-house-door-fill text-success me-2"></i>Home
             </a>
           </li>
           <li class="list-group-item bg-transparent">
             <a href="javascript:void(0)" class="text-decoration-none text-dark fw-semibold" onclick="openProductsView('All')" data-bs-dismiss="offcanvas">
-              <i class="bi bi-grid me-2"></i>All Products (Filter)
+              <i class="bi bi-grid-fill text-primary me-2"></i>All Products (Filter)
             </a>
           </li>
           <li class="list-group-item bg-transparent d-flex justify-content-between align-items-center">
             <a href="javascript:void(0)" class="text-decoration-none text-dark fw-semibold flex-grow-1" onclick="openFavoritesView()" data-bs-dismiss="offcanvas">
               <i class="bi bi-heart-fill text-danger me-2"></i>My Favorites
             </a>
-            <span id="navFavCount" class="badge rounded-pill bg-danger d-none">0</span>
+            <span id="navFavCount" class="badge rounded-pill bg-danger">0</span>
           </li>
           <li class="list-group-item bg-transparent d-flex justify-content-between align-items-center">
             <a href="javascript:void(0)" class="text-decoration-none text-dark fw-semibold flex-grow-1" data-bs-toggle="offcanvas" data-bs-target="#myOrdersOffcanvas" onclick="switchCustomerActivityTab('orders')">
               <i class="bi bi-receipt-cutoff text-success me-2"></i>My Orders
             </a>
-            <span id="navOrdersCount" class="badge rounded-pill bg-success d-none">0</span>
+            <span id="navOrdersCount" class="badge rounded-pill bg-success">0</span>
           </li>
           <li class="list-group-item bg-transparent d-flex justify-content-between align-items-center">
             <a href="javascript:void(0)" class="text-decoration-none text-dark fw-semibold flex-grow-1" data-bs-toggle="offcanvas" data-bs-target="#myOrdersOffcanvas" onclick="switchCustomerActivityTab('enquiries')">
               <i class="bi bi-chat-dots-fill text-warning me-2"></i>My Enquiries <i class="bi bi-bell-fill text-danger small ms-1"></i>
             </a>
-            <span id="navEnquiriesCount" class="badge rounded-pill bg-danger d-none">0</span>
+            <span id="navEnquiriesCount" class="badge rounded-pill bg-danger">0</span>
           </li>
           <li class="list-group-item bg-transparent d-flex justify-content-between align-items-center">
             <a href="javascript:void(0)" class="text-decoration-none text-dark fw-semibold flex-grow-1" data-bs-toggle="offcanvas" data-bs-target="#cartOffcanvas">
@@ -143,31 +154,37 @@
           </li>
           <li class="list-group-item bg-transparent">
             <a href="about.html" class="text-decoration-none text-dark fw-semibold">
-              <i class="bi bi-info-circle me-2"></i>About Us
+              <i class="bi bi-info-circle-fill text-info me-2"></i>About Us
             </a>
           </li>
           <li class="list-group-item bg-transparent">
             <a href="care-guide.html" class="text-decoration-none text-dark fw-semibold">
-              <i class="bi bi-stars me-2"></i>Care Guide
+              <i class="bi bi-stars text-warning me-2"></i>Care Guide
             </a>
           </li>
           <li class="list-group-item bg-transparent">
             <a href="shipping-policy.html" class="text-decoration-none text-dark fw-semibold">
-              <i class="bi bi-truck me-2"></i>Shipping Policy
+              <i class="bi bi-truck text-primary me-2"></i>Shipping Policy
             </a>
           </li>
           <li class="list-group-item bg-transparent">
             <a href="return-policy.html" class="text-decoration-none text-dark fw-semibold">
-              <i class="bi bi-arrow-counterclockwise me-2"></i>Return Policy
+              <i class="bi bi-arrow-counterclockwise text-danger me-2"></i>Return Policy
             </a>
           </li>
         </ul>
-
-        <h6 class="fw-bold px-3 mb-2 text-uppercase small" style="color: var(--accent-gold); letter-spacing: 1px;">All Categories</h6>
-        <div class="list-group list-group-flush px-2 mb-3" id="sidebarCategoryList" style="max-height: 220px; overflow-y: auto;"></div>
       </div>
-
       <div class="text-center border-top pt-3">
+        <div class="p-2 mb-3 rounded-3 bg-white border shadow-sm">
+          <div class="fw-semibold small mb-1" style="color: var(--primary-green);">Direct Order &amp; Enquiry</div>
+          <div class="small mb-2">
+            <i class="bi bi-telephone-fill text-success me-1"></i>
+            <a href="tel:+918412981213" class="fw-bold text-dark text-decoration-none">+91 84129 81213</a>
+          </div>
+          <a href="https://wa.me/918412981213?text=Hello%20Jewellery%20by%20Riddhi!%20I%20have%20an%20enquiry." target="_blank" class="btn btn-green btn-sm w-100 rounded-pill py-1 fw-semibold">
+            <i class="bi bi-whatsapp me-1"></i> Message on WhatsApp
+          </a>
+        </div>
         <p class="small fw-semibold mb-2" style="color: var(--primary-green);">Follow Us on Instagram</p>
         <div class="qr-box shadow-sm">
           <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://www.instagram.com/jewellery_by_riddhi/" alt="Instagram QR">
@@ -180,6 +197,7 @@
         </div>
       </div>
     </div>
+  </div>
   </div>
 
   <!-- HOME VIEW -->
@@ -245,7 +263,7 @@
     </section>
 
     <!-- NEW ARRIVALS SECTION -->
-    <section class="container my-5">
+    <section class="container my-5" id="newArrivalsSection">
       <div class="d-flex justify-content-between align-items-center mb-3">
         <h3 class="section-title m-0">✦ New Arrivals ✦</h3>
         <button class="btn btn-sm btn-outline-dark rounded-pill px-3" onclick="openProductsView('All')">View All</button>
@@ -255,8 +273,9 @@
 
     <!-- SHOP BY CATEGORY (15 CATEGORIES) -->
     <section class="container my-5">
-      <div class="text-center mb-4">
-        <h3 class="section-title">✦ Shop by Category ✦</h3>
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="section-title m-0">✦ Shop by Category ✦</h3>
+        <button class="btn btn-sm btn-outline-dark rounded-pill px-3" onclick="openProductsView('All')">View All</button>
       </div>
       <div class="row g-3 g-md-4" id="homeCategoryGrid">
       </div>
@@ -356,10 +375,13 @@
               </div>
               <p class="small text-muted mb-2" id="modalDesc"></p>
 
-              <!-- SHIPPING POLICY LINK IN PRODUCT DETAIL -->
-              <div class="mb-3">
+              <!-- SHIPPING & RETURN POLICY LINKS IN PRODUCT DETAIL (POPUP) -->
+              <div class="mb-3 d-flex flex-wrap gap-3">
                 <a href="javascript:void(0)" class="small fw-semibold text-decoration-none" style="color: var(--primary-green);" onclick="openPolicyModal('shipping')">
-                  <i class="bi bi-truck me-1 text-warning"></i>View Shipping Policy &amp; Delivery Timelines <i class="bi bi-box-arrow-up-right" style="font-size: 10px;"></i>
+                  <i class="bi bi-truck me-1 text-warning"></i>Shipping Policy &amp; Delivery Timelines <i class="bi bi-box-arrow-up-right" style="font-size: 10px;"></i>
+                </a>
+                <a href="javascript:void(0)" class="small fw-semibold text-decoration-none" style="color: var(--primary-green);" onclick="openPolicyModal('return')">
+                  <i class="bi bi-arrow-counterclockwise me-1 text-danger"></i>Return Policy <i class="bi bi-box-arrow-up-right" style="font-size: 10px;"></i>
                 </a>
               </div>
 
@@ -380,9 +402,9 @@
                     Quantity <span class="text-muted fw-normal" id="maxStockHint">(Max 2 ready)</span>:
                   </label>
                   <div class="input-group input-group-sm" style="width: 135px;">
-                    <button class="btn btn-outline-secondary" type="button" onclick="changeModalQty(-1)">-</button>
+                    <button class="btn btn-outline-secondary rounded-square" type="button" onclick="changeModalQty(-1)">-</button>
                     <input type="text" class="form-control text-center fw-bold" id="modalQty" value="1" readonly>
-                    <button class="btn btn-outline-secondary" type="button" onclick="changeModalQty(1)">+</button>
+                    <button class="btn btn-outline-secondary rounded-square" type="button" onclick="changeModalQty(1)">+</button>
                   </div>
                 </div>
 
@@ -392,7 +414,7 @@
                 </div>
 
                 <div class="d-grid gap-2 d-sm-flex">
-                  <button class="btn btn-outline-dark flex-fill fw-medium btn-sm py-2" onclick="handleAddToCartClick()">
+                  <button class="btn btn-outline-dark flex-fill fw-medium btn-sm py-2 rounded-pill" onclick="handleAddToCartClick()">
                     <i class="bi bi-cart-plus me-1"></i> Add to Cart
                   </button>
                   <button class="btn btn-green flex-fill fw-medium btn-sm py-2" onclick="handleOrderSingleClick()">
@@ -473,7 +495,7 @@
                 <div class="city-autocomplete-wrap">
                   <div class="input-group input-group-sm">
                     <input type="text" id="custCity" class="form-control" required placeholder="Select or type city..." oninput="handleCityInput(this.value)" onfocus="handleCityInput(this.value)">
-                    <button class="btn btn-outline-secondary" type="button" onclick="toggleCityDropdownBtn()" title="Show city list" aria-label="Show city list">
+                    <button class="btn btn-outline-secondary rounded-square city-dropdown-btn" type="button" onclick="toggleCityDropdownBtn()" title="Show city list" aria-label="Show city list">
                       <i class="bi bi-chevron-down"></i>
                     </button>
                   </div>
@@ -512,13 +534,13 @@
           </div>
         </div>
         <div class="modal-footer border-0 d-grid gap-2 pt-2">
-          <button type="button" class="btn btn-outline-dark btn-sm w-100 rounded-square py-2 fw-medium" onclick="editOrderDetailsFromConfirm()">
+          <button type="button" class="btn btn-outline-dark btn-sm w-100 rounded-pill py-2 fw-medium" onclick="editOrderDetailsFromConfirm()">
             <i class="bi bi-pencil-square me-1"></i> Edit Details
           </button>
-          <button type="button" class="btn btn-outline-danger btn-sm w-100 rounded-square py-2 fw-medium" data-bs-dismiss="modal">
+          <button type="button" class="btn btn-outline-danger btn-sm w-100 rounded-pill py-2 fw-medium" data-bs-dismiss="modal">
             No, Cancel
           </button>
-          <button type="button" class="btn btn-green btn-sm w-100 rounded-square py-2 fw-semibold" onclick="confirmAndSendOrderWhatsApp()">
+          <button type="button" class="btn btn-green btn-sm w-100 rounded-pill py-2 fw-semibold" onclick="confirmAndSendOrderWhatsApp()">
             <i class="bi bi-whatsapp me-1"></i> Yes, Confirm
           </button>
         </div>
@@ -606,9 +628,9 @@
               <div class="col-6">
                 <label class="form-label small fw-semibold mb-1">Total Required Qty:</label>
                 <div class="input-group input-group-sm">
-                  <button class="btn btn-outline-dark fw-bold" type="button" onclick="adjustEnquiryQty(-1)">-</button>
+                  <button class="btn btn-outline-dark fw-bold rounded-square" type="button" onclick="adjustEnquiryQty(-1)">-</button>
                   <input type="number" id="enqReqQtyInput" class="form-control text-center fw-bold" min="1" max="500" value="6" oninput="refreshEnquiryStockBreakdown()">
-                  <button class="btn btn-outline-dark fw-bold" type="button" onclick="adjustEnquiryQty(1)">+</button>
+                  <button class="btn btn-outline-dark fw-bold rounded-square" type="button" onclick="adjustEnquiryQty(1)">+</button>
                 </div>
               </div>
             </div>
@@ -631,11 +653,11 @@
               <textarea id="enqCustNote" class="form-control form-control-sm" rows="2" placeholder="Required delivery date, color preference, or custom note..."></textarea>
             </div>
           </div>
-          <div class="modal-footer border-0">
-            <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" data-bs-dismiss="modal">Cancel</button>
-            <button type="submit" id="submitOverStockEnqBtn" class="btn btn-green btn-sm rounded-pill px-4 fw-semibold">
+          <div class="modal-footer border-0 d-grid gap-2 pt-2">
+            <button type="submit" id="submitOverStockEnqBtn" class="btn btn-green btn-sm w-100 rounded-pill py-2 fw-semibold">
               <i class="bi bi-whatsapp me-1"></i> Update Enquiry &amp; Send on WhatsApp
             </button>
+            <button type="button" class="btn btn-outline-secondary btn-sm w-100 rounded-pill py-2" data-bs-dismiss="modal">Cancel</button>
           </div>
         </form>
       </div>
@@ -700,7 +722,7 @@
     </div>
   </div>
 
-  <!-- MY ORDERS OFFCANVAS (TWO TABS: MY ORDERS & MY ENQUIRIES + FILTERS) -->
+<!-- MY ORDERS OFFCANVAS (TWO TABS: MY ORDERS & MY ENQUIRIES + FILTERS) -->
   <div class="offcanvas offcanvas-end" tabindex="-1" id="myOrdersOffcanvas">
     <div class="offcanvas-header" style="background-color: var(--primary-green); color: #fff;">
       <h5 class="offcanvas-title brand-font"><i class="bi bi-receipt-cutoff me-2"></i>My Placed Orders</h5>
@@ -708,19 +730,6 @@
     </div>
     <div class="offcanvas-body d-flex flex-column justify-content-between" style="background-color: var(--cream-bg);">
       <div>
-        <!-- CUSTOMER MOBILE SYNC BAR INSIDE MY ORDERS DRAWER -->
-        <div id="drawerCustSyncBanner" class="p-2 mb-2 rounded-3 bg-white border d-flex justify-content-between align-items-center gap-2">
-          <div class="small" style="font-size: 11px;">
-            <span id="drawerCustStatusText" class="text-muted">Login with mobile no. to load orders from all devices</span>
-          </div>
-          <button type="button" id="drawerCustLoginBtn" class="btn btn-green btn-sm py-0 px-2 rounded-pill text-nowrap" style="font-size: 11px;" onclick="openCustomerMobileLoginModal()">
-            <i class="bi bi-phone me-1"></i>Login
-          </button>
-          <button type="button" id="drawerCustLogoutBtn" class="btn btn-outline-danger btn-sm py-0 px-2 rounded-pill text-nowrap d-none" style="font-size: 11px;" onclick="logoutCustomerMobileSession()">
-            Logout
-          </button>
-        </div>
-
         <!-- TWO SEPARATE TABS FOR CUSTOMER: MY ORDERS & MY ENQUIRIES -->
         <ul class="nav nav-pills nav-fill mb-3 bg-white p-1 rounded-pill shadow-sm border" id="customerActivityTabs" role="tablist">
           <li class="nav-item" role="presentation">
@@ -815,7 +824,6 @@
       </div>
     </div>
   </div>
-
   <!-- FLOATING CART -->
   <div class="floating-cart d-none" id="floatingCartBtn" data-bs-toggle="offcanvas" data-bs-target="#cartOffcanvas">
     <i class="bi bi-bag-check-fill fs-5" style="color: var(--accent-gold);"></i>
@@ -855,9 +863,6 @@
             <a id="customerWhatsAppCopyBtn" href="#" target="_blank" class="btn btn-green py-2 fw-semibold rounded-pill">
               <i class="bi bi-whatsapp me-1"></i> Get Order Details on My WhatsApp
             </a>
-            <button type="button" class="btn btn-outline-success btn-sm rounded-pill" data-bs-dismiss="modal" data-bs-toggle="offcanvas" data-bs-target="#myOrdersOffcanvas">
-              <i class="bi bi-receipt-cutoff me-1"></i> View in My Orders
-            </button>
             <button type="button" class="btn btn-outline-dark btn-sm rounded-pill" data-bs-dismiss="modal">
               Continue Shopping
             </button>
@@ -914,7 +919,7 @@
               <label class="form-label small fw-semibold" for="adminPass">Password</label>
               <div class="input-group input-group-sm">
                 <input type="password" id="adminPass" class="form-control" required autocomplete="current-password">
-                <button class="btn btn-outline-secondary" type="button" onclick="const f=document.getElementById('adminPass'); f.type = f.type==='password' ? 'text' : 'password'" aria-label="Show or hide password"><i class="bi bi-eye"></i></button>
+                <button class="btn btn-outline-secondary rounded-square" type="button" onclick="const f=document.getElementById('adminPass'); f.type = f.type==='password' ? 'text' : 'password'" aria-label="Show or hide password"><i class="bi bi-eye"></i></button>
               </div>
             </div>
           </div>
@@ -1001,15 +1006,14 @@
         <div class="col-md-4">
           <div class="d-flex align-items-center justify-content-center justify-content-md-start gap-2 mb-2">
             <img src="assets/logo.png" alt="Jewellery by Riddhi" class="brand-logo-img">
-            <h4 class="brand-font fw-bold m-0" style="color: var(--accent-gold);">Jewellery by Riddhi</h4>
           </div>
           <p class="small text-light opacity-75 mb-2">Handcrafted with love. Discover thoughtfully designed handmade jewellery for your special moments.</p>
           <div class="d-flex justify-content-center justify-content-md-start gap-3 small flex-wrap">
             <a href="index.html" class="text-light text-decoration-none">Home</a>
             <a href="about.html" class="text-light text-decoration-none">About Us</a>
             <a href="care-guide.html" class="text-light text-decoration-none">Care Guide</a>
-            <a href="javascript:void(0)" class="text-warning text-decoration-none" onclick="openPolicyModal('shipping')">Shipping Policy</a>
-            <a href="javascript:void(0)" class="text-warning text-decoration-none" onclick="openPolicyModal('return')">Return Policy</a>
+            <a href="shipping-policy.html" class="text-warning text-decoration-none">Shipping Policy</a>
+            <a href="return-policy.html" class="text-warning text-decoration-none">Return Policy</a>
           </div>
         </div>
 

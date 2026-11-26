@@ -600,15 +600,32 @@ function updateCustomerAccountUI() {
   }
 }
 
-function handleCustomerAccountBtnClick() {
+function closeHeaderProfileMenu() {
+  const dd = document.getElementById("headerProfileDropdown");
+  if (dd) dd.classList.add("d-none");
+}
+
+function handleCustomerAccountBtnClick(ev) {
+  if (ev) ev.stopPropagation();
   const mob = getCustomerSessionMobile();
   if (mob) {
-    const oc = document.getElementById("myOrdersOffcanvas");
-    if (oc) bootstrap.Offcanvas.getOrCreateInstance(oc).show();
+    const dd = document.getElementById("headerProfileDropdown");
+    const mobTxt = document.getElementById("headerProfileMobileText");
+    if (mobTxt) mobTxt.textContent = `+91 ${mob.slice(0, 5)} ${mob.slice(5)}`;
+    if (dd) dd.classList.toggle("d-none");
   } else {
     openCustomerMobileLoginModal();
   }
 }
+
+document.addEventListener("click", (ev) => {
+  const dd = document.getElementById("headerProfileDropdown");
+  const btn = document.getElementById("navCustAccountBtn");
+  if (!dd || dd.classList.contains("d-none")) return;
+  if (!dd.contains(ev.target) && (!btn || !btn.contains(ev.target))) {
+    dd.classList.add("d-none");
+  }
+});
 
 function openCustomerMobileLoginModal() {
   const el = document.getElementById("customerMobileLoginModal");
@@ -840,18 +857,32 @@ function renderHomeOffersAndMarquee() {
         ? c.targetCategories
         : (c.targetCategory ? [c.targetCategory] : ["All"]);
       const encodedCats = encodeURIComponent(JSON.stringify(catsArr));
-      const isGreen = !!c.featuredGreen;
+      let themeCls = "";
+      let isDarkTheme = false;
+      if (c.themeGold) {
+        themeCls = "theme-festive-gold";
+        isDarkTheme = true;
+      } else if (c.themeRose) {
+        themeCls = "theme-bridal-rose";
+        isDarkTheme = true;
+      } else if (c.themeMint) {
+        themeCls = "theme-soft-cream";
+        isDarkTheme = false;
+      } else if (c.featuredGreen) {
+        themeCls = "featured-green theme-royal-green";
+        isDarkTheme = true;
+      }
       const delay = Math.min(idx * 0.08, 0.35).toFixed(2);
       return `
         <div class="col-12 col-md-4 d-flex stagger-card" style="animation-delay: ${delay}s;">
-          <div class="offer-highlight-card w-100 ${isGreen ? "featured-green" : ""}" onclick="openOfferTargetCategories('${encodedCats}', '${esc(c.title || "")}')">
+          <div class="offer-highlight-card w-100 ${themeCls}" onclick="openOfferTargetCategories('${encodedCats}', '${esc(c.title || "")}')">
             <div class="d-flex justify-content-between align-items-center mb-2">
-              <span class="${isGreen ? "offer-urgency-pill" : "badge bg-danger"}">${esc(c.badge1 || "OFFER")}</span>
-              ${c.badge2 ? `<span class="badge ${isGreen ? "" : "bg-success-subtle text-success border border-success-subtle"}" style="${isGreen ? "background-color: var(--accent-gold); color: #15321e;" : ""}">${esc(c.badge2)}</span>` : ""}
+              <span class="${isDarkTheme ? "offer-urgency-pill" : "badge bg-danger"}">${esc(c.badge1 || "OFFER")}</span>
+              ${c.badge2 ? `<span class="badge ${isDarkTheme ? "" : "bg-success-subtle text-success border border-success-subtle"}" style="${isDarkTheme ? "background-color: var(--accent-gold); color: #15321e;" : ""}">${esc(c.badge2)}</span>` : ""}
             </div>
-            <h5 class="brand-font fw-bold mb-1 offer-card-title" style="color: ${isGreen ? "var(--accent-gold-light)" : "var(--primary-green)"};">${esc(c.title || "")}</h5>
-            <p class="small mb-2 offer-card-desc ${isGreen ? "opacity-90" : "text-muted"}">${esc(c.desc || "")}</p>
-            <span class="small fw-semibold offer-card-footer-link ${isGreen ? "text-warning" : ""}" style="${isGreen ? "" : "color: var(--primary-green);"}">Shop Now <i class="bi bi-arrow-right"></i></span>
+            <h5 class="brand-font fw-bold mb-1 offer-card-title" style="color: ${isDarkTheme ? "var(--accent-gold-light)" : "var(--primary-green)"};">${esc(c.title || "")}</h5>
+            <p class="small mb-2 offer-card-desc ${isDarkTheme ? "opacity-90" : "text-muted"}">${esc(c.desc || "")}</p>
+            <span class="small fw-semibold offer-card-footer-link ${isDarkTheme ? "text-warning" : ""}" style="${isDarkTheme ? "" : "color: var(--primary-green);"}">Shop Now <i class="bi bi-arrow-right"></i></span>
           </div>
         </div>`;
     }).join("");
@@ -893,9 +924,11 @@ function openOfferTargetCategories(encodedCatsJson, offerTitle = "") {
 // NEW ARRIVALS ON HOME PAGE
 // ==========================================
 function renderNewArrivals() {
+  const sec = document.getElementById("newArrivalsSection");
   const container = document.getElementById("newArrivalsGrid");
   if (!container) return;
   const newItems = PRODUCTS.filter(p => p.isNewArrival).slice(0, 4);
+  if (sec) sec.classList.toggle("d-none", newItems.length === 0);
   container.innerHTML = newItems.map((prod, idx) => buildProductCardHtml(prod, idx, true)).join("");
 }
 
@@ -1361,6 +1394,10 @@ async function submitOverStockEnquiry(e) {
   };
 
   try {
+    localStorage.setItem("riddhi_customer_mobile_session", mobile);
+    localStorage.removeItem("riddhi_customer_logged_out");
+    localStorage.removeItem("riddhi_enquiries_cleared_at");
+    updateCustomerAccountUI();
     const localEnqs = JSON.parse(localStorage.getItem("riddhi_enquiries") || "[]");
     localEnqs.unshift({ ...enquiryPayload, status: "New Enquiry", date: new Date().toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }), timestamp: Date.now() });
     localStorage.setItem("riddhi_enquiries", JSON.stringify(localEnqs));
@@ -1533,7 +1570,7 @@ function updateCartUI() {
 
   if (cart.length === 0) {
     container.innerHTML = `<div class="text-center text-muted my-5"><i class="bi bi-bag-x fs-1"></i><p class="mt-2">Your cart is empty.</p></div>`;
-    navCount.innerText = "0";
+    if (navCount) { navCount.innerText = "0"; navCount.classList.remove("d-none"); }
     document.getElementById("cartTotal").innerText = "0";
     if (savingsEl) savingsEl.innerText = "0";
     floatBtn.classList.add("d-none");
@@ -1554,9 +1591,9 @@ function updateCartUI() {
         <div class="card-body p-2 d-flex gap-2 align-items-center">
           <img src="${item.images[0]}" style="width: 62px; height: 62px; object-fit: cover; border-radius: 8px;">
           <div class="flex-grow-1">
-            <div class="d-flex justify-content-between align-items-start gap-1">
-              <h6 class="mb-0 small fw-bold">${esc(item.name)}</h6>
-              ${discPct > 0 ? `<span class="discount-badge" style="font-size:9px;">${discPct}% OFF</span>` : ""}
+            <div class="d-flex align-items-center gap-2 flex-nowrap">
+              <h6 class="mb-0 small fw-bold text-truncate">${esc(item.name)}</h6>
+              ${discPct > 0 ? `<span class="discount-badge text-nowrap" style="font-size:9px;">${discPct}% OFF</span>` : ""}
             </div>
             <small class="text-muted d-block" style="font-size: 11px;">Size: ${esc(item.size)}</small>
             ${item.customNote ? `<small class="text-success d-block" style="font-size: 11px;"><strong>Note:</strong> ${esc(item.customNote)}</small>` : ""}
@@ -2238,96 +2275,56 @@ async function refreshMyOrderStatuses(forceReplace = false) {
   autoDeliverLocalOrders();
   if (!APPS_SCRIPT_URL || !isCustomerStorefrontPage()) return;
 
-  // 1. Cross-device full sync by customer's 10-digit mobile number!
   const lookupMob = getCustomerLookupMobile();
-  if (lookupMob) {
-    try {
-      const mobRes = await callScript({ action: "getOrdersByMobile", mobile: lookupMob });
-      if (mobRes && mobRes.ok) {
-        const ordClearedAt = forceReplace ? 0 : Number(localStorage.getItem("riddhi_orders_cleared_at") || 0);
-        if (Array.isArray(mobRes.orders)) {
-          const localOrds = forceReplace ? [] : getLocalOrders();
-          const mergedMap = {};
-          localOrds.forEach(o => { if (o && o.orderId) mergedMap[o.orderId] = o; });
-          mobRes.orders.forEach(so => {
-            if (so && so.orderId && (Number(so.timestamp) || 0) > ordClearedAt) {
-              mergedMap[so.orderId] = { ...(mergedMap[so.orderId] || {}), ...so };
-            }
-          });
-          const mergedArr = Object.values(mergedMap).sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0));
-          localStorage.setItem("riddhi_orders", JSON.stringify(mergedArr));
-          // Auto-fill saved customer profile from latest order if name/address was empty
-          if (mergedArr.length > 0 && mergedArr[0].customer) {
-            const latestC = mergedArr[0].customer;
-            const curC = getSavedCustomer() || {};
-            if (!curC.name && latestC.name) {
-              localStorage.setItem("riddhi_customer", JSON.stringify({ ...latestC, mobile: lookupMob }));
-            }
-          }
-        }
-        const enqClearedAt = forceReplace ? 0 : Number(localStorage.getItem("riddhi_enquiries_cleared_at") || 0);
-        if (Array.isArray(mobRes.enquiries)) {
-          let localEnqs = [];
-          if (!forceReplace) {
-            try { localEnqs = JSON.parse(localStorage.getItem("riddhi_enquiries") || "[]"); } catch (e) {}
-          }
-          const eqMap = {};
-          localEnqs.forEach(q => { if (q && q.enquiryId) eqMap[q.enquiryId] = q; });
-          mobRes.enquiries.forEach(sq => {
-            if (sq && sq.enquiryId && (Number(sq.timestamp) || 0) > enqClearedAt) {
-              eqMap[sq.enquiryId] = { ...(eqMap[sq.enquiryId] || {}), ...sq };
-            }
-          });
-          const mergedEqs = Object.values(eqMap).sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0));
-          localStorage.setItem("riddhi_enquiries", JSON.stringify(mergedEqs));
-        }
-        renderMyOrders();
-        if (activeCustomerTab === "enquiries") renderCustomerMyEnquiriesTab();
-      }
-    } catch (e) {}
+  if (!lookupMob) {
+    localStorage.removeItem("riddhi_orders");
+    localStorage.removeItem("riddhi_enquiries");
+    renderMyOrders();
+    renderCustomerMyEnquiriesTab();
+    return;
   }
 
-  const orders = getLocalOrders();
-  if (!orders.length) return;
   try {
-    const list = orders.slice(0, 30).map(o => ({ orderId: o.orderId, mobile: (o.customer || {}).mobile }));
-    const r = await callScript({ action: "orderStatus", orders: list });
-    if (!r.ok || !r.statuses) return;
-    let changed = false;
-    const fresh = getLocalOrders();
-    fresh.forEach(o => {
-      const st = r.statuses[o.orderId];
-      if (st && (o.status !== st.status || o.statusUpdated !== st.updated || (o.cancelReason || "") !== (st.cancelReason || ""))) {
-        o.status = st.status;
-        o.statusUpdated = st.updated;
-        o.cancelReason = st.cancelReason || "";
-        changed = true;
-      }
-    });
-    if (changed) localStorage.setItem("riddhi_orders", JSON.stringify(fresh));
+    const mobRes = await callScript({ action: "getOrdersByMobile", mobile: lookupMob });
+    if (mobRes && mobRes.ok) {
+      localStorage.removeItem("riddhi_orders_cleared_at");
+      localStorage.removeItem("riddhi_enquiries_cleared_at");
 
-    try {
-      const localEnqs = JSON.parse(localStorage.getItem("riddhi_enquiries") || "[]");
-      if (localEnqs.length > 0) {
-        const er = await callScript({
-          action: "enquiryStatus",
-          enquiries: localEnqs.slice(0, 30).map(x => ({ enquiryId: x.enquiryId, mobile: x.mobile }))
-        });
-        if (er && er.ok && er.statuses) {
-          let eChanged = false;
-          localEnqs.forEach(x => {
-            if (er.statuses[x.enquiryId] && x.status !== er.statuses[x.enquiryId].status) {
-              x.status = er.statuses[x.enquiryId].status;
-              eChanged = true;
-            }
-          });
-          if (eChanged) localStorage.setItem("riddhi_enquiries", JSON.stringify(localEnqs));
+      const pendingForMob = getPendingSync().filter(
+        o => String((o.customer || {}).mobile || "").replace(/[^0-9]/g, "").slice(-10) === lookupMob
+      );
+      const sheetOrders = Array.isArray(mobRes.orders) ? mobRes.orders : [];
+      const orderMap = {};
+      sheetOrders.forEach(so => {
+        if (so && so.orderId) orderMap[so.orderId] = so;
+      });
+      pendingForMob.forEach(po => {
+        if (po && po.orderId && !orderMap[po.orderId]) orderMap[po.orderId] = po;
+      });
+      const finalOrders = Object.values(orderMap).sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0));
+      localStorage.setItem("riddhi_orders", JSON.stringify(finalOrders));
+
+      if (finalOrders.length > 0 && finalOrders[0].customer) {
+        const latestC = finalOrders[0].customer;
+        const curC = getSavedCustomer() || {};
+        if (!curC.name && latestC.name) {
+          localStorage.setItem("riddhi_customer", JSON.stringify({ ...latestC, mobile: lookupMob }));
         }
       }
-    } catch (ee) {}
 
+      const sheetEnqs = Array.isArray(mobRes.enquiries) ? mobRes.enquiries : [];
+      const finalEnqs = sheetEnqs
+        .filter(eq => eq && eq.enquiryId)
+        .sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0));
+      localStorage.setItem("riddhi_enquiries", JSON.stringify(finalEnqs));
+
+      renderMyOrders();
+      renderCustomerMyEnquiriesTab();
+    }
+  } catch (e) {
     renderMyOrders();
-  } catch (e) { /* offline fallback */ }
+    renderCustomerMyEnquiriesTab();
+  }
 }
 
 function safeImgUrl(u) {
@@ -2604,7 +2601,10 @@ function renderCustomerMyEnquiriesTab() {
     try {
       const parsedE = JSON.parse(localStorage.getItem("riddhi_enquiries") || "[]");
       if (Array.isArray(parsedE)) {
-        enqs = parsedE.filter(eq => String(eq.mobile || "").replace(/[^0-9]/g, "").slice(-10) === loggedCustMob);
+        enqs = parsedE.filter(eq => {
+          const eqMob = String(eq.mobile || eq.customerMobile || "").replace(/[^0-9]/g, "").slice(-10);
+          return !eqMob || eqMob === loggedCustMob;
+        });
       }
     } catch (e) {}
   }
@@ -2618,7 +2618,9 @@ function renderCustomerMyEnquiriesTab() {
     }
   }
   if (!loggedCustMob) {
-    container.innerHTML = `
+    const targetBox = document.getElementById("myEnquiriesTabListContainer");
+    if (!targetBox) return "";
+    targetBox.innerHTML = `
       <div class="text-center text-muted my-4 p-3 bg-white rounded-3 border shadow-sm">
         <i class="bi bi-chat-dots fs-1 text-warning"></i>
         <p class="small text-muted my-2">Login with your mobile number to view your enquiries.</p>
@@ -2639,15 +2641,15 @@ function renderCustomerMyEnquiriesTab() {
     return matchesCustomerDateFilter(eq.timestamp, eq.date, dateFilter, customIso);
   });
 
-  const refreshBtn = APPS_SCRIPT_URL
+  const refreshBtn = (APPS_SCRIPT_URL && filtered.length > 0)
     ? `<button type="button" class="btn btn-outline-dark btn-sm w-100 mb-3 rounded-pill" onclick="refreshMyOrderStatuses()"><i class="bi bi-arrow-clockwise me-1"></i>Refresh Enquiry Status</button>`
     : "";
 
   if (filtered.length === 0) {
-    container.innerHTML = refreshBtn + `
+    container.innerHTML = `
       <div class="text-center text-muted my-4">
         <i class="bi bi-chat-dots fs-1"></i>
-        <p class="mt-2 small">No enquiries match your selected filter.</p>
+        <p class="mt-2 small">No enquiries found.</p>
       </div>`;
     return;
   }
@@ -2781,9 +2783,8 @@ function renderMyOrders() {
   }
 
   const refreshBtn = (!adminView && APPS_SCRIPT_URL)
-    ? `<div class="d-flex gap-1 mb-3">
-         <button type="button" class="btn btn-outline-dark btn-sm flex-fill rounded-pill" style="font-size:11px;" onclick="refreshMyOrderStatuses()"><i class="bi bi-arrow-clockwise me-1"></i>Refresh Status</button>
-         <button type="button" class="btn btn-outline-success btn-sm rounded-pill px-2" style="font-size:11px;" onclick="promptCustomerMobileSync()"><i class="bi bi-phone me-1"></i>Sync Mobile</button>
+    ? `<div class="mb-3">
+         <button type="button" class="btn btn-outline-dark btn-sm w-100 rounded-pill" style="font-size:11px;" onclick="refreshMyOrderStatuses()"><i class="bi bi-arrow-clockwise me-1"></i>Refresh Order Status</button>
        </div>`
     : "";
 
@@ -2827,17 +2828,17 @@ function renderMyOrders() {
 }
 
 function clearOrderHistory() {
-  if (confirm("Clear saved order history from this browser?")) {
+  if (confirm("Clear saved order history from this browser only? (Google Sheet data remains unchanged)")) {
     localStorage.removeItem("riddhi_orders");
-    localStorage.setItem("riddhi_orders_cleared_at", String(Date.now()));
+    localStorage.removeItem("riddhi_orders_cleared_at");
     renderMyOrders();
   }
 }
 
 function clearEnquiryHistory() {
-  if (confirm("Clear saved enquiry history from this browser?")) {
+  if (confirm("Clear saved enquiry history from this browser only? (Google Sheet data remains unchanged)")) {
     localStorage.removeItem("riddhi_enquiries");
-    localStorage.setItem("riddhi_enquiries_cleared_at", String(Date.now()));
+    localStorage.removeItem("riddhi_enquiries_cleared_at");
     renderCustomerMyEnquiriesTab();
   }
 }
@@ -2913,7 +2914,10 @@ function buildCustomerEnquiriesTrackerHtml() {
     try {
       const parsedE = JSON.parse(localStorage.getItem("riddhi_enquiries") || "[]");
       if (Array.isArray(parsedE)) {
-        enqs = parsedE.filter(eq => String(eq.mobile || "").replace(/[^0-9]/g, "").slice(-10) === loggedCustMob);
+        enqs = parsedE.filter(eq => {
+          const eqMob = String(eq.mobile || eq.customerMobile || "").replace(/[^0-9]/g, "").slice(-10);
+          return !eqMob || eqMob === loggedCustMob;
+        });
       }
     } catch (e) {}
   }
@@ -3194,9 +3198,33 @@ async function submitAdminLogin(e) {
     if (APPS_SCRIPT_URL) {
       let r;
       try {
-        r = await callScript({ action: "adminLogin", username, password });
+        const ctrl = new AbortController();
+        const tmr = setTimeout(() => ctrl.abort(), 8000);
+        const res = await fetch(APPS_SCRIPT_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({ action: "adminLogin", username, password }),
+          signal: ctrl.signal
+        });
+        clearTimeout(tmr);
+        r = await res.json();
       } catch (netErr) {
-        showAdminLoginError("Could not connect to server. Check internet and try again.");
+        try {
+          const h = await sha256Hex(username + ":" + password);
+          if (username === ADMIN_USERNAME && h === ADMIN_LOCAL_HASH) {
+            session = { mode: "local" };
+            adminOrders = getLocalOrders();
+            try { adminEnquiries = JSON.parse(localStorage.getItem('riddhi_enquiries') || '[]'); } catch (e) { adminEnquiries = []; }
+            clearAdminFails();
+            localStorage.setItem("riddhi_admin_session", JSON.stringify(session));
+            sessionStorage.setItem("riddhi_admin_session", JSON.stringify(session));
+            const loginEl = document.getElementById("adminLoginModal");
+            if (loginEl) bootstrap.Modal.getOrCreateInstance(loginEl).hide();
+            window.location.href = "admin-orders.html";
+            return;
+          }
+        } catch (ex) {}
+        showAdminLoginError("Invalid username or password.");
         return;
       }
       if (!r.ok) {

@@ -60,12 +60,23 @@
           </div>
         </div>
 
-        <!-- Right: Customer Mobile Login Only (Desktop & Mobile) -->
+        <!-- Right: Customer Mobile Login & Profile Menu -->
         <div class="nav-right-slot d-flex align-items-center gap-1 gap-md-2">
-          <button id="navCustAccountBtn" class="btn btn-outline-dark btn-sm px-2 px-md-3 py-1 d-flex align-items-center gap-1 rounded-pill" onclick="handleCustomerAccountBtnClick()" title="Customer Mobile Login">
-            <i class="bi bi-person-circle fs-6"></i>
-            <span id="navCustAccountLabel" class="small fw-semibold">Login</span>
-          </button>
+          <div class="profile-account-wrap">
+            <button id="navCustAccountBtn" type="button" class="btn btn-outline-dark btn-sm px-2 px-md-3 py-1 d-flex align-items-center rounded-pill" onclick="handleCustomerAccountBtnClick(event)" title="Customer Mobile Login">
+              <i class="bi bi-person-circle fs-6"></i>
+              <span id="navCustAccountLabel" class="small fw-semibold">Login</span>
+            </button>
+            <div id="headerProfileDropdown" class="profile-account-menu d-none">
+              <div class="px-2 py-1 border-bottom mb-1 small">
+                <div class="text-muted" style="font-size:10px;">Logged In Mobile</div>
+                <div class="fw-bold text-dark" id="headerProfileMobileText">+91 00000 00000</div>
+              </div>
+              <button type="button" class="btn btn-outline-danger btn-sm w-100 rounded-2 py-1 px-2 fw-semibold" style="font-size:12px;" onclick="closeHeaderProfileMenu(); logoutCustomerMobileSession()">
+                <i class="bi bi-box-arrow-right me-1"></i> Logout
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -108,31 +119,31 @@
         <ul class="list-group list-group-flush mb-3">
           <li class="list-group-item bg-transparent">
             <a href="javascript:void(0)" class="text-decoration-none text-dark fw-semibold" onclick="navigateTo('home')" data-bs-dismiss="offcanvas">
-              <i class="bi bi-house-door me-2"></i>Home
+              <i class="bi bi-house-door-fill text-success me-2"></i>Home
             </a>
           </li>
           <li class="list-group-item bg-transparent">
             <a href="javascript:void(0)" class="text-decoration-none text-dark fw-semibold" onclick="openProductsView('All')" data-bs-dismiss="offcanvas">
-              <i class="bi bi-grid me-2"></i>All Products (Filter)
+              <i class="bi bi-grid-fill text-primary me-2"></i>All Products (Filter)
             </a>
           </li>
           <li class="list-group-item bg-transparent d-flex justify-content-between align-items-center">
             <a href="javascript:void(0)" class="text-decoration-none text-dark fw-semibold flex-grow-1" onclick="openFavoritesView()" data-bs-dismiss="offcanvas">
               <i class="bi bi-heart-fill text-danger me-2"></i>My Favorites
             </a>
-            <span id="navFavCount" class="badge rounded-pill bg-danger d-none">0</span>
+            <span id="navFavCount" class="badge rounded-pill bg-danger">0</span>
           </li>
           <li class="list-group-item bg-transparent d-flex justify-content-between align-items-center">
             <a href="javascript:void(0)" class="text-decoration-none text-dark fw-semibold flex-grow-1" data-bs-toggle="offcanvas" data-bs-target="#myOrdersOffcanvas" onclick="switchCustomerActivityTab('orders')">
               <i class="bi bi-receipt-cutoff text-success me-2"></i>My Orders
             </a>
-            <span id="navOrdersCount" class="badge rounded-pill bg-success d-none">0</span>
+            <span id="navOrdersCount" class="badge rounded-pill bg-success">0</span>
           </li>
           <li class="list-group-item bg-transparent d-flex justify-content-between align-items-center">
             <a href="javascript:void(0)" class="text-decoration-none text-dark fw-semibold flex-grow-1" data-bs-toggle="offcanvas" data-bs-target="#myOrdersOffcanvas" onclick="switchCustomerActivityTab('enquiries')">
               <i class="bi bi-chat-dots-fill text-warning me-2"></i>My Enquiries
             </a>
-            <span id="navEnquiriesCount" class="badge rounded-pill bg-danger d-none">0</span>
+            <span id="navEnquiriesCount" class="badge rounded-pill bg-danger">0</span>
           </li>
           <li class="list-group-item bg-transparent d-flex justify-content-between align-items-center">
             <a href="javascript:void(0)" class="text-decoration-none text-dark fw-semibold flex-grow-1" data-bs-toggle="offcanvas" data-bs-target="#cartOffcanvas">
@@ -142,31 +153,37 @@
           </li>
           <li class="list-group-item bg-transparent">
             <a href="about.html" class="text-decoration-none text-dark fw-semibold">
-              <i class="bi bi-info-circle me-2"></i>About Us
+              <i class="bi bi-info-circle-fill text-info me-2"></i>About Us
             </a>
           </li>
           <li class="list-group-item bg-transparent">
             <a href="care-guide.html" class="text-decoration-none text-dark fw-semibold">
-              <i class="bi bi-stars me-2"></i>Care Guide
+              <i class="bi bi-stars text-warning me-2"></i>Care Guide
             </a>
           </li>
           <li class="list-group-item bg-transparent">
             <a href="shipping-policy.html" class="text-decoration-none text-dark fw-semibold">
-              <i class="bi bi-truck me-2"></i>Shipping Policy
+              <i class="bi bi-truck text-primary me-2"></i>Shipping Policy
             </a>
           </li>
           <li class="list-group-item bg-transparent">
             <a href="javascript:void(0)" class="text-decoration-none text-dark fw-semibold" onclick="openPolicyModal('return')" data-bs-dismiss="offcanvas">
-              <i class="bi bi-arrow-counterclockwise me-2"></i>Return Policy
+              <i class="bi bi-arrow-counterclockwise text-danger me-2"></i>Return Policy
             </a>
           </li>
         </ul>
-
-        <h6 class="fw-bold px-3 mb-2 text-uppercase small" style="color: var(--accent-gold); letter-spacing: 1px;">All Categories</h6>
-        <div class="list-group list-group-flush px-2 mb-3" id="sidebarCategoryList" style="max-height: 220px; overflow-y: auto;"></div>
       </div>
-
       <div class="text-center border-top pt-3">
+        <div class="p-2 mb-3 rounded-3 bg-white border shadow-sm">
+          <div class="fw-semibold small mb-1" style="color: var(--primary-green);">Direct Order &amp; Enquiry</div>
+          <div class="small mb-2">
+            <i class="bi bi-telephone-fill text-success me-1"></i>
+            <a href="tel:+918412981213" class="fw-bold text-dark text-decoration-none">+91 84129 81213</a>
+          </div>
+          <a href="https://wa.me/918412981213?text=Hello%20Jewellery%20by%20Riddhi!%20I%20have%20an%20enquiry." target="_blank" class="btn btn-green btn-sm w-100 rounded-pill py-1 fw-semibold">
+            <i class="bi bi-whatsapp me-1"></i> Message on WhatsApp
+          </a>
+        </div>
         <p class="small fw-semibold mb-2" style="color: var(--primary-green);">Follow Us on Instagram</p>
         <div class="qr-box shadow-sm">
           <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://www.instagram.com/jewellery_by_riddhi/" alt="Instagram QR">
@@ -179,6 +196,7 @@
         </div>
       </div>
     </div>
+  </div>
   </div>
 
   <!-- LEFT SIDEBAR MENU (offcanvas-start) -->
@@ -218,31 +236,31 @@
         <ul class="list-group list-group-flush mb-3">
           <li class="list-group-item bg-transparent">
             <a href="javascript:void(0)" class="text-decoration-none text-dark fw-semibold" onclick="navigateTo('home')" data-bs-dismiss="offcanvas">
-              <i class="bi bi-house-door me-2"></i>Home
+              <i class="bi bi-house-door-fill text-success me-2"></i>Home
             </a>
           </li>
           <li class="list-group-item bg-transparent">
             <a href="javascript:void(0)" class="text-decoration-none text-dark fw-semibold" onclick="openProductsView('All')" data-bs-dismiss="offcanvas">
-              <i class="bi bi-grid me-2"></i>All Products (Filter)
+              <i class="bi bi-grid-fill text-primary me-2"></i>All Products (Filter)
             </a>
           </li>
           <li class="list-group-item bg-transparent d-flex justify-content-between align-items-center">
             <a href="javascript:void(0)" class="text-decoration-none text-dark fw-semibold flex-grow-1" onclick="openFavoritesView()" data-bs-dismiss="offcanvas">
               <i class="bi bi-heart-fill text-danger me-2"></i>My Favorites
             </a>
-            <span id="navFavCount" class="badge rounded-pill bg-danger d-none">0</span>
+            <span id="navFavCount" class="badge rounded-pill bg-danger">0</span>
           </li>
           <li class="list-group-item bg-transparent d-flex justify-content-between align-items-center">
             <a href="javascript:void(0)" class="text-decoration-none text-dark fw-semibold flex-grow-1" data-bs-toggle="offcanvas" data-bs-target="#myOrdersOffcanvas" onclick="switchCustomerActivityTab('orders')">
               <i class="bi bi-receipt-cutoff text-success me-2"></i>My Orders
             </a>
-            <span id="navOrdersCount" class="badge rounded-pill bg-success d-none">0</span>
+            <span id="navOrdersCount" class="badge rounded-pill bg-success">0</span>
           </li>
           <li class="list-group-item bg-transparent d-flex justify-content-between align-items-center">
             <a href="javascript:void(0)" class="text-decoration-none text-dark fw-semibold flex-grow-1" data-bs-toggle="offcanvas" data-bs-target="#myOrdersOffcanvas" onclick="switchCustomerActivityTab('enquiries')">
               <i class="bi bi-chat-dots-fill text-warning me-2"></i>My Enquiries
             </a>
-            <span id="navEnquiriesCount" class="badge rounded-pill bg-danger d-none">0</span>
+            <span id="navEnquiriesCount" class="badge rounded-pill bg-danger">0</span>
           </li>
           <li class="list-group-item bg-transparent d-flex justify-content-between align-items-center">
             <a href="javascript:void(0)" class="text-decoration-none text-dark fw-semibold flex-grow-1" data-bs-toggle="offcanvas" data-bs-target="#cartOffcanvas">
@@ -252,31 +270,37 @@
           </li>
           <li class="list-group-item bg-transparent">
             <a href="about.html" class="text-decoration-none text-dark fw-semibold">
-              <i class="bi bi-info-circle me-2"></i>About Us
+              <i class="bi bi-info-circle-fill text-info me-2"></i>About Us
             </a>
           </li>
           <li class="list-group-item bg-transparent">
             <a href="care-guide.html" class="text-decoration-none text-dark fw-semibold">
-              <i class="bi bi-stars me-2"></i>Care Guide
+              <i class="bi bi-stars text-warning me-2"></i>Care Guide
             </a>
           </li>
           <li class="list-group-item bg-transparent">
             <a href="shipping-policy.html" class="text-decoration-none text-dark fw-semibold">
-              <i class="bi bi-truck me-2"></i>Shipping Policy
+              <i class="bi bi-truck text-primary me-2"></i>Shipping Policy
             </a>
           </li>
           <li class="list-group-item bg-transparent">
             <a href="return-policy.html" class="text-decoration-none text-dark fw-semibold">
-              <i class="bi bi-arrow-counterclockwise me-2"></i>Return Policy
+              <i class="bi bi-arrow-counterclockwise text-danger me-2"></i>Return Policy
             </a>
           </li>
         </ul>
-
-        <h6 class="fw-bold px-3 mb-2 text-uppercase small" style="color: var(--accent-gold); letter-spacing: 1px;">All Categories</h6>
-        <div class="list-group list-group-flush px-2 mb-3" id="sidebarCategoryList" style="max-height: 220px; overflow-y: auto;"></div>
       </div>
-
       <div class="text-center border-top pt-3">
+        <div class="p-2 mb-3 rounded-3 bg-white border shadow-sm">
+          <div class="fw-semibold small mb-1" style="color: var(--primary-green);">Direct Order &amp; Enquiry</div>
+          <div class="small mb-2">
+            <i class="bi bi-telephone-fill text-success me-1"></i>
+            <a href="tel:+918412981213" class="fw-bold text-dark text-decoration-none">+91 84129 81213</a>
+          </div>
+          <a href="https://wa.me/918412981213?text=Hello%20Jewellery%20by%20Riddhi!%20I%20have%20an%20enquiry." target="_blank" class="btn btn-green btn-sm w-100 rounded-pill py-1 fw-semibold">
+            <i class="bi bi-whatsapp me-1"></i> Message on WhatsApp
+          </a>
+        </div>
         <p class="small fw-semibold mb-2" style="color: var(--primary-green);">Follow Us on Instagram</p>
         <div class="qr-box shadow-sm">
           <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://www.instagram.com/jewellery_by_riddhi/" alt="Instagram QR">
@@ -289,6 +313,7 @@
         </div>
       </div>
     </div>
+  </div>
   </div>
 
   <section class="container my-5">
@@ -346,7 +371,7 @@
     </div>
   </div>
 
-  <!-- MY ORDERS OFFCANVAS (TWO TABS: MY ORDERS & MY ENQUIRIES + FILTERS) -->
+<!-- MY ORDERS OFFCANVAS (TWO TABS: MY ORDERS & MY ENQUIRIES + FILTERS) -->
   <div class="offcanvas offcanvas-end" tabindex="-1" id="myOrdersOffcanvas">
     <div class="offcanvas-header" style="background-color: var(--primary-green); color: #fff;">
       <h5 class="offcanvas-title brand-font"><i class="bi bi-receipt-cutoff me-2"></i>My Placed Orders</h5>
@@ -354,19 +379,6 @@
     </div>
     <div class="offcanvas-body d-flex flex-column justify-content-between" style="background-color: var(--cream-bg);">
       <div>
-        <!-- CUSTOMER MOBILE SYNC BAR INSIDE MY ORDERS DRAWER -->
-        <div id="drawerCustSyncBanner" class="p-2 mb-2 rounded-3 bg-white border d-flex justify-content-between align-items-center gap-2">
-          <div class="small" style="font-size: 11px;">
-            <span id="drawerCustStatusText" class="text-muted">Login with mobile no. to load orders from all devices</span>
-          </div>
-          <button type="button" id="drawerCustLoginBtn" class="btn btn-green btn-sm py-0 px-2 rounded-pill text-nowrap" style="font-size: 11px;" onclick="openCustomerMobileLoginModal()">
-            <i class="bi bi-phone me-1"></i>Login
-          </button>
-          <button type="button" id="drawerCustLogoutBtn" class="btn btn-outline-danger btn-sm py-0 px-2 rounded-pill text-nowrap d-none" style="font-size: 11px;" onclick="logoutCustomerMobileSession()">
-            Logout
-          </button>
-        </div>
-
         <!-- TWO SEPARATE TABS FOR CUSTOMER: MY ORDERS & MY ENQUIRIES -->
         <ul class="nav nav-pills nav-fill mb-3 bg-white p-1 rounded-pill shadow-sm border" id="customerActivityTabs" role="tablist">
           <li class="nav-item" role="presentation">
@@ -461,7 +473,6 @@
       </div>
     </div>
   </div>
-
   <!-- CUSTOMER MOBILE-ONLY LOGIN MODAL (Jewellery by Riddhi) -->
   <div class="modal fade" id="customerMobileLoginModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-sm">
@@ -543,15 +554,14 @@
         <div class="col-md-4">
           <div class="d-flex align-items-center justify-content-center justify-content-md-start gap-2 mb-2">
             <img src="assets/logo.png" alt="Jewellery by Riddhi" class="brand-logo-img">
-            <h4 class="brand-font fw-bold m-0" style="color: var(--accent-gold);">Jewellery by Riddhi</h4>
           </div>
           <p class="small text-light opacity-75 mb-2">Handcrafted with love. Discover thoughtfully designed handmade jewellery for your special moments.</p>
           <div class="d-flex justify-content-center justify-content-md-start gap-3 small flex-wrap">
             <a href="index.html" class="text-light text-decoration-none">Home</a>
             <a href="about.html" class="text-light text-decoration-none">About Us</a>
             <a href="care-guide.html" class="text-light text-decoration-none">Care Guide</a>
-            <a href="javascript:void(0)" class="text-warning text-decoration-none" onclick="openPolicyModal('shipping')">Shipping Policy</a>
-            <a href="javascript:void(0)" class="text-warning text-decoration-none" onclick="openPolicyModal('return')">Return Policy</a>
+            <a href="shipping-policy.html" class="text-warning text-decoration-none">Shipping Policy</a>
+            <a href="return-policy.html" class="text-warning text-decoration-none">Return Policy</a>
           </div>
         </div>
 

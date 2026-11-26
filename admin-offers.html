@@ -124,15 +124,27 @@
               </div>
 
               <div class="mb-2" id="fOfferCatWrap">
-                <label class="form-label small fw-semibold mb-1">Opens Category on Click (Multi-Select)</label>
-                <select id="fOfferTargetCategory" class="form-select form-select-sm" multiple size="5"></select>
+                <label class="form-label small fw-semibold mb-1">Opens Category on Click</label>
+                <div id="fOfferTargetCategoryCheckboxes" class="p-2 rounded border bg-white" style="max-height:155px;overflow-y:auto;"></div>
                 <small class="text-muted d-block mt-1" style="font-size:10.5px;">Select one or more categories (All Products selects everything).</small>
               </div>
 
-              <div class="d-flex flex-wrap gap-3 my-2 p-2 rounded bg-light border">
+              <div class="d-flex flex-column gap-2 my-2 p-2 rounded bg-light border">
                 <div class="form-check form-switch m-0" id="fOfferGreenWrap">
                   <input class="form-check-input" type="checkbox" id="fOfferFeaturedGreen">
                   <label class="form-check-label small fw-semibold" for="fOfferFeaturedGreen">Royal Green Card Theme</label>
+                </div>
+                <div class="form-check form-switch m-0">
+                  <input class="form-check-input" type="checkbox" id="fOfferThemeGold">
+                  <label class="form-check-label small fw-semibold" for="fOfferThemeGold">Festive Gold Theme</label>
+                </div>
+                <div class="form-check form-switch m-0">
+                  <input class="form-check-input" type="checkbox" id="fOfferThemeRose">
+                  <label class="form-check-label small fw-semibold" for="fOfferThemeRose">Bridal Rose Theme</label>
+                </div>
+                <div class="form-check form-switch m-0">
+                  <input class="form-check-input" type="checkbox" id="fOfferThemeMint">
+                  <label class="form-check-label small fw-semibold" for="fOfferThemeMint">Soft Cream &amp; Gold Theme</label>
                 </div>
                 <div class="form-check form-switch m-0">
                   <input class="form-check-input" type="checkbox" id="fOfferActive" checked>
@@ -324,8 +336,8 @@
     }
 
     function populateOfferCategoryDropdown() {
-      const sel = document.getElementById("fOfferTargetCategory");
-      if (!sel) return;
+      const box = document.getElementById("fOfferTargetCategoryCheckboxes");
+      if (!box) return;
       let cats = CATEGORIES;
       try {
         const raw = localStorage.getItem("riddhi_custom_categories_v1");
@@ -334,8 +346,12 @@
           if (Array.isArray(p) && p.length) cats = p;
         }
       } catch (e) {}
-      sel.innerHTML = `<option value="All">All Products</option>` +
-        cats.map(c => `<option value="${escF(c.name)}">${escF(c.name)}</option>`).join("");
+      const opts = ["All", ...cats.map(c => c.name)];
+      box.innerHTML = opts.map((cname, i) => `
+        <div class="form-check mb-1">
+          <input class="form-check-input offer-cat-chk" type="checkbox" id="offerCatChk_${i}" value="${escF(cname)}">
+          <label class="form-check-label small" for="offerCatChk_${i}">${cname === "All" ? "All Products" : escF(cname)}</label>
+        </div>`).join("");
     }
 
     function toggleOfferTypeFields() {
@@ -412,8 +428,7 @@
       const badge2 = document.getElementById("fOfferBadge2").value.trim();
       const title = document.getElementById("fOfferTitle").value.trim();
       const desc = document.getElementById("fOfferDesc").value.trim();
-      const catSelEl = document.getElementById("fOfferTargetCategory");
-      let selectedCats = Array.from(catSelEl ? catSelEl.selectedOptions : []).map(o => o.value).filter(Boolean);
+      let selectedCats = Array.from(document.querySelectorAll(".offer-cat-chk:checked")).map(el => el.value).filter(Boolean);
       if (selectedCats.length === 0) selectedCats = ["All"];
       if (selectedCats.includes("All")) selectedCats = ["All"];
       const targetCategory = selectedCats.join(", ");
@@ -445,6 +460,9 @@
             targetCategory: type === "card" ? targetCategory : "All",
             targetCategories: type === "card" ? selectedCats : ["All"],
             featuredGreen: type === "card" ? featuredGreen : false,
+            themeGold: type === "card" ? !!document.getElementById("fOfferThemeGold")?.checked : false,
+            themeRose: type === "card" ? !!document.getElementById("fOfferThemeRose")?.checked : false,
+            themeMint: type === "card" ? !!document.getElementById("fOfferThemeMint")?.checked : false,
             active
           };
 
@@ -475,16 +493,20 @@
       document.getElementById("fOfferBadge2").value = item.badge2 || "";
       document.getElementById("fOfferTitle").value = item.title || "";
       document.getElementById("fOfferDesc").value = item.desc || "";
-      const editCatSel = document.getElementById("fOfferTargetCategory");
       const savedMulti = Array.isArray(item.targetCategories) && item.targetCategories.length > 0
         ? item.targetCategories
         : String(item.targetCategory || "All").split(",").map(s => s.trim()).filter(Boolean);
-      if (editCatSel) {
-        Array.from(editCatSel.options).forEach(opt => {
-          opt.selected = savedMulti.some(m => m.toLowerCase() === opt.value.toLowerCase());
-        });
-      }
-      document.getElementById("fOfferFeaturedGreen").checked = !!item.featuredGreen;
+      document.querySelectorAll(".offer-cat-chk").forEach(chk => {
+        chk.checked = savedMulti.some(m => m.toLowerCase() === chk.value.toLowerCase());
+      });
+      const tGold = !!item.themeGold;
+      const tRose = !!item.themeRose;
+      const tMint = !!item.themeMint;
+      const tGreen = !!(item.featuredGreen || item.themeRoyalGreen) && !tGold && !tRose && !tMint;
+      if (document.getElementById("fOfferThemeGold")) document.getElementById("fOfferThemeGold").checked = tGold;
+      if (document.getElementById("fOfferThemeRose")) document.getElementById("fOfferThemeRose").checked = tRose;
+      if (document.getElementById("fOfferThemeMint")) document.getElementById("fOfferThemeMint").checked = tMint;
+      document.getElementById("fOfferFeaturedGreen").checked = tGreen;
       document.getElementById("fOfferActive").checked = item.active !== false;
 
       document.getElementById("offerFormHeader").innerHTML = `<i class="bi bi-pencil-square me-1 text-warning"></i> Update Offer: ${escF(item.id)}`;
@@ -642,6 +664,23 @@
       window.location.reload();
     }
 
+
+    function wireOfferThemeToggles() {
+      const ids = ["fOfferFeaturedGreen", "fOfferThemeGold", "fOfferThemeRose", "fOfferThemeMint"];
+      ids.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener("change", () => {
+          if (el.checked) {
+            ids.filter(other => other !== id).forEach(other => {
+              const oEl = document.getElementById(other);
+              if (oEl) oEl.checked = false;
+            });
+          }
+        });
+      });
+    }
+
     function initOfferPage() {
       const s = getAdminSessionObj();
       if (!s) {
@@ -653,6 +692,7 @@
       document.getElementById("offerLoginGate").classList.add("d-none");
       document.getElementById("offerWorkspace").classList.remove("d-none");
       document.getElementById("offerLogoutBtn").classList.remove("d-none");
+      wireOfferThemeToggles();
       populateOfferCategoryDropdown();
       toggleOfferTypeFields();
       renderOffersTable();

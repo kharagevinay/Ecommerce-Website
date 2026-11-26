@@ -192,9 +192,14 @@
       window.location.reload();
     }
 
-    function matchEnqDate(ts, bucket, customIso) {
+    function matchEnqDate(ts, bucket, customIso, dateStr = "") {
       if (bucket === "all") return true;
-      const d = ts ? new Date(Number(ts)) : null;
+      let numTs = Number(ts) || 0;
+      if (!numTs && dateStr) {
+        const p = new Date(dateStr);
+        if (!isNaN(p.getTime())) numTs = p.getTime();
+      }
+      const d = numTs ? new Date(numTs) : null;
       const now = new Date();
       if (bucket === "today") {
         if (!d || isNaN(d.getTime())) return false;
@@ -240,12 +245,19 @@
       const list = (adminEnquiries || []).filter(eq => {
         const eid = String(eq.enquiryId || "").toLowerCase();
         const cname = String(eq.customerName || "").toLowerCase();
-        const cmob = String(eq.mobile || "").toLowerCase();
-        if (q && !eid.includes(q) && !cname.includes(q) && !cmob.includes(q)) return false;
+        const cmob = String(eq.mobile || "").replace(/[^0-9]/g, "");
+        const qDigits = q.replace(/[^0-9]/g, "");
+        const pname = String(eq.productName || "").toLowerCase();
+        const pid = String(eq.productId || "").toLowerCase();
+        const pcat = String(eq.category || "").toLowerCase();
+        const mobMatch = qDigits.length >= 3 ? cmob.includes(qDigits) : String(eq.mobile || "").toLowerCase().includes(q);
+        if (q && !eid.includes(q) && !cname.includes(q) && !mobMatch && !pname.includes(q) && !pid.includes(q) && !pcat.includes(q)) {
+          return false;
+        }
 
-        const st = eq.status || "New Enquiry";
-        if (stFilter !== "all" && st !== stFilter) return false;
-        return matchEnqDate(eq.timestamp, dateBucket, customIso);
+        const st = String(eq.status || "New Enquiry").trim();
+        if (stFilter !== "all" && st.toLowerCase() !== String(stFilter).toLowerCase()) return false;
+        return matchEnqDate(eq.timestamp, dateBucket, customIso, eq.date);
       });
 
       const statsEl = document.getElementById("enqStatsSummaryBar");
