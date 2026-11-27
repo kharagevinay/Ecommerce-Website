@@ -40,6 +40,9 @@
       </div>
       <div class="d-flex flex-wrap align-items-center gap-2">
         <span id="catSheetSyncBadge" class="badge bg-warning text-dark">Checking Sheet...</span>
+        <button type="button" id="ghSyncCatNavBtn" class="btn btn-outline-light btn-sm rounded-pill px-3 fw-semibold" onclick="openGitHubSyncConfigModal()">
+          <i class="bi bi-github me-1"></i> Connect GitHub Repo
+        </button>
         <button type="button" class="btn btn-warning btn-sm rounded-pill px-3 fw-semibold text-dark" onclick="pushAllWebsiteCategoriesToSheet('catSheetSyncBadge')">
           <i class="bi bi-cloud-upload me-1"></i> Sync All Categories to Sheet
         </button>
@@ -193,6 +196,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
   <script src="js/data.js?v=36"></script>
+  <script src="js/github-sync.js?v=1"></script>
   <script>
     const DEFAULT_PREFIX_MAP = {};
 
@@ -706,13 +710,38 @@
         } catch (err) {}
       }
 
+      let ghCatSaved = false;
+      let ghCatErr = "";
+      if (typeof getGitHubSyncConfig === "function" && getGitHubSyncConfig() && finalObj) {
+        try {
+          const ghCatRes = await syncCategoryToGitHubRepo(sheetCatPayload, oldName, list, updatedProdsList);
+          if (ghCatRes && ghCatRes.ok) {
+            ghCatSaved = true;
+            if (ghCatRes.image) {
+              finalObj.image = ghCatRes.image;
+              saveCatalogCategoriesLocal(list);
+            }
+          }
+        } catch (errGh) {
+          ghCatErr = errGh && errGh.message ? errGh.message : "GitHub sync error";
+        }
+      }
       await syncCategoryToGoogleSheet(sheetCatPayload, oldName);
       resetCategoryForm();
       renderAdminCategoriesTable();
-      alert(oldName
-        ? `Category updated to "${name}" & all linked products updated!`
-        : `New category "${name}" added!`
-      );
+      if (ghCatSaved) {
+        alert(oldName
+          ? `Category updated to "${name}"! GitHub repo mein assets/Categories/${name}/ folder & js/data.js update ho gaya hai.`
+          : `New category "${name}" added! GitHub repo mein assets/Categories/${name}/ folder & js/data.js create ho gaya hai.`
+        );
+      } else if (ghCatErr) {
+        alert(`Category "${name}" Google Sheet mein save ho gayi, lekin GitHub commit fail hua: ${ghCatErr}`);
+      } else {
+        alert(oldName
+          ? `Category updated to "${name}" & all linked products updated!`
+          : `New category "${name}" added!`
+        );
+      }
     }
 
     function loadCategoryForEdit(catName) {
@@ -776,6 +805,11 @@
                 body: JSON.stringify({ categoryName: catName, allCategories: updated, allProducts: remainingProds })
               });
             } catch (err) {}
+          }
+          if (typeof getGitHubSyncConfig === "function" && getGitHubSyncConfig()) {
+            try {
+              await deleteCategoryFromGitHubRepo(catName, updated, remainingProds);
+            } catch (ghDelCatErr) {}
           }
           await deleteCategoryFromGoogleSheet(catName);
           if (document.getElementById("editingOldCatName").value === catName) {
@@ -898,6 +932,9 @@
     }
 
     function initCatPage() {
+      if (typeof injectGitHubSyncModalAndWiring === "function") {
+        injectGitHubSyncModalAndWiring("ghSyncCatNavBtn");
+      }
       const s = getAdminSessionObj();
       if (!s) {
         document.getElementById("catLoginGate").classList.remove("d-none");

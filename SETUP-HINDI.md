@@ -45,3 +45,12 @@ Google Sheet mode me hoti hai. Naya local password banane ke liye browser consol
 - Sheet me seedha **Status** column ka dropdown badalne se bhi status update hota hai.
 - Customer ko **My Orders** me status badge + progress tracker dikhta hai. Wo "Refresh Order Status" dabane par ya My Orders kholne par update hota hai.
 - Isko chalane ke liye naya `Code.gs` paste karke **Deploy -> Manage deployments -> Edit -> New version -> Deploy** karein.
+
+
+## E. Live GitHub Website se Direct `assets/Categories/` Folder & Files Create Karna (GitHub API)
+1. GitHub par login karke **Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token** kholein.
+2. Token ka naam dein (e.g. `Riddhi-Store-Sync`), **Repository access** me **Only select repositories** chunein aur apna `jewellery_by_riddhi_site` repo select karein.
+3. **Permissions → Repository permissions → Contents** ko **Read and write** par set karke **Generate token** dabayein aur token copy karein.
+4. Live website ke Admin Panel (`admin-products.html` ya `admin-categories.html`) me upar **Connect GitHub Repo** button par click karein:
+   - **GitHub Username / Owner**, **Repository Name**, **Branch** (`main`), aur **Token** daal kar **Verify & Save** dabayein.
+5. Ab jab bhi aap live site se Category ya Product Add/Edit/Delete karenge, aapke GitHub repo ke `assets/Categories/<Category>/<ProductID>/` folder me images/videos aur `js/data.js` automatically commit ho jayenge!
