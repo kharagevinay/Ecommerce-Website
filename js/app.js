@@ -85,9 +85,12 @@ const BASELINE_DEFAULT_CATEGORIES = JSON.parse(JSON.stringify(CATEGORIES));
 
 function syncCustomCategoriesFromStorage() {
   try {
-    const customCats = JSON.parse(localStorage.getItem("riddhi_custom_categories_v1") || "null");
-    if (Array.isArray(customCats) && customCats.length > 0) {
-      CATEGORIES.splice(0, CATEGORIES.length, ...customCats);
+    const raw = localStorage.getItem("riddhi_custom_categories_v1");
+    if (raw !== null) {
+      const customCats = JSON.parse(raw);
+      if (Array.isArray(customCats)) {
+        CATEGORIES.splice(0, CATEGORIES.length, ...customCats);
+      }
     }
   } catch (e) {}
 }
@@ -95,9 +98,12 @@ function syncCustomCategoriesFromStorage() {
 function syncCustomCatalogFromStorage() {
   syncCustomCategoriesFromStorage();
   try {
-    const customList = JSON.parse(localStorage.getItem("riddhi_custom_products_v1") || "null");
-    if (Array.isArray(customList) && customList.length > 0) {
-      PRODUCTS.splice(0, PRODUCTS.length, ...customList);
+    const raw = localStorage.getItem("riddhi_custom_products_v1");
+    if (raw !== null) {
+      const customList = JSON.parse(raw);
+      if (Array.isArray(customList)) {
+        PRODUCTS.splice(0, PRODUCTS.length, ...customList);
+      }
     }
   } catch (e) {}
 }
@@ -272,103 +278,63 @@ function applyServerStockMap(stockMap) {
 async function syncGlobalStockFromSheet() {
   if (!APPS_SCRIPT_URL) return;
   try {
-    // 1. Fetch authoritative Products Master + Deleted IDs (including manual row deletions in Google Sheet!) + Per-Size Stock
     const remoteRes = await callScript({ action: "getProducts" });
-
     if (remoteRes && remoteRes.ok) {
-      if (Array.isArray(remoteRes.offers) && remoteRes.offers.length > 0) {
+      if (Array.isArray(remoteRes.offers)) {
         localStorage.setItem("riddhi_custom_offers_v1", JSON.stringify(remoteRes.offers));
         renderHomeOffersAndMarquee();
       }
-      if (Array.isArray(remoteRes.categories) && remoteRes.categories.length > 0) {
-        const delCats = (Array.isArray(remoteRes.deletedCategoryNames) ? remoteRes.deletedCategoryNames : []).map(x => x.toLowerCase());
-        const mergedCats = JSON.parse(JSON.stringify(BASELINE_DEFAULT_CATEGORIES))
-          .filter(c => !delCats.includes(c.name.toLowerCase()));
-        let cachedCats = [];
-        try {
-          const rc = localStorage.getItem("riddhi_custom_categories_v1");
-          if (rc) cachedCats = JSON.parse(rc);
-        } catch (e) {}
 
-        remoteRes.categories.forEach(sc => {
-          if (!sc || !sc.name || delCats.includes(sc.name.toLowerCase())) return;
-          const baseCat = mergedCats.find(m => m.name.toLowerCase() === sc.name.toLowerCase());
-          const cachedCat = Array.isArray(cachedCats) ? cachedCats.find(cc => cc && cc.name.toLowerCase() === sc.name.toLowerCase()) : null;
-          const preferredLocalImg = (baseCat && baseCat.image && !baseCat.image.includes("Comming-Soon.png"))
-            ? baseCat.image
-            : ((cachedCat && cachedCat.image && !cachedCat.image.includes("Comming-Soon.png")) ? cachedCat.image : "");
-          const scImg = preferredLocalImg || ((sc.image && !sc.image.includes("Comming-Soon.png")) ? sc.image : "assets/Categories/Comming-Soon.png");
-          if (baseCat) {
-            const ci = mergedCats.indexOf(baseCat);
-            mergedCats[ci] = { ...baseCat, ...sc, image: scImg };
-          } else {
-            mergedCats.push({ ...sc, image: scImg });
-          }
-        });
-        CATEGORIES.splice(0, CATEGORIES.length, ...mergedCats);
-        localStorage.setItem("riddhi_custom_categories_v1", JSON.stringify(CATEGORIES));
-        renderCategories();
-      }
-      const deletedIds = Array.isArray(remoteRes.deletedIds) ? remoteRes.deletedIds : [];
-      const mergedCatalog = JSON.parse(JSON.stringify(BASELINE_DEFAULT_PRODUCTS))
-        .filter(p => !deletedIds.includes(p.id));
-
-      let cachedLocalProds = [];
+      let cachedCats = [];
       try {
-        const rawCached = localStorage.getItem("riddhi_custom_products_v1");
-        if (rawCached) cachedLocalProds = JSON.parse(rawCached);
+        const rc = localStorage.getItem("riddhi_custom_categories_v1");
+        if (rc) cachedCats = JSON.parse(rc);
       } catch (e) {}
 
-      if (Array.isArray(remoteRes.products) && remoteRes.products.length > 0) {
-        remoteRes.products.forEach(sp => {
-          if (!sp || !sp.id || deletedIds.includes(sp.id)) return;
-          const idx = mergedCatalog.findIndex(lp => lp.id === sp.id);
-          const baseItem = idx > -1 ? mergedCatalog[idx] : BASELINE_DEFAULT_PRODUCTS.find(bp => bp.id === sp.id);
-          const cachedItem = Array.isArray(cachedLocalProds) ? cachedLocalProds.find(cp => cp && cp.id === sp.id) : null;
+      const delCats = (Array.isArray(remoteRes.deletedCategoryNames) ? remoteRes.deletedCategoryNames : []).map(x => x.toLowerCase());
+      const sheetCats = Array.isArray(remoteRes.categories) ? remoteRes.categories.filter(sc => sc && sc.name && !delCats.includes(sc.name.toLowerCase())) : [];
+      const finalCats = sheetCats.map(sc => {
+        const cc = Array.isArray(cachedCats) ? cachedCats.find(x => x && x.name.toLowerCase() === sc.name.toLowerCase()) : null;
+        const cImg = (cc && cc.image && !cc.image.includes("Comming-Soon.png")) ? cc.image : (sc.image || "assets/Categories/Comming-Soon.png");
+        return { ...sc, image: cImg };
+      });
+      CATEGORIES.splice(0, CATEGORIES.length, ...finalCats);
+      localStorage.setItem("riddhi_custom_categories_v1", JSON.stringify(CATEGORIES));
+      renderCategories();
 
-          const baseHasRealImgs = baseItem && Array.isArray(baseItem.images) && baseItem.images.length > 0 && !baseItem.images.every(u => String(u).includes("Comming-Soon.png"));
-          const cachedHasRealImgs = cachedItem && Array.isArray(cachedItem.images) && cachedItem.images.length > 0 && !cachedItem.images.every(u => String(u).includes("Comming-Soon.png"));
-          const spHasRealImgs = Array.isArray(sp.images) && sp.images.length > 0 && !sp.images.every(u => String(u).includes("Comming-Soon.png"));
+      let cachedProds = [];
+      try {
+        const rp = localStorage.getItem("riddhi_custom_products_v1");
+        if (rp) cachedProds = JSON.parse(rp);
+      } catch (e) {}
 
-          // Prefer local folder asset / cached image if valid so images never flicker or disappear when Drive links are slow/blocked
-          const finalImgs = baseHasRealImgs
-            ? baseItem.images
-            : (cachedHasRealImgs ? cachedItem.images : (spHasRealImgs ? sp.images : ["assets/Categories/Comming-Soon.png"]));
-          const finalVid = (baseItem && baseItem.video) || (cachedItem && cachedItem.video) || sp.video || "";
+      const deletedIds = Array.isArray(remoteRes.deletedIds) ? remoteRes.deletedIds : [];
+      const sheetProds = Array.isArray(remoteRes.products) ? remoteRes.products.filter(sp => sp && sp.id && !deletedIds.includes(sp.id)) : [];
+      const finalProds = sheetProds.map(sp => {
+        const cp = Array.isArray(cachedProds) ? cachedProds.find(x => x && x.id === sp.id) : null;
+        const cpHasImgs = cp && Array.isArray(cp.images) && cp.images.length > 0 && !cp.images.every(u => String(u).includes("Comming-Soon.png"));
+        const spHasImgs = Array.isArray(sp.images) && sp.images.length > 0 && !sp.images.every(u => String(u).includes("Comming-Soon.png"));
+        const imgs = cpHasImgs ? cp.images : (spHasImgs ? sp.images : ["assets/Categories/Comming-Soon.png"]);
+        const vid = (cp && cp.video) ? cp.video : (sp.video || "");
+        const szMap = (remoteRes.sizeStock && remoteRes.sizeStock[sp.id] && Object.keys(remoteRes.sizeStock[sp.id]).length > 0)
+          ? { ...remoteRes.sizeStock[sp.id] }
+          : (sp.sizeStock && Object.keys(sp.sizeStock).length > 0 ? { ...sp.sizeStock } : { "Free Size (Adjustable Dori)": Math.max(0, parseInt(sp.availableStock, 10) || 0) });
+        const szList = Object.keys(szMap);
+        const totSt = Object.values(szMap).reduce((s, v) => s + (Math.max(0, parseInt(v, 10) || 0)), 0);
+        return {
+          ...sp,
+          images: imgs,
+          video: vid,
+          sizes: szList,
+          sizeStock: szMap,
+          availableStock: totSt
+        };
+      });
 
-          if (idx > -1) {
-            mergedCatalog[idx] = {
-              ...mergedCatalog[idx],
-              ...sp,
-              images: finalImgs,
-              video: finalVid
-            };
-          } else {
-            mergedCatalog.unshift({
-              ...sp,
-              images: finalImgs,
-              video: finalVid
-            });
-          }
-        });
-      }
-
-      if (remoteRes.sizeStock && typeof remoteRes.sizeStock === "object") {
-        mergedCatalog.forEach(p => {
-          if (remoteRes.sizeStock[p.id] && Object.keys(remoteRes.sizeStock[p.id]).length > 0) {
-            p.sizeStock = { ...remoteRes.sizeStock[p.id] };
-            p.sizes = Object.keys(p.sizeStock);
-            p.availableStock = Object.values(p.sizeStock).reduce((s, v) => s + (Math.max(0, parseInt(v, 10) || 0)), 0);
-          }
-        });
-      }
-
-      PRODUCTS.splice(0, PRODUCTS.length, ...mergedCatalog);
+      PRODUCTS.splice(0, PRODUCTS.length, ...finalProds);
       savePersistedStock();
       refreshAllProductViews();
     }
-
-    // Stock tab is managed manually by Admin from Admin Panel (no auto-seeding of stock rows).
   } catch (e) { /* offline fallback */ }
 }
 
@@ -773,7 +739,7 @@ function buildProductCardHtml(prod, idx = 0, showNewBadge = false) {
       <div class="product-card ${isOut ? "out-of-stock" : ""}" onclick="openProductDetail('${prod.id}')">
         <div>
           <div class="position-relative">
-            <img src="${esc((prod.images && prod.images[0]) || 'assets/Categories/Comming-Soon.png')}" alt="${esc(prod.name)}" onerror="handleSmartImgError(this, 'assets/Categories/Comming-Soon.png');">
+            <img referrerpolicy="no-referrer" src="${esc((prod.images && prod.images[0]) || 'assets/Categories/Comming-Soon.png')}" alt="${esc(prod.name)}" onerror="handleSmartImgError(this, 'assets/Categories/Comming-Soon.png');">
             ${showNewBadge ? `<span class="badge bg-warning text-dark position-absolute top-0 start-0 m-2" style="font-size: 10px;">NEW</span>` : ""}
             ${discPct > 0 && !showNewBadge ? `<span class="discount-badge position-absolute top-0 start-0 m-2">${discPct}% OFF</span>` : ""}
             ${isOut
@@ -949,7 +915,7 @@ function renderCategories() {
       homeGrid.innerHTML += `
         <div class="col-6 col-md-4 col-lg-3 stagger-card" style="animation-delay: ${delay}s;">
           <div class="custom-card" onclick="openProductsView('${cat.name}')">
-            <img src="${esc(cat.image)}" alt="${esc(cat.name)}" onerror="handleSmartImgError(this, 'assets/Categories/Comming-Soon.png');">
+            <img referrerpolicy="no-referrer" src="${esc(cat.image)}" alt="${esc(cat.name)}" onerror="handleSmartImgError(this, 'assets/Categories/Comming-Soon.png');">
             <div class="card-footer-title">${cat.name}</div>
           </div>
         </div>
@@ -2275,56 +2241,96 @@ async function refreshMyOrderStatuses(forceReplace = false) {
   autoDeliverLocalOrders();
   if (!APPS_SCRIPT_URL || !isCustomerStorefrontPage()) return;
 
+  // 1. Cross-device full sync by customer's 10-digit mobile number!
   const lookupMob = getCustomerLookupMobile();
-  if (!lookupMob) {
-    localStorage.removeItem("riddhi_orders");
-    localStorage.removeItem("riddhi_enquiries");
-    renderMyOrders();
-    renderCustomerMyEnquiriesTab();
-    return;
+  if (lookupMob) {
+    try {
+      const mobRes = await callScript({ action: "getOrdersByMobile", mobile: lookupMob });
+      if (mobRes && mobRes.ok) {
+        const ordClearedAt = forceReplace ? 0 : Number(localStorage.getItem("riddhi_orders_cleared_at") || 0);
+        if (Array.isArray(mobRes.orders)) {
+          const localOrds = forceReplace ? [] : getLocalOrders();
+          const mergedMap = {};
+          localOrds.forEach(o => { if (o && o.orderId) mergedMap[o.orderId] = o; });
+          mobRes.orders.forEach(so => {
+            if (so && so.orderId && (Number(so.timestamp) || 0) > ordClearedAt) {
+              mergedMap[so.orderId] = { ...(mergedMap[so.orderId] || {}), ...so };
+            }
+          });
+          const mergedArr = Object.values(mergedMap).sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0));
+          localStorage.setItem("riddhi_orders", JSON.stringify(mergedArr));
+          // Auto-fill saved customer profile from latest order if name/address was empty
+          if (mergedArr.length > 0 && mergedArr[0].customer) {
+            const latestC = mergedArr[0].customer;
+            const curC = getSavedCustomer() || {};
+            if (!curC.name && latestC.name) {
+              localStorage.setItem("riddhi_customer", JSON.stringify({ ...latestC, mobile: lookupMob }));
+            }
+          }
+        }
+        const enqClearedAt = forceReplace ? 0 : Number(localStorage.getItem("riddhi_enquiries_cleared_at") || 0);
+        if (Array.isArray(mobRes.enquiries)) {
+          let localEnqs = [];
+          if (!forceReplace) {
+            try { localEnqs = JSON.parse(localStorage.getItem("riddhi_enquiries") || "[]"); } catch (e) {}
+          }
+          const eqMap = {};
+          localEnqs.forEach(q => { if (q && q.enquiryId) eqMap[q.enquiryId] = q; });
+          mobRes.enquiries.forEach(sq => {
+            if (sq && sq.enquiryId && (Number(sq.timestamp) || 0) > enqClearedAt) {
+              eqMap[sq.enquiryId] = { ...(eqMap[sq.enquiryId] || {}), ...sq };
+            }
+          });
+          const mergedEqs = Object.values(eqMap).sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0));
+          localStorage.setItem("riddhi_enquiries", JSON.stringify(mergedEqs));
+        }
+        renderMyOrders();
+        if (activeCustomerTab === "enquiries") renderCustomerMyEnquiriesTab();
+      }
+    } catch (e) {}
   }
 
+  const orders = getLocalOrders();
+  if (!orders.length) return;
   try {
-    const mobRes = await callScript({ action: "getOrdersByMobile", mobile: lookupMob });
-    if (mobRes && mobRes.ok) {
-      localStorage.removeItem("riddhi_orders_cleared_at");
-      localStorage.removeItem("riddhi_enquiries_cleared_at");
+    const list = orders.slice(0, 30).map(o => ({ orderId: o.orderId, mobile: (o.customer || {}).mobile }));
+    const r = await callScript({ action: "orderStatus", orders: list });
+    if (!r.ok || !r.statuses) return;
+    let changed = false;
+    const fresh = getLocalOrders();
+    fresh.forEach(o => {
+      const st = r.statuses[o.orderId];
+      if (st && (o.status !== st.status || o.statusUpdated !== st.updated || (o.cancelReason || "") !== (st.cancelReason || ""))) {
+        o.status = st.status;
+        o.statusUpdated = st.updated;
+        o.cancelReason = st.cancelReason || "";
+        changed = true;
+      }
+    });
+    if (changed) localStorage.setItem("riddhi_orders", JSON.stringify(fresh));
 
-      const pendingForMob = getPendingSync().filter(
-        o => String((o.customer || {}).mobile || "").replace(/[^0-9]/g, "").slice(-10) === lookupMob
-      );
-      const sheetOrders = Array.isArray(mobRes.orders) ? mobRes.orders : [];
-      const orderMap = {};
-      sheetOrders.forEach(so => {
-        if (so && so.orderId) orderMap[so.orderId] = so;
-      });
-      pendingForMob.forEach(po => {
-        if (po && po.orderId && !orderMap[po.orderId]) orderMap[po.orderId] = po;
-      });
-      const finalOrders = Object.values(orderMap).sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0));
-      localStorage.setItem("riddhi_orders", JSON.stringify(finalOrders));
-
-      if (finalOrders.length > 0 && finalOrders[0].customer) {
-        const latestC = finalOrders[0].customer;
-        const curC = getSavedCustomer() || {};
-        if (!curC.name && latestC.name) {
-          localStorage.setItem("riddhi_customer", JSON.stringify({ ...latestC, mobile: lookupMob }));
+    try {
+      const localEnqs = JSON.parse(localStorage.getItem("riddhi_enquiries") || "[]");
+      if (localEnqs.length > 0) {
+        const er = await callScript({
+          action: "enquiryStatus",
+          enquiries: localEnqs.slice(0, 30).map(x => ({ enquiryId: x.enquiryId, mobile: x.mobile }))
+        });
+        if (er && er.ok && er.statuses) {
+          let eChanged = false;
+          localEnqs.forEach(x => {
+            if (er.statuses[x.enquiryId] && x.status !== er.statuses[x.enquiryId].status) {
+              x.status = er.statuses[x.enquiryId].status;
+              eChanged = true;
+            }
+          });
+          if (eChanged) localStorage.setItem("riddhi_enquiries", JSON.stringify(localEnqs));
         }
       }
+    } catch (ee) {}
 
-      const sheetEnqs = Array.isArray(mobRes.enquiries) ? mobRes.enquiries : [];
-      const finalEnqs = sheetEnqs
-        .filter(eq => eq && eq.enquiryId)
-        .sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0));
-      localStorage.setItem("riddhi_enquiries", JSON.stringify(finalEnqs));
-
-      renderMyOrders();
-      renderCustomerMyEnquiriesTab();
-    }
-  } catch (e) {
     renderMyOrders();
-    renderCustomerMyEnquiriesTab();
-  }
+  } catch (e) { /* offline fallback */ }
 }
 
 function safeImgUrl(u) {
@@ -2618,9 +2624,7 @@ function renderCustomerMyEnquiriesTab() {
     }
   }
   if (!loggedCustMob) {
-    const targetBox = document.getElementById("myEnquiriesTabListContainer");
-    if (!targetBox) return "";
-    targetBox.innerHTML = `
+    container.innerHTML = `
       <div class="text-center text-muted my-4 p-3 bg-white rounded-3 border shadow-sm">
         <i class="bi bi-chat-dots fs-1 text-warning"></i>
         <p class="small text-muted my-2">Login with your mobile number to view your enquiries.</p>
@@ -2828,17 +2832,17 @@ function renderMyOrders() {
 }
 
 function clearOrderHistory() {
-  if (confirm("Clear saved order history from this browser only? (Google Sheet data remains unchanged)")) {
+  if (confirm("Clear saved order history from this browser?")) {
     localStorage.removeItem("riddhi_orders");
-    localStorage.removeItem("riddhi_orders_cleared_at");
+    localStorage.setItem("riddhi_orders_cleared_at", String(Date.now()));
     renderMyOrders();
   }
 }
 
 function clearEnquiryHistory() {
-  if (confirm("Clear saved enquiry history from this browser only? (Google Sheet data remains unchanged)")) {
+  if (confirm("Clear saved enquiry history from this browser?")) {
     localStorage.removeItem("riddhi_enquiries");
-    localStorage.removeItem("riddhi_enquiries_cleared_at");
+    localStorage.setItem("riddhi_enquiries_cleared_at", String(Date.now()));
     renderCustomerMyEnquiriesTab();
   }
 }

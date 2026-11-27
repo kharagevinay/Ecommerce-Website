@@ -27,7 +27,7 @@
     select.form-select, .btn-outline-primary, .btn-outline-danger { border-radius: 4px !important; }
   </style>
 </head>
-<body>
+<body class="admin-page-body">
 
   <nav class="admin-top-bar py-2 px-3 sticky-top shadow-sm">
     <div class="container d-flex flex-wrap justify-content-between align-items-center gap-2">
@@ -120,8 +120,9 @@
                 </label>
                 <div class="d-flex align-items-center gap-2">
                   <input type="file" id="fCatImgFile" class="form-control form-control-sm" accept="image/*" onchange="handleCatDeviceImage(this)">
-                  <img id="catImgPreview" src="assets/Categories/Comming-Soon.png" class="cat-thumb-admin" alt="Category Preview">
+                  <img id="catImgPreview" src="assets/Categories/Comming-Soon.png" class="cat-thumb-admin" referrerpolicy="no-referrer" alt="Category Preview">
                 </div>
+                <div id="catImgPathStatus" class="small text-muted mt-1" style="font-size: 10.5px;">No category image selected</div>
                 <input type="hidden" id="fCatImageVal" value="">
               </div>
 
@@ -193,23 +194,7 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
   <script src="js/data.js?v=36"></script>
   <script>
-    const DEFAULT_PREFIX_MAP = {
-      "Choker": "CHK",
-      "Necklaces": "NCK",
-      "Mangalsutra": "MNG",
-      "Combo Set": "CMB",
-      "Nath": "NTH",
-      "Earrings": "EAR",
-      "Bugadi": "BUG",
-      "Sugar-Ball Jewelry": "SGR",
-      "Baby Girl Jewellery Set": "BBY",
-      "Rakhi": "RKH",
-      "Armcuffs": "ARM",
-      "Invisible Necklaces": "INV",
-      "Mundavali": "MND",
-      "Bangles": "BNG",
-      "Ring": "RNG"
-    };
+    const DEFAULT_PREFIX_MAP = {};
 
     let confirmModalInst = null;
     let pendingConfirmCallback = null;
@@ -245,25 +230,28 @@
     }
 
     function getCatalogCategories() {
-      let savedCats = null;
       try {
         const raw = localStorage.getItem("riddhi_custom_categories_v1");
-        if (raw) savedCats = JSON.parse(raw);
+        if (raw !== null) {
+          const savedCats = JSON.parse(raw);
+          if (Array.isArray(savedCats)) {
+            return savedCats.map(c => ({
+              name: c.name,
+              prefix: c.prefix || c.name.replace(/[^A-Za-z]/g, "").toUpperCase().slice(0, 3).padEnd(3, "X"),
+              image: c.image || "assets/Categories/Comming-Soon.png"
+            }));
+          }
+        }
       } catch (e) {}
-
-      const list = Array.isArray(savedCats) && savedCats.length > 0
-        ? savedCats
-        : JSON.parse(JSON.stringify(CATEGORIES));
-
-      return list.map(c => ({
+      return (Array.isArray(CATEGORIES) ? CATEGORIES : []).map(c => ({
         name: c.name,
-        prefix: c.prefix || DEFAULT_PREFIX_MAP[c.name] || c.name.replace(/[^A-Za-z]/g, "").toUpperCase().slice(0, 3).padEnd(3, "X"),
+        prefix: c.prefix || c.name.replace(/[^A-Za-z]/g, "").toUpperCase().slice(0, 3).padEnd(3, "X"),
         image: c.image || "assets/Categories/Comming-Soon.png"
       }));
     }
 
     function saveCatalogCategoriesLocal(list) {
-      localStorage.setItem("riddhi_custom_categories_v1", JSON.stringify(list));
+      try { localStorage.setItem("riddhi_custom_categories_v1", JSON.stringify(list)); } catch (e) {}
     }
 
     function getProductsCountInCategory(catName) {
@@ -291,27 +279,54 @@
       if (!file) return;
       const reader = new FileReader();
       reader.onload = function (ev) {
+        const rawDataUrl = ev.target.result;
+        const prevEl = document.getElementById("catImgPreview");
+        const valEl = document.getElementById("fCatImageVal");
+
+        const pathEl = document.getElementById("catImgPathStatus");
+        const cname = (document.getElementById("fCatName")?.value || "Category").trim().replace(/\s+/g, "-");
+        const ext = (file.type && file.type.includes("png")) ? "png" : "jpg";
+        const targetCatPath = `assets/Categories/${cname}-Category.${ext}`;
+
+        const setPreview = (srcVal) => {
+          if (valEl) valEl.value = srcVal;
+          if (prevEl) {
+            prevEl.classList.remove("d-none");
+            prevEl.onerror = null;
+            prevEl.src = srcVal;
+          }
+          if (pathEl) {
+            pathEl.innerHTML = `<span class="text-success fw-semibold"><i class="bi bi-check-circle-fill"></i> ${escC(file.name)}</span> • Path: <code>${escC(targetCatPath)}</code>`;
+          }
+        };
+
+        // Immediately display full original image without loss
+        setPreview(rawDataUrl);
+
+        // Only resize if massive (> 2200px or > 2.5MB) while keeping crisp high quality (0.95)
         const img = new Image();
         img.onload = function () {
-          const canvas = document.createElement("canvas");
-          const maxDim = 420;
+          const maxDim = 2200;
           let w = img.width;
           let h = img.height;
-          if (w > maxDim || h > maxDim) {
-            if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
-            else { w = Math.round((w * maxDim) / h); h = maxDim; }
+          if (w > maxDim || h > maxDim || String(rawDataUrl).length > 2600000) {
+            if (w > maxDim || h > maxDim) {
+              if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
+              else { w = Math.round((w * maxDim) / h); h = maxDim; }
+            }
+            const canvas = document.createElement("canvas");
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext("2d");
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = "high";
+            ctx.drawImage(img, 0, 0, w, h);
+            const outMime = (file.type && file.type.includes("png")) ? "image/png" : "image/jpeg";
+            const highQualityUrl = outMime === "image/png" ? canvas.toDataURL("image/png") : canvas.toDataURL("image/jpeg", 0.95);
+            setPreview(highQualityUrl);
           }
-          canvas.width = w;
-          canvas.height = h;
-          const ctx = canvas.getContext("2d");
-          ctx.drawImage(img, 0, 0, w, h);
-          let dataUrl = canvas.toDataURL("image/jpeg", 0.72);
-          if (dataUrl.length > 45000) dataUrl = canvas.toDataURL("image/jpeg", 0.48);
-
-          document.getElementById("fCatImageVal").value = dataUrl;
-          document.getElementById("catImgPreview").src = dataUrl;
         };
-        img.src = ev.target.result;
+        img.src = rawDataUrl;
       };
       reader.readAsDataURL(file);
     }
@@ -321,7 +336,7 @@
       const badge = document.getElementById("catSheetSyncBadge");
       if (!sess || sess.mode !== "sheet" || !APPS_SCRIPT_URL) {
         if (badge) { badge.className = "badge bg-secondary"; badge.textContent = "Local Mode"; }
-        return;
+        return { ok: true, localOnly: true };
       }
       if (badge) { badge.className = "badge bg-info text-dark"; badge.textContent = "Syncing Sheet..."; }
       try {
@@ -356,16 +371,25 @@
             if (srvMatch) {
               const list = getCatalogCategories();
               const idx = list.findIndex(x => x.name.toLowerCase() === catObj.name.toLowerCase());
+              const keptImg = (catObj.image && !catObj.image.includes("Comming-Soon.png")) ? catObj.image : (srvMatch.image || "assets/Categories/Comming-Soon.png");
               if (idx > -1) {
-                list[idx] = { ...list[idx], ...srvMatch };
+                list[idx] = { ...list[idx], ...srvMatch, image: keptImg };
                 saveCatalogCategoriesLocal(list);
               }
             }
           }
           if (badge) { badge.className = "badge bg-success"; badge.textContent = "Synced with Google Sheet ✓"; }
+          return { ok: true };
+        } else {
+          if (badge) { badge.className = "badge bg-danger"; badge.textContent = "Sheet Sync Error"; }
+          if (r && r.error === "auth") {
+            alert("Admin session expired! Please logout and login again to sync with Google Sheet.");
+          }
+          return { ok: false, error: (r && r.error) || "sync_failed" };
         }
       } catch (e) {
         if (badge) { badge.className = "badge bg-warning text-dark"; badge.textContent = "Saved Locally"; }
+        return { ok: false, error: "network" };
       }
     }
 
@@ -392,6 +416,9 @@
           if (badge) { badge.className = "badge bg-success"; badge.textContent = "Synced with Google Sheet ✓"; }
         } else {
           if (badge) { badge.className = "badge bg-danger"; badge.textContent = "Sheet Delete Error"; }
+          if (r && r.error === "auth") {
+            alert("Admin session expired! Please logout and login again to delete from Google Sheet.");
+          }
         }
       } catch (e) {
         if (badge) { badge.className = "badge bg-warning text-dark"; badge.textContent = "Sheet Offline"; }
@@ -543,16 +570,21 @@
         });
         const r = await res.json();
         if (r && r.ok) {
-          const delNames = (Array.isArray(r.deletedCategoryNames) ? r.deletedCategoryNames : []).map(x => x.toLowerCase());
-          const merged = getCatalogCategories().filter(c => !delNames.includes(c.name.toLowerCase()));
-          if (Array.isArray(r.categories)) {
-            r.categories.forEach(sc => {
-              if (!sc || !sc.name || delNames.includes(sc.name.toLowerCase())) return;
-              const idx = merged.findIndex(m => m.name.toLowerCase() === sc.name.toLowerCase());
-              if (idx > -1) merged[idx] = { ...merged[idx], ...sc };
-              else merged.push(sc);
-            });
-          }
+          const existingLocal = getCatalogCategories();
+          const sheetCats = Array.isArray(r.categories) ? r.categories.filter(sc => sc && sc.name) : [];
+          const merged = sheetCats.map(sc => {
+            const loc = existingLocal.find(c => c.name.toLowerCase() === sc.name.toLowerCase());
+            const sheetImg = String(sc.image || "").trim();
+            const locImg = loc ? String(loc.image || "").trim() : "";
+            const chosenImg = (locImg && !locImg.includes("Comming-Soon.png"))
+              ? locImg
+              : ((sheetImg && !sheetImg.includes("Comming-Soon.png")) ? sheetImg : "assets/Categories/Comming-Soon.png");
+            return {
+              name: sc.name,
+              prefix: sc.prefix || (loc && loc.prefix) || sc.name.replace(/[^A-Za-z]/g, "").toUpperCase().slice(0, 3).padEnd(3, "X"),
+              image: chosenImg
+            };
+          });
           saveCatalogCategoriesLocal(merged);
           renderAdminCategoriesTable();
           if (badge) { badge.className = "badge bg-success"; badge.textContent = "Connected to Google Sheet ✓"; }
@@ -691,8 +723,19 @@
       document.getElementById("editingOldCatName").value = cat.name;
       document.getElementById("fCatName").value = cat.name;
       document.getElementById("fCatPrefix").value = cat.prefix || "";
-      document.getElementById("fCatImageVal").value = cat.image || "";
-      document.getElementById("catImgPreview").src = cat.image || "assets/Categories/Comming-Soon.png";
+      const cImgVal = cat.image || "";
+      const cSlug = String(cat.name || "Category").trim().replace(/\s+/g, "-");
+      const expectedCatPath = `assets/Categories/${cSlug}-Category.jpg`;
+      const fCatFile = document.getElementById("fCatImgFile");
+      if (fCatFile) fCatFile.value = "";
+      document.getElementById("fCatImageVal").value = cImgVal;
+      document.getElementById("catImgPreview").src = cImgVal || "assets/Categories/Comming-Soon.png";
+      const cPathEl = document.getElementById("catImgPathStatus");
+      if (cPathEl) {
+        cPathEl.innerHTML = cImgVal
+          ? `<span class="text-success fw-semibold"><i class="bi bi-image-fill me-1"></i>Loaded</span> • Path: <code>${escC(cImgVal.startsWith("data:") ? expectedCatPath : cImgVal)}</code>`
+          : `No category image selected (Target path: <code>${escC(expectedCatPath)}</code>)`;
+      }
 
       document.getElementById("catFormHeader").innerHTML = `<i class="bi bi-pencil-square me-1 text-warning"></i> Update Category: ${escC(cat.name)}`;
       document.getElementById("catFormBadge").textContent = "EDITING";
@@ -748,6 +791,8 @@
       document.getElementById("editingOldCatName").value = "";
       document.getElementById("fCatImageVal").value = "";
       document.getElementById("catImgPreview").src = "assets/Categories/Comming-Soon.png";
+      const cPathReset = document.getElementById("catImgPathStatus");
+      if (cPathReset) cPathReset.textContent = "No category image selected";
       document.getElementById("catFormHeader").innerHTML = `<i class="bi bi-plus-circle me-1 text-warning"></i> Add New Category`;
       document.getElementById("catFormBadge").textContent = "NEW";
       document.getElementById("catFormBadge").className = "badge bg-warning text-dark";
@@ -774,7 +819,7 @@
           <tr>
             <td>
               <div class="d-flex align-items-center gap-2">
-                <img src="${escC(c.image)}" class="cat-thumb-admin" alt="">
+                <img src="${escC(c.image || 'assets/Categories/Comming-Soon.png')}" class="cat-thumb-admin" referrerpolicy="no-referrer" alt="" onerror="this.onerror=null; this.src='assets/Categories/Comming-Soon.png';">
                 <div class="fw-bold small text-dark">${escC(c.name)}</div>
               </div>
             </td>

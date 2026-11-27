@@ -45,7 +45,7 @@
     select.form-select, .btn-outline-primary, .btn-outline-danger { border-radius: 4px !important; }
   </style>
 </head>
-<body>
+<body class="admin-page-body">
 
   <!-- TOP ADMIN NAVBAR -->
   <nav class="admin-top-bar py-2 px-3 sticky-top shadow-sm">
@@ -176,22 +176,25 @@
                   <i class="bi bi-images me-1 text-success"></i>Product Images (Browse from Device) *
                 </label>
 
-                <div class="d-flex align-items-center gap-2 mb-1">
+                <div class="d-flex align-items-center gap-2">
                   <input type="file" id="fProdImgFile1" class="form-control form-control-sm" accept="image/*" onchange="handleDeviceImageSelect(this, 1)">
-                  <img id="previewImg1" src="assets/Categories/Comming-Soon.png" class="media-preview-mini" alt="Preview 1">
+                  <img id="previewImg1" src="assets/Categories/Comming-Soon.png" class="media-preview-mini" referrerpolicy="no-referrer" alt="Preview 1">
                 </div>
+                <div id="imgPathStatus1" class="small text-muted mb-1" style="font-size: 10.5px;">Image 1: No file selected</div>
                 <input type="hidden" id="fProdImg1" value="">
 
-                <div class="d-flex align-items-center gap-2 mb-1">
+                <div class="d-flex align-items-center gap-2">
                   <input type="file" id="fProdImgFile2" class="form-control form-control-sm" accept="image/*" onchange="handleDeviceImageSelect(this, 2)">
-                  <img id="previewImg2" src="assets/Categories/Comming-Soon.png" class="media-preview-mini d-none" alt="Preview 2">
+                  <img id="previewImg2" src="assets/Categories/Comming-Soon.png" class="media-preview-mini d-none" referrerpolicy="no-referrer" alt="Preview 2">
                 </div>
+                <div id="imgPathStatus2" class="small text-muted mb-1" style="font-size: 10.5px;">Image 2: Optional</div>
                 <input type="hidden" id="fProdImg2" value="">
 
                 <div class="d-flex align-items-center gap-2">
                   <input type="file" id="fProdImgFile3" class="form-control form-control-sm" accept="image/*" onchange="handleDeviceImageSelect(this, 3)">
-                  <img id="previewImg3" src="assets/Categories/Comming-Soon.png" class="media-preview-mini d-none" alt="Preview 3">
+                  <img id="previewImg3" src="assets/Categories/Comming-Soon.png" class="media-preview-mini d-none" referrerpolicy="no-referrer" alt="Preview 3">
                 </div>
+                <div id="imgPathStatus3" class="small text-muted" style="font-size: 10.5px;">Image 3: Optional</div>
                 <input type="hidden" id="fProdImg3" value="">
               </div>
 
@@ -348,23 +351,7 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
   <script src="js/data.js?v=36"></script>
   <script>
-    const CATEGORY_PREFIX_MAP = {
-      "Choker": "CHK",
-      "Necklaces": "NCK",
-      "Mangalsutra": "MNG",
-      "Combo Set": "CMB",
-      "Nath": "NTH",
-      "Earrings": "EAR",
-      "Bugadi": "BUG",
-      "Sugar-Ball Jewelry": "SGR",
-      "Baby Girl Jewellery Set": "BBY",
-      "Rakhi": "RKH",
-      "Armcuffs": "ARM",
-      "Invisible Necklaces": "INV",
-      "Mundavali": "MND",
-      "Bangles": "BNG",
-      "Ring": "RNG"
-    };
+    const CATEGORY_PREFIX_MAP = {};
 
     let prodConfirmModalInst = null;
     let pendingProdConfirmFn = null;
@@ -400,15 +387,14 @@
     }
 
     function getEffectiveCategories() {
-      let customCats = null;
       try {
         const raw = localStorage.getItem("riddhi_custom_categories_v1");
-        if (raw) customCats = JSON.parse(raw);
+        if (raw !== null) {
+          const customCats = JSON.parse(raw);
+          if (Array.isArray(customCats)) return customCats;
+        }
       } catch (e) {}
-      const list = Array.isArray(customCats) && customCats.length > 0
-        ? customCats
-        : JSON.parse(JSON.stringify(CATEGORIES));
-      return list;
+      return Array.isArray(CATEGORIES) ? JSON.parse(JSON.stringify(CATEGORIES)) : [];
     }
 
     function refreshCategoryDropdownsInAdminProducts() {
@@ -474,33 +460,51 @@
 
       const reader = new FileReader();
       reader.onload = function (ev) {
-        const img = new Image();
-        img.onload = function () {
-          const canvas = document.createElement("canvas");
-          const maxDim = 420;
-          let w = img.width;
-          let h = img.height;
-          if (w > maxDim || h > maxDim) {
-            if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
-            else { w = Math.round((w * maxDim) / h); h = maxDim; }
-          }
-          canvas.width = w;
-          canvas.height = h;
-          const ctx = canvas.getContext("2d");
-          ctx.drawImage(img, 0, 0, w, h);
-          let compressedDataUrl = canvas.toDataURL("image/jpeg", 0.68);
-          if (compressedDataUrl.length > 45000) {
-            compressedDataUrl = canvas.toDataURL("image/jpeg", 0.45);
-          }
+        const rawDataUrl = ev.target.result;
+        const valEl = document.getElementById(`fProdImg${slotNum}`);
+        const prevEl = document.getElementById(`previewImg${slotNum}`);
+        const pathEl = document.getElementById(`imgPathStatus${slotNum}`);
+        const cat = document.getElementById("fProdCategory")?.value || "Category";
+        const pid = document.getElementById("fProdId")?.value || "ID";
+        const ext = (file.type && file.type.includes("png")) ? "png" : "jpg";
+        const targetPath = `assets/Categories/${cat}/${pid}/image-${slotNum}.${ext}`;
 
-          document.getElementById(`fProdImg${slotNum}`).value = compressedDataUrl;
-          const prevEl = document.getElementById(`previewImg${slotNum}`);
+        const applyImg = (srcStr) => {
+          if (valEl) valEl.value = srcStr;
           if (prevEl) {
-            prevEl.src = compressedDataUrl;
             prevEl.classList.remove("d-none");
+            prevEl.onerror = null;
+            prevEl.src = srcStr;
+          }
+          if (pathEl) {
+            pathEl.innerHTML = `<span class="text-success fw-semibold"><i class="bi bi-check-circle-fill"></i> ${escHtml(file.name)}</span> • Path: <code>${escHtml(targetPath)}</code>`;
           }
         };
-        img.src = ev.target.result;
+
+        applyImg(rawDataUrl);
+
+        const img = new Image();
+        img.onload = function () {
+          const maxDim = 2200;
+          let w = img.width;
+          let h = img.height;
+          if (w > maxDim || h > maxDim || String(rawDataUrl).length > 2600000) {
+            if (w > maxDim || h > maxDim) {
+              if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
+              else { w = Math.round((w * maxDim) / h); h = maxDim; }
+            }
+            const canvas = document.createElement("canvas");
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext("2d");
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = "high";
+            ctx.drawImage(img, 0, 0, w, h);
+            const finalDataUrl = ext === "png" ? canvas.toDataURL("image/png") : canvas.toDataURL("image/jpeg", 0.95);
+            applyImg(finalDataUrl);
+          }
+        };
+        img.src = rawDataUrl;
       };
       reader.readAsDataURL(file);
     }
@@ -516,11 +520,17 @@
         return;
       }
       wrap.classList.remove("d-none");
-      const driveMatch = src.match(/drive\.google\.com\/(?:file\/d\/|uc\?[^#]*id=)([A-Za-z0-9_-]+)/i);
+      const driveMatch = src.match(/drive\.google\.com\/(?:file\/d\/|uc\?[^#]*id=|open\?id=)([A-Za-z0-9_-]+)/i);
       if (driveMatch && driveMatch[1]) {
         box.innerHTML = `<iframe src="https://drive.google.com/file/d/${driveMatch[1]}/preview" allow="autoplay; fullscreen" style="width:100%;height:100%;border:0;"></iframe>`;
       } else {
-        box.innerHTML = `<video src="${escHtml(src)}" controls muted loop playsinline preload="metadata" style="width:100%;height:100%;object-fit:cover;"><source src="${escHtml(src)}" type="video/mp4"></video>`;
+        box.innerHTML = `<video id="adminPreviewVidPlayer" src="${escHtml(src)}" controls autoplay muted loop playsinline preload="auto" style="width:100%;height:100%;object-fit:contain;background:#000;"></video>`;
+        const vp = document.getElementById("adminPreviewVidPlayer");
+        if (vp) {
+          vp.muted = true;
+          const pr = vp.play();
+          if (pr && typeof pr.catch === "function") pr.catch(() => {});
+        }
       }
     }
 
@@ -540,7 +550,7 @@
       const blobUrl = URL.createObjectURL(file);
       renderAdminVideoPreview(blobUrl);
 
-      if (file.size > 4 * 1024 * 1024) {
+      if (file.size > 24 * 1024 * 1024) {
         const cat = document.getElementById("fProdCategory").value;
         const pid = document.getElementById("fProdId").value;
         const relPath = `assets/Categories/${cat}/${pid}/${file.name}`;
@@ -551,22 +561,36 @@
 
       const reader = new FileReader();
       reader.onload = function (ev) {
-        document.getElementById("fProdVideo").value = ev.target.result;
-        if (statusEl) statusEl.innerHTML = `<span class="text-success fw-semibold"><i class="bi bi-check-circle-fill"></i> Video loaded from device: ${escHtml(file.name)}</span>`;
+        const vDataUrl = ev.target.result;
+        document.getElementById("fProdVideo").value = vDataUrl;
+        renderAdminVideoPreview(vDataUrl);
+        const cat = document.getElementById("fProdCategory").value;
+        const pid = document.getElementById("fProdId").value;
+        if (statusEl) statusEl.innerHTML = `<span class="text-success fw-semibold"><i class="bi bi-check-circle-fill"></i> Video loaded (${escHtml(file.name)})</span> • Path: <code>assets/Categories/${escHtml(cat)}/${escHtml(pid)}/video-1.mp4</code>`;
       };
       reader.readAsDataURL(file);
     }
 
-    function getCatalogProducts() {
-      let customList = null;
-      try {
-        const raw = localStorage.getItem("riddhi_custom_products_v1");
-        if (raw) customList = JSON.parse(raw);
-      } catch (e) {}
+    let inMemoryCatalogCache = null;
 
-      let list = Array.isArray(customList) && customList.length > 0
-        ? customList
-        : JSON.parse(JSON.stringify(PRODUCTS));
+    function getCatalogProducts() {
+      let list = [];
+      if (Array.isArray(inMemoryCatalogCache)) {
+        list = inMemoryCatalogCache;
+      } else {
+        try {
+          const raw = localStorage.getItem("riddhi_custom_products_v1");
+          if (raw !== null) {
+            const parsed = JSON.parse(raw);
+            list = Array.isArray(parsed) ? parsed : [];
+          } else {
+            list = Array.isArray(PRODUCTS) ? JSON.parse(JSON.stringify(PRODUCTS)) : [];
+          }
+        } catch (e) {
+          list = [];
+        }
+        inMemoryCatalogCache = list;
+      }
 
       let sizeStockMap = {};
       try {
@@ -594,6 +618,7 @@
     }
 
     function saveCatalogLocalOnly(list) {
+      inMemoryCatalogCache = list;
       const sizeStockMap = {};
       const flatStockMap = {};
 
@@ -607,9 +632,24 @@
         flatStockMap[p.id] = p.availableStock;
       });
 
-      localStorage.setItem("riddhi_custom_products_v1", JSON.stringify(list));
-      localStorage.setItem("riddhi_product_size_stock", JSON.stringify(sizeStockMap));
-      localStorage.setItem("riddhi_product_stock", JSON.stringify(flatStockMap));
+      try {
+        localStorage.setItem("riddhi_product_size_stock", JSON.stringify(sizeStockMap));
+        localStorage.setItem("riddhi_product_stock", JSON.stringify(flatStockMap));
+      } catch (e) {}
+
+      try {
+        localStorage.setItem("riddhi_custom_products_v1", JSON.stringify(list));
+      } catch (quotaErr) {
+        // If base64 media exceeds 5MB browser localStorage quota, strip inline video data URLs in localStorage copy while keeping images & full in-memory copy
+        try {
+          const compactList = list.map(p => ({
+            ...p,
+            video: String(p.video || "").startsWith("data:") ? "" : (p.video || ""),
+            images: (p.images || []).map((u, idx) => (String(u).startsWith("data:") && idx > 0) ? "" : u).filter(Boolean)
+          }));
+          localStorage.setItem("riddhi_custom_products_v1", JSON.stringify(compactList));
+        } catch (e2) {}
+      }
     }
 
     function getLocalSaveEndpointBase() {
@@ -628,7 +668,7 @@
           statusBadge.className = "badge bg-secondary";
           statusBadge.textContent = "Local Mode";
         }
-        return;
+        return { ok: true, localOnly: true };
       }
 
       if (statusBadge) {
@@ -673,8 +713,12 @@
             if (serverSaved) {
               const localList = getCatalogProducts();
               const idx = localList.findIndex(lp => lp.id === prodObj.id);
+              const bestImgs = (Array.isArray(prodObj.images) && prodObj.images.length > 0 && !prodObj.images.every(u => String(u).includes("Comming-Soon.png")))
+                ? prodObj.images
+                : (serverSaved.images || ["assets/Categories/Comming-Soon.png"]);
+              const bestVid = prodObj.video || serverSaved.video || "";
               if (idx > -1) {
-                localList[idx] = { ...localList[idx], ...serverSaved };
+                localList[idx] = { ...localList[idx], ...serverSaved, images: bestImgs, video: bestVid };
                 saveCatalogLocalOnly(localList);
               }
             }
@@ -683,25 +727,32 @@
             statusBadge.className = "badge bg-success";
             statusBadge.textContent = "Synced with Google Sheet ✓";
           }
+          return { ok: true };
         } else {
           if (statusBadge) {
             statusBadge.className = "badge bg-danger";
             statusBadge.textContent = "Sheet Sync Error";
           }
+          if (r && r.error === "auth") {
+            alert("Admin session expired! Please logout and login again so changes sync to Google Sheet.");
+          }
+          return { ok: false, error: (r && r.error) || "sync_error" };
         }
       } catch (e) {
         if (statusBadge) {
           statusBadge.className = "badge bg-warning text-dark";
           statusBadge.textContent = "Saved Locally (Offline)";
         }
+        return { ok: false, error: "network" };
       }
     }
 
     async function deleteProductFromGoogleSheet(prodId) {
       const sess = getAdminSessionObj();
+      const statusBadge = document.getElementById("sheetSyncStatusBadge");
       if (!sess || sess.mode !== "sheet" || !APPS_SCRIPT_URL) return;
       try {
-        await fetch(APPS_SCRIPT_URL, {
+        const res = await fetch(APPS_SCRIPT_URL, {
           method: "POST",
           headers: { "Content-Type": "text/plain;charset=utf-8" },
           body: JSON.stringify({
@@ -710,6 +761,15 @@
             productId: prodId
           })
         });
+        const r = await res.json();
+        if (r && r.ok) {
+          if (statusBadge) {
+            statusBadge.className = "badge bg-success";
+            statusBadge.textContent = "Deleted in Google Sheet ✓";
+          }
+        } else if (r && r.error === "auth") {
+          alert("Admin session expired! Please logout and login again to delete from Google Sheet.");
+        }
       } catch (e) {}
     }
 
@@ -731,53 +791,44 @@
         });
         const r = await res.json();
         if (r && r.ok) {
-          // Sync Categories if returned
-          if (Array.isArray(r.categories) && r.categories.length > 0) {
-            const delCats = (Array.isArray(r.deletedCategoryNames) ? r.deletedCategoryNames : []).map(x => x.toLowerCase());
-            const mergedCats = getEffectiveCategories().filter(c => !delCats.includes(c.name.toLowerCase()));
-            r.categories.forEach(sc => {
-              if (!sc || !sc.name || delCats.includes(sc.name.toLowerCase())) return;
-              const ci = mergedCats.findIndex(m => m.name.toLowerCase() === sc.name.toLowerCase());
-              if (ci > -1) {
-                const keepCatImg = (mergedCats[ci].image && !mergedCats[ci].image.includes("Comming-Soon.png")) ? mergedCats[ci].image : sc.image;
-                mergedCats[ci] = { ...mergedCats[ci], ...sc, image: keepCatImg };
-              } else {
-                mergedCats.push(sc);
-              }
+          const existingCats = getEffectiveCategories();
+          const delCats = (Array.isArray(r.deletedCategoryNames) ? r.deletedCategoryNames : []).map(x => x.toLowerCase());
+          const sheetCats = Array.isArray(r.categories) ? r.categories.filter(sc => sc && sc.name && !delCats.includes(sc.name.toLowerCase())) : [];
+          if (sheetCats.length > 0) {
+            const mergedCats = sheetCats.map(sc => {
+              const locC = existingCats.find(c => c.name.toLowerCase() === sc.name.toLowerCase());
+              const keepCatImg = (locC && locC.image && !locC.image.includes("Comming-Soon.png")) ? locC.image : (sc.image || "assets/Categories/Comming-Soon.png");
+              return { ...sc, image: keepCatImg };
             });
             localStorage.setItem("riddhi_custom_categories_v1", JSON.stringify(mergedCats));
             refreshCategoryDropdownsInAdminProducts();
           }
 
-          const localList = JSON.parse(JSON.stringify(PRODUCTS));
+          const existingProds = getCatalogProducts();
           const deletedIds = Array.isArray(r.deletedIds) ? r.deletedIds : [];
-          if (deletedIds.length > 0) {
-            for (let i = localList.length - 1; i >= 0; i--) {
-              if (deletedIds.includes(localList[i].id)) localList.splice(i, 1);
-            }
-          }
-          if (Array.isArray(r.products) && r.products.length > 0) {
-            r.products.forEach(sp => {
-              if (!sp || !sp.id || deletedIds.includes(sp.id)) return;
-              const idx = localList.findIndex(lp => lp.id === sp.id);
-              if (idx > -1) {
-                const keepImgs = (localList[idx].images && localList[idx].images.length && !localList[idx].images.every(u => String(u).includes("Comming-Soon.png"))) ? localList[idx].images : sp.images;
-                localList[idx] = { ...localList[idx], ...sp, images: keepImgs };
-              } else {
-                localList.unshift(sp);
-              }
-            });
-          }
-          if (r.sizeStock && typeof r.sizeStock === "object") {
-            localList.forEach(lp => {
-              if (r.sizeStock[lp.id] && Object.keys(r.sizeStock[lp.id]).length > 0) {
-                lp.sizeStock = { ...r.sizeStock[lp.id] };
-                lp.sizes = Object.keys(lp.sizeStock);
-                lp.availableStock = Object.values(lp.sizeStock).reduce((s, v) => s + (Math.max(0, parseInt(v, 10) || 0)), 0);
-              }
-            });
-          }
-          saveCatalogLocalOnly(localList);
+          const sheetProds = Array.isArray(r.products) ? r.products.filter(sp => sp && sp.id && !deletedIds.includes(sp.id)) : [];
+
+          const mergedProds = sheetProds.map(sp => {
+            const locP = existingProds.find(lp => lp.id === sp.id);
+            const locHasRealImgs = locP && Array.isArray(locP.images) && locP.images.length > 0 && !locP.images.every(u => String(u).includes("Comming-Soon.png"));
+            const keepImgs = locHasRealImgs ? locP.images : (Array.isArray(sp.images) && sp.images.length > 0 ? sp.images : ["assets/Categories/Comming-Soon.png"]);
+            const keepVid = (locP && locP.video) ? locP.video : (sp.video || "");
+            const szMap = (r.sizeStock && r.sizeStock[sp.id] && Object.keys(r.sizeStock[sp.id]).length > 0)
+              ? { ...r.sizeStock[sp.id] }
+              : (sp.sizeStock && Object.keys(sp.sizeStock).length > 0 ? { ...sp.sizeStock } : { "Free Size (Adjustable Dori)": Math.max(0, parseInt(sp.availableStock, 10) || 0) });
+            const szList = Object.keys(szMap);
+            const totSt = Object.values(szMap).reduce((s, v) => s + (Math.max(0, parseInt(v, 10) || 0)), 0);
+            return {
+              ...sp,
+              images: keepImgs,
+              video: keepVid,
+              sizes: szList,
+              sizeStock: szMap,
+              availableStock: totSt
+            };
+          });
+
+          saveCatalogLocalOnly(mergedProds);
           renderAdminProductsTable();
           onCategorySelectAutoId();
           if (statusBadge) {
@@ -1068,6 +1119,10 @@
           prev.src = "assets/Categories/Comming-Soon.png";
           if (n > 1) prev.classList.add("d-none");
         }
+        const pStatus = document.getElementById(`imgPathStatus${n}`);
+        if (pStatus) {
+          pStatus.textContent = n === 1 ? "Image 1: No file selected" : `Image ${n}: Optional`;
+        }
       });
       document.getElementById("fProdVideo").value = "";
       document.getElementById("videoFileStatus").textContent = "No video selected";
@@ -1090,7 +1145,11 @@
     function saveProductFromAdminPage(e) {
       e.preventDefault();
       const origId = document.getElementById("editingOriginalId").value.trim();
-      const category = document.getElementById("fProdCategory").value;
+      const category = String(document.getElementById("fProdCategory").value || "").trim();
+      if (!category) {
+        alert("Please add at least one Category first in Shop by Category Manager!");
+        return;
+      }
       const id = origId || generateNextProductIdForCategory(category);
       document.getElementById("fProdId").value = id;
 
@@ -1246,28 +1305,6 @@
 
     async function loadProductForEdit(prodId) {
       refreshCategoryDropdownsInAdminProducts();
-      const sess = getAdminSessionObj();
-      if (sess && sess.mode === "sheet" && APPS_SCRIPT_URL) {
-        try {
-          const r = await fetch(APPS_SCRIPT_URL, {
-            method: "POST",
-            headers: { "Content-Type": "text/plain;charset=utf-8" },
-            body: JSON.stringify({ action: "getProducts" })
-          });
-          const data = await r.json();
-          if (data && data.ok && Array.isArray(data.products)) {
-            const srvProd = data.products.find(x => x.id === prodId);
-            if (srvProd) {
-              const curList = getCatalogProducts();
-              const idx = curList.findIndex(x => x.id === prodId);
-              if (idx > -1) {
-                curList[idx] = { ...curList[idx], ...srvProd };
-                saveCatalogLocalOnly(curList);
-              }
-            }
-          }
-        } catch (e) {}
-      }
       const list = getCatalogProducts();
       const prod = list.find(p => p.id === prodId);
       if (!prod) return;
@@ -1299,12 +1336,19 @@
       document.getElementById("fProdNewArrival").checked = !!prod.isNewArrival;
       updateTargetFolderHint();
 
+      const imgsArr = Array.isArray(prod.images) ? prod.images : [];
       [1, 2, 3].forEach(n => {
-        const val = (prod.images && prod.images[n - 1]) || "";
-        document.getElementById(`fProdImg${n}`).value = val;
+        const val = String(imgsArr[n - 1] || "").trim();
+        const hidInp = document.getElementById(`fProdImg${n}`);
         const prev = document.getElementById(`previewImg${n}`);
+        const fileInp = document.getElementById(`fProdImgFile${n}`);
+        const pathEl = document.getElementById(`imgPathStatus${n}`);
+        const expectedImgPath = `assets/Categories/${targetCat}/${prod.id}/image-${n}.jpg`;
+        if (fileInp) fileInp.value = "";
+        if (hidInp) hidInp.value = val;
         if (prev) {
           if (val) {
+            prev.onerror = function () { this.onerror = null; this.src = "assets/Categories/Comming-Soon.png"; };
             prev.src = val;
             prev.classList.remove("d-none");
           } else {
@@ -1312,13 +1356,25 @@
             if (n > 1) prev.classList.add("d-none");
           }
         }
+        if (pathEl) {
+          if (val) {
+            const shownPath = val.startsWith("data:") ? expectedImgPath : val;
+            pathEl.innerHTML = `<span class="text-success fw-semibold"><i class="bi bi-image-fill me-1"></i>Loaded</span> • Path: <code>${escHtml(shownPath)}</code>`;
+          } else {
+            pathEl.innerHTML = `No image selected (Target path: <code>${escHtml(expectedImgPath)}</code>)`;
+          }
+        }
       });
 
-      document.getElementById("fProdVideo").value = prod.video || "";
-      document.getElementById("videoFileStatus").innerHTML = prod.video
-        ? `<span class="text-success fw-semibold"><i class="bi bi-camera-video-fill me-1"></i>Existing video loaded</span> (browse new file to replace)`
-        : "No video selected";
-      renderAdminVideoPreview(prod.video || "");
+      const vidVal = String(prod.video || "").trim();
+      const vidFileInp = document.getElementById("fProdVideoFile");
+      if (vidFileInp) vidFileInp.value = "";
+      document.getElementById("fProdVideo").value = vidVal;
+      const expectedVidPath = `assets/Categories/${targetCat}/${prod.id}/video-1.mp4`;
+      document.getElementById("videoFileStatus").innerHTML = vidVal
+        ? `<span class="text-success fw-semibold"><i class="bi bi-camera-video-fill me-1"></i>Video loaded</span> • Path: <code>${escHtml(vidVal.startsWith("data:") ? expectedVidPath : vidVal)}</code>`
+        : `No video selected (Target path: <code>${escHtml(expectedVidPath)}</code>)`;
+      renderAdminVideoPreview(vidVal);
       document.getElementById("fProdDesc").value = prod.desc || "";
 
       const szContainer = document.getElementById("dynamicSizesContainer");
@@ -1437,7 +1493,7 @@
           <tr>
             <td>
               <div class="d-flex align-items-center gap-2">
-                <img src="${escHtml(thumb)}" class="prod-thumb-admin" alt="">
+                <img src="${escHtml(thumb)}" class="prod-thumb-admin" referrerpolicy="no-referrer" alt="">
                 <div>
                   <div class="fw-bold small text-dark">${escHtml(p.name)}</div>
                   <div class="text-muted" style="font-size: 11px;">

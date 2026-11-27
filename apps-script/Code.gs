@@ -3,8 +3,8 @@
  */
 
 // ====== SIRF YE 2 LINES BADLEIN ======
-const ADMIN_USERNAME = 'Admin';
-const ADMIN_PASSWORD = 'Admin@2026';
+const ADMIN_USERNAME = 'Riddhi';
+const ADMIN_PASSWORD = 'Riddhi@2026';
 // =====================================
 
 const SHEET_NAME = 'Orders';
